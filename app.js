@@ -611,8 +611,19 @@ function showFatal(message) {
   el.textContent = `Ошибка JS:\\n${String(message).slice(0, 600)}\\n\\nОткройте DevTools -> Console и пришлите первую ошибку.`;
 }
 
+let cloudPushTimer = null;
+function scheduleCloudSync() {
+  if (!state.cloud?.enabled || !state.cloud?.token) return;
+  if (!state.encryption?.enabled || state.__locked || !state.__cryptoKey) return;
+  clearTimeout(cloudPushTimer);
+  cloudPushTimer = setTimeout(() => {
+    cloudPush().catch(() => {});
+  }, 4000);
+}
+
 function save() {
   saveState(state).catch(() => {});
+  scheduleCloudSync();
 }
 
 function ensureTodaySteps() {
