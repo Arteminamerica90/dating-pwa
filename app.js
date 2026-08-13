@@ -132,6 +132,7 @@ const STEP_BUCKETS = [
 const DATING_PROFILES = [
   {
     id: 'p1',
+    likesYou: true,
     name: 'Алина',
     age: 26,
     city: 'Moscow',
@@ -173,6 +174,7 @@ const DATING_PROFILES = [
   },
   {
     id: 'p2',
+    likesYou: true,
     name: 'Илья',
     age: 29,
     city: 'Moscow',
@@ -214,6 +216,7 @@ const DATING_PROFILES = [
   },
   {
     id: 'p3',
+    likesYou: false,
     name: 'Катя',
     age: 24,
     city: 'Saint Petersburg',
@@ -255,6 +258,7 @@ const DATING_PROFILES = [
   },
   {
     id: 'p4',
+    likesYou: true,
     name: 'Данил',
     age: 31,
     city: 'Kazan',
@@ -639,6 +643,10 @@ function wireTabs() {
       document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b === btn));
       document.querySelectorAll('.view').forEach((v) => v.classList.add('hidden'));
       $(`#view-${tab}`).classList.remove('hidden');
+      if (tab !== 'home' && state?.messages?.openChat) {
+        state.messages.openChat = null;
+        save();
+      }
       haptic('tab');
       renderAll();
     });
@@ -1482,6 +1490,45 @@ function renderQuestionnaireBlocks(profile = state.profile) {
     .join('');
 }
 
+// Горизонтальная лента вопросов (слева направо). Личные данные — в начале.
+function renderQuestionnaireStrip(profile = state.profile) {
+  const answers = getQuestionnaireAnswers(profile);
+  const ordered = [];
+  for (const cat of CATEGORY_ORDER) {
+    for (const q of ALL_QUESTIONS) {
+      if (q.category === cat) ordered.push(q);
+    }
+  }
+  for (const q of ALL_QUESTIONS) {
+    if (!q.category) ordered.push(q);
+  }
+
+  const cards = ordered
+    .map((q) => {
+      const selected = answers[q.id];
+      const catLabel = q.category ? CATEGORY_LABELS[q.category] || q.category : q.block || 'Психология';
+      const opts = q.options
+        .map((opt) => {
+          const active = selected === opt.id;
+          return `<button class="chip questionnaire-chip ${active ? 'active' : ''}" type="button" data-question-answer="${q.id}" data-option="${opt.id}"><span>${escapeHtml(opt.label)}</span>${opt.hint ? `<small>${escapeHtml(opt.hint)}</small>` : ''}</button>`;
+        })
+        .join('');
+      return `
+        <div class="qn-mini-card">
+          <div class="qn-mini-cat">${escapeHtml(catLabel)}</div>
+          <div class="qn-mini-title">${escapeHtml(q.question)}</div>
+          <div class="chip-row questionnaire-options">${opts}</div>
+        </div>
+      `;
+    })
+    .join('');
+
+  return `
+    <div class="muted" style="margin-top:14px">Все вопросы доступны здесь: листайте карточки слева направо, отвечайте кликом по варианту. Личные данные — в начале.</div>
+    <div class="qn-strip">${cards}</div>
+  `;
+}
+
 function renderQuestionnaireCategories(profile = state.profile) {
   const answers = getQuestionnaireAnswers(profile);
   const cats = answeredCategories(answers);
@@ -1834,22 +1881,34 @@ function renderHomeFeedHtml() {
   `;
 }
 
-function getMessageThreadIds() {
+function profileLikesYou(id) {
+  const p = DATING_PROFILES.find((x) => x.id === id);
+  return !!(p && p.likesYou);
+}
+
+// Матч засчитывается только когда оба человека поставили друг другу лайк.
+function getMutualMatches() {
+  const likes = state.dating.likes || {};
+  const qualified = (id) => likes[id] === 'like' && profileLikesYou(id);
+  const out = [];
   const seen = new Set();
-  const ids = [];
   for (const id of state.dating.matches || []) {
-    if (!seen.has(id)) {
+    if (qualified(id) && !seen.has(id)) {
       seen.add(id);
-      ids.push(id);
+      out.push(id);
     }
   }
-  for (const profile of DATING_PROFILES) {
-    if (!seen.has(profile.id)) {
-      seen.add(profile.id);
-      ids.push(profile.id);
+  for (const id of Object.keys(likes)) {
+    if (qualified(id) && !seen.has(id)) {
+      seen.add(id);
+      out.push(id);
     }
   }
-  return ids;
+  return out;
+}
+
+function getMessageThreadIds() {
+  return getMutualMatches();
 }
 
 function ensureMessageThread(profileId) {
@@ -1892,60 +1951,19 @@ function formatMessageTime(ts) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function renderHomeMessagesHtml() {
-  const threadIds = getMessageThreadIds();
-  if (!state.messages?.activeThreadId || !threadIds.includes(state.messages.activeThreadId)) {
-    state.messages = state.messages || { activeThreadId: null, threads: {} };
-    state.messages.activeThreadId = threadIds[0] || null;
-  }
-
-  const activeId = state.messages.activeThreadId;
-  const activeProfile = DATING_PROFILES.find((x) => x.id === activeId) || DATING_PROFILES[0];
-  const thread = activeId ? ensureMessageThread(activeId) : null;
+function renderChatScreen(profileId) {
+  const profile = DATING_PROFILES.find((x) => x.id === profileId) || DATING_PROFILES[0];
+  const thread = ensureMessageThread(profileId);
   const messages = thread?.messages || [];
-
-  const list = threadIds.length
-    ? threadIds
-        .map((id) => {
-          const profile = DATING_PROFILES.find((x) => x.id === id);
-          if (!profile) return '';
-          const t = ensureMessageThread(id);
-          const lastMsg = t.messages?.[t.messages.length - 1];
-          const unread = !!t.unread;
-          return `
-            <button class="chat-item ${id === activeId ? 'active' : ''}" type="button" data-chat-id="${id}">
-              <div class="chat-avatar-wrap ${unread ? 'unread' : ''}">
-                <img class="chat-avatar" src="${profile.photos?.[0] || './assets/profile/avatar-square.jpg'}" alt="${escapeHtml(profile.name)}" />
-              </div>
-              <div class="chat-main">
-                <div class="chat-topline">
-                  <div class="chat-name">${escapeHtml(profile.name)}, ${profile.age}</div>
-                  <div class="chat-time">${lastMsg ? formatMessageTime(lastMsg.ts) : ''}</div>
-                </div>
-                <div class="chat-preview">${escapeHtml(lastMsg?.text || profile.about || 'Новое совпадение')}</div>
-              </div>
-            </button>
-          `;
-        })
-        .join('')
-    : `<div class="muted">Пока нет чатов. Поставьте лайк, чтобы появился диалог.</div>`;
-
-  const matches = state.dating.matches || [];
-  const seenMatches = state.dating.seenMatches || {};
-  const matchesStrip = matches.length
-    ? `<div class="matches-strip">${matches
-        .map((id) => renderMatchCard(id, { seen: !!seenMatches[id] }))
-        .join('')}</div>`
-    : `<div class="muted">Пока нет матчей.</div>`;
-
-  const convo = activeProfile
-    ? `
-      <div class="chat-thread-head">
+  return `
+    <div class="card chat-screen">
+      <div class="chat-screen-head">
+        <button class="btn ghost chat-back" type="button" data-chat-back>← Назад</button>
         <div class="chat-thread-user">
-          <img class="chat-thread-avatar" src="${activeProfile.photos?.[0] || './assets/profile/avatar-square.jpg'}" alt="${escapeHtml(activeProfile.name)}" />
+          <img class="chat-thread-avatar" src="${profile.photos?.[0] || './assets/profile/avatar-square.jpg'}" alt="${escapeHtml(profile.name)}" />
           <div>
-            <div class="chat-thread-name">${escapeHtml(activeProfile.name)}, ${activeProfile.age}</div>
-            <div class="chat-thread-meta">${cityLabel(activeProfile.city)} • ${escapeHtml(activeProfile.jobTitle || '')}</div>
+            <div class="chat-thread-name">${escapeHtml(profile.name)}, ${profile.age}</div>
+            <div class="chat-thread-meta">${cityLabel(profile.city)} • ${escapeHtml(profile.jobTitle || '')}</div>
           </div>
         </div>
       </div>
@@ -1965,8 +1983,55 @@ function renderHomeMessagesHtml() {
         <input id="chatInput" class="input" placeholder="Написать сообщение..." />
         <button class="btn" type="button" data-action="sendChat">Отправить</button>
       </div>
-    `
-    : `<div class="muted">Выберите чат слева.</div>`;
+    </div>
+  `;
+}
+
+function renderHomeMessagesHtml() {
+  const matches = getMutualMatches();
+  const threadIds = getMessageThreadIds();
+
+  state.messages = state.messages || { activeThreadId: null, threads: {} };
+
+  const openChat = state.messages.openChat && threadIds.includes(state.messages.openChat) ? state.messages.openChat : null;
+  if (openChat) return renderChatScreen(openChat);
+
+  if (!threadIds.includes(state.messages.activeThreadId)) {
+    state.messages.activeThreadId = threadIds[0] || null;
+  }
+
+  const seenMatches = state.dating.seenMatches || {};
+  const matchesStrip = matches.length
+    ? `<div class="matches-strip">${matches
+        .map((id) => renderMatchCard(id, { seen: !!seenMatches[id] }))
+        .join('')}</div>`
+    : `<div class="muted">Пока нет матчей. Матч появляется, когда вы оба поставите друг другу лайк.</div>`;
+
+  const list = threadIds.length
+    ? threadIds
+        .map((id) => {
+          const profile = DATING_PROFILES.find((x) => x.id === id);
+          if (!profile) return '';
+          const t = ensureMessageThread(id);
+          const lastMsg = t.messages?.[t.messages.length - 1];
+          const unread = !!t.unread;
+          return `
+            <button class="chat-item" type="button" data-chat-id="${id}">
+              <div class="chat-avatar-wrap ${unread ? 'unread' : ''}">
+                <img class="chat-avatar" src="${profile.photos?.[0] || './assets/profile/avatar-square.jpg'}" alt="${escapeHtml(profile.name)}" />
+              </div>
+              <div class="chat-main">
+                <div class="chat-topline">
+                  <div class="chat-name">${escapeHtml(profile.name)}, ${profile.age}</div>
+                  <div class="chat-time">${lastMsg ? formatMessageTime(lastMsg.ts) : ''}</div>
+                </div>
+                <div class="chat-preview">${escapeHtml(lastMsg?.text || profile.about || 'Новое совпадение')}</div>
+              </div>
+            </button>
+          `;
+        })
+        .join('')
+    : `<div class="muted">Пока нет чатов. Поставьте лайк — диалог появится при взаимном лайке.</div>`;
 
   return `
     <div class="card">
@@ -1974,14 +2039,9 @@ function renderHomeMessagesHtml() {
       ${matchesStrip}
     </div>
 
-    <div class="messages-shell">
-      <div class="card messages-list-card">
-        <div class="card-title">Чаты</div>
-        <div class="messages-list">${list}</div>
-      </div>
-      <div class="card messages-thread-card">
-        ${convo}
-      </div>
+    <div class="card">
+      <div class="card-title">Чаты</div>
+      <div class="messages-list">${list}</div>
     </div>
   `;
 }
@@ -2023,12 +2083,34 @@ function wireHomeContentHandlers(rootSelector) {
   });
   root.querySelectorAll('[data-chat-id]').forEach((b) => {
     b.addEventListener('click', () => {
+      const chatId = b.dataset.chatId;
       state.messages = state.messages || { activeThreadId: null, threads: {} };
-      state.messages.activeThreadId = b.dataset.chatId;
-      const t = ensureMessageThread(b.dataset.chatId);
+      state.messages.activeThreadId = chatId;
+      state.messages.openChat = chatId;
+      const t = ensureMessageThread(chatId);
       t.unread = false;
       state.dating.seenMatches = state.dating.seenMatches || {};
-      state.dating.seenMatches[b.dataset.chatId] = true;
+      state.dating.seenMatches[chatId] = true;
+      save();
+      renderAll();
+    });
+  });
+  root.querySelectorAll('[data-chat-back]').forEach((b) => {
+    b.addEventListener('click', () => {
+      state.messages = state.messages || {};
+      state.messages.openChat = null;
+      save();
+      renderAll();
+    });
+  });
+  root.querySelectorAll('[data-match-id]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const matchId = el.dataset.matchId;
+      if (!matchId) return;
+      state.dating.seenMatches = state.dating.seenMatches || {};
+      state.dating.seenMatches[matchId] = true;
+      state.messages = state.messages || { activeThreadId: null, threads: {} };
+      state.messages.openChat = matchId;
       save();
       renderAll();
     });
@@ -2528,6 +2610,7 @@ function renderStats() {
           <span class="pill">${portrait.answered || 0}/${portrait.total || ALL_QUESTIONS.length}</span>
         </div>
         ${renderQuestionnaireCategories(state.profile)}
+        ${renderQuestionnaireStrip(state.profile)}
       </div>
 
       <div class="card">
@@ -3033,13 +3116,14 @@ function renderGeoItem(p) {
 
 function onLike(id) {
   state.dating.likes[id] = 'like';
-  // Demo matching: if interest overlap >= 2 => match.
-  const p = DATING_PROFILES.find((x) => x.id === id);
-  const overlap = overlapCount(new Set(state.profile.interests || []), new Set(p?.interests || []));
-  if (overlap >= 2 && !state.dating.matches.includes(id)) {
-    state.dating.matches.unshift(id);
+  const mutual = profileLikesYou(id);
+  state.dating.matches = (state.dating.matches || []).filter((x) => x !== id);
+  if (mutual) state.dating.matches.unshift(id);
+
+  if (mutual) {
     state.messages = state.messages || { activeThreadId: null, threads: {} };
     state.messages.activeThreadId = id;
+    state.messages.openChat = id;
     state.ui = state.ui || {};
     state.ui.homePanel = 'messages';
     haptic('match');
@@ -3047,10 +3131,9 @@ function onLike(id) {
     save();
     switchTab('home');
     return;
-  } else {
-    haptic('like');
-    toast('Лайк');
   }
+  haptic('like');
+  toast('Лайк отправлен');
   save();
   renderAll();
 }
