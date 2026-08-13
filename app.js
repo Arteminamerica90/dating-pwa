@@ -1507,16 +1507,23 @@ function activeQuestionnaireCategory() {
   return cats.some((c) => c.id === active) ? active : cats[0].id;
 }
 
-// Категории-кнопки с горизонтальной прокруткой (влево/вправо).
+// Категории-кнопки — бесконечная карусель слева направо.
 function renderQuestionnaireCategoryNav() {
   const active = activeQuestionnaireCategory();
-  const buttons = getQuestionnaireCategories()
+  const chips = getQuestionnaireCategories()
     .map((c) => {
       const count = questionsForQuestionnaireCategory(c.id).length;
       return `<button class="chip qn-cat-chip ${active === c.id ? 'active' : ''}" type="button" data-qn-cat="${c.id}">${escapeHtml(c.label)} (${count})</button>`;
     })
     .join('');
-  return `<div class="qn-cat-strip">${buttons}</div>`;
+  const dur = Math.max(14, chips.length * 1.6);
+  return `
+    <div class="qn-cat-strip">
+      <div class="qn-cat-track" style="--qn-marquee-dur:${dur}s">
+        <div class="qn-cat-half">${chips}</div>
+        <div class="qn-cat-half" aria-hidden="true">${chips}</div>
+      </div>
+    </div>`;
 }
 
 // Вопросы выбранной категории — вертикальная прокрутка (сверху вниз).
