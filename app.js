@@ -1490,43 +1490,58 @@ function renderQuestionnaireBlocks(profile = state.profile) {
     .join('');
 }
 
-// Горизонтальная лента вопросов (слева направо). Личные данные — в начале.
-function renderQuestionnaireStrip(profile = state.profile) {
-  const answers = getQuestionnaireAnswers(profile);
-  const ordered = [];
-  for (const cat of CATEGORY_ORDER) {
-    for (const q of ALL_QUESTIONS) {
-      if (q.category === cat) ordered.push(q);
-    }
-  }
-  for (const q of ALL_QUESTIONS) {
-    if (!q.category) ordered.push(q);
-  }
+function getQuestionnaireCategories() {
+  const cats = CATEGORY_ORDER.map((c) => ({ id: c, label: CATEGORY_LABELS[c] || c }));
+  cats.push({ id: 'psych', label: 'Психология' });
+  return cats;
+}
 
-  const cards = ordered
+function questionsForQuestionnaireCategory(catId) {
+  if (catId === 'psych') return ALL_QUESTIONS.filter((q) => !q.category);
+  return ALL_QUESTIONS.filter((q) => q.category === catId);
+}
+
+function activeQuestionnaireCategory() {
+  const active = state.ui?.qnCategory;
+  const cats = getQuestionnaireCategories();
+  return cats.some((c) => c.id === active) ? active : cats[0].id;
+}
+
+// Категории-кнопки с горизонтальной прокруткой (влево/вправо).
+function renderQuestionnaireCategoryNav() {
+  const active = activeQuestionnaireCategory();
+  const buttons = getQuestionnaireCategories()
+    .map((c) => {
+      const count = questionsForQuestionnaireCategory(c.id).length;
+      return `<button class="chip qn-cat-chip ${active === c.id ? 'active' : ''}" type="button" data-qn-cat="${c.id}">${escapeHtml(c.label)} (${count})</button>`;
+    })
+    .join('');
+  return `<div class="qn-cat-strip">${buttons}</div>`;
+}
+
+// Вопросы выбранной категории — вертикальная прокрутка (сверху вниз).
+function renderQuestionnaireCategoryQuestions(profile = state.profile) {
+  const answers = getQuestionnaireAnswers(profile);
+  const active = activeQuestionnaireCategory();
+  const items = questionsForQuestionnaireCategory(active)
     .map((q) => {
       const selected = answers[q.id];
-      const catLabel = q.category ? CATEGORY_LABELS[q.category] || q.category : q.block || 'Психология';
       const opts = q.options
         .map((opt) => {
-          const active = selected === opt.id;
-          return `<button class="chip questionnaire-chip ${active ? 'active' : ''}" type="button" data-question-answer="${q.id}" data-option="${opt.id}"><span>${escapeHtml(opt.label)}</span>${opt.hint ? `<small>${escapeHtml(opt.hint)}</small>` : ''}</button>`;
+          const activeOpt = selected === opt.id;
+          return `<button class="chip questionnaire-chip ${activeOpt ? 'active' : ''}" type="button" data-question-answer="${q.id}" data-option="${opt.id}"><span>${escapeHtml(opt.label)}</span>${opt.hint ? `<small>${escapeHtml(opt.hint)}</small>` : ''}</button>`;
         })
         .join('');
       return `
-        <div class="qn-mini-card">
-          <div class="qn-mini-cat">${escapeHtml(catLabel)}</div>
-          <div class="qn-mini-title">${escapeHtml(q.question)}</div>
+        <div class="question-block">
+          <div class="question-title">${escapeHtml(q.question)}</div>
           <div class="chip-row questionnaire-options">${opts}</div>
         </div>
       `;
     })
     .join('');
-
-  return `
-    <div class="muted" style="margin-top:14px">Все вопросы доступны здесь: листайте карточки слева направо, отвечайте кликом по варианту. Личные данные — в начале.</div>
-    <div class="qn-strip">${cards}</div>
-  `;
+  if (!items) return `<div class="muted">В этой категории пока нет вопросов.</div>`;
+  return `<div class="qn-question-list">${items}</div>`;
 }
 
 function renderQuestionnaireCategories(profile = state.profile) {
@@ -2610,7 +2625,9 @@ function renderStats() {
           <span class="pill">${portrait.answered || 0}/${portrait.total || ALL_QUESTIONS.length}</span>
         </div>
         ${renderQuestionnaireCategories(state.profile)}
-        ${renderQuestionnaireStrip(state.profile)}
+        <div class="muted" style="margin-top:12px">Категории-кнопки листаются слева направо; вопросы выбранной категории — сверху вниз.</div>
+        ${renderQuestionnaireCategoryNav()}
+        ${renderQuestionnaireCategoryQuestions(state.profile)}
       </div>
 
       <div class="card">
@@ -2710,6 +2727,16 @@ function renderStats() {
   });
 
   $('#view-stats').querySelector('[data-action="openQuestionnaire"]')?.addEventListener('click', openQuestionnaire);
+
+  $('#view-stats').querySelectorAll('[data-qn-cat]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.ui = state.ui || {};
+      state.ui.qnCategory = btn.dataset.qnCat;
+      save();
+      renderAll();
+      haptic('light');
+    });
+  });
 
   $('#view-stats').querySelector('[data-action="toggleSteps"]')?.addEventListener('click', async () => {
     if (state.consent.steps && stepCounter?.running) {
