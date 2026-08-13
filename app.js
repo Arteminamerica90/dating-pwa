@@ -553,10 +553,6 @@ function boot() {
     startGeoIfNeeded();
     startStepsIfNeeded();
   }
-
-  window.addEventListener('online', () => updateFooter());
-  window.addEventListener('offline', () => updateFooter());
-  updateFooter();
 }
 
 async function safeLoadState() {
@@ -1270,7 +1266,6 @@ function renderAll() {
   renderDating();
   renderStats();
   renderCircle();
-  updateFooter();
 }
 
 function maybeStartOnboarding() {
@@ -1833,11 +1828,6 @@ function renderHomeFeedHtml() {
           <button class="btn ghost" type="button" data-open-tab="dating">Подобрать пару</button>
         </div>
       </div>
-
-      <div class="card">
-        <div class="card-title">Приватность</div>
-        <div class="muted">Это демо хранит данные локально. Для реального продукта нужны: явное согласие, минимизация данных, шифрование, сроки хранения, возможность удаления и экспорт.</div>
-      </div>
     </div>
   `;
 }
@@ -2281,6 +2271,66 @@ function categorizeEvents(list) {
   })).filter((g) => g.events.length || g.id === 'culture');
 }
 
+function renderTreeFilterGroup(catId, label, questions, tree, catKey) {
+  const qs = questions.filter((q) => (catKey ? q.category === catKey : !q.category));
+  const selectedCount = qs.reduce((n, q) => n + ((tree[q.id] || []).length ? 1 : 0), 0);
+  return `
+    <div class="tree-filter-cat">
+      <button class="tree-filter-cat-head" type="button" data-tree-filter-cat="${catId}" aria-expanded="false">
+        <span>${escapeHtml(label)}</span>
+        ${selectedCount ? `<span class="pill">${selectedCount}</span>` : ''}
+        <span class="chevron" aria-hidden="true"></span>
+      </button>
+      <div class="tree-filter-body" hidden>
+        ${qs
+          .map((q) => {
+            const sel = new Set(tree[q.id] || []);
+            const opts = q.options
+              .map((o) => {
+                const active = sel.has(o.id);
+                return `<button class="chip ${active ? 'active' : ''}" type="button" data-tree-answer="${q.id}" data-option="${o.id}">${escapeHtml(o.label)}</button>`;
+              })
+              .join('');
+            return `<div class="tree-filter-q"><div class="muted">${escapeHtml(q.question)}</div><div class="chip-row">${opts}</div></div>`;
+          })
+          .join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderTreeFilters(filters = {}) {
+  const tree = filters.tree || {};
+  const cats = CATEGORY_ORDER.map((catId) =>
+    renderTreeFilterGroup(catId, CATEGORY_LABELS[catId] || catId, FULL_QUESTIONNAIRE, tree, catId)
+  ).join('');
+  const psych = renderTreeFilterGroup('psych', 'Психология', QUESTIONNAIRE, tree);
+  const totalActive = Object.values(tree).reduce((n, a) => n + a.length, 0);
+  return `
+    <div class="filter-group">
+      <div class="label">Анкета (дерево решений)${totalActive ? ` <span class="pill">${totalActive}</span>` : ''}</div>
+      <div class="tree-filter">${cats}${psych}</div>
+      ${totalActive ? '<button class="btn ghost" type="button" data-tree-filter-reset>Сбросить фильтры анкеты</button>' : ''}
+    </div>
+  `;
+}
+
+function matchesTreeFilters(p, treeFilter = {}) {
+  for (const [qid, opts] of Object.entries(treeFilter)) {
+    if (!Array.isArray(opts) || !opts.length) continue;
+    const q = ALL_QUESTIONS.find((x) => x.id === qid);
+    if (!q) continue;
+    const matches = opts.some((optId) => {
+      const opt = q.options.find((o) => o.id === optId);
+      if (!opt) return false;
+      if (q.category) return p.factual?.[q.category] === opt.value;
+      return Object.entries(getOptionTraits(q, opt)).some(([dim, val]) => p.persona?.[dim] === val);
+    });
+    if (!matches) return false;
+  }
+  return true;
+}
+
 function renderDating() {
   const cityKey = currentCityKey();
   const userPortrait = buildQuestionnairePortrait(state.profile?.questionnaireAnswers || {});
@@ -2297,6 +2347,8 @@ function renderDating() {
   const stepsBucket = String(filters.stepsBucket || '');
 
   const candidates = DATING_PROFILES.filter((p) => {
+    if (!matchesTreeFilters(p, filters.tree)) return false;
+
     if (selectedIntents.size) {
       const intents = new Set(p.meetingIntent || []);
       if (!overlapCount(selectedIntents, intents)) return false;
@@ -2371,6 +2423,7 @@ function renderDating() {
               }).join('')}
             </div>
           </div>
+          ${renderTreeFilters(filters)}
         </div>
       </div>
 
@@ -2434,6 +2487,40 @@ function renderDating() {
     });
   });
 
+  $('#view-dating').querySelectorAll('[data-tree-filter-cat]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const body = btn.closest('.tree-filter-cat')?.querySelector('.tree-filter-body');
+      if (!body) return;
+      const open = body.hidden;
+      body.hidden = !open;
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  });
+
+  $('#view-dating').querySelectorAll('[data-tree-answer]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const qid = btn.dataset.treeAnswer;
+      const optId = btn.dataset.option;
+      state.dating.filters = state.dating.filters || {};
+      state.dating.filters.tree = state.dating.filters.tree || {};
+      const cur = new Set(state.dating.filters.tree[qid] || []);
+      if (cur.has(optId)) cur.delete(optId);
+      else cur.add(optId);
+      if (cur.size) state.dating.filters.tree[qid] = [...cur];
+      else delete state.dating.filters.tree[qid];
+      if (!Object.keys(state.dating.filters.tree).length) delete state.dating.filters.tree;
+      save();
+      renderAll();
+    });
+  });
+
+  $('#view-dating').querySelector('[data-tree-filter-reset]')?.addEventListener('click', () => {
+    state.dating.filters = state.dating.filters || {};
+    delete state.dating.filters.tree;
+    save();
+    renderAll();
+  });
+
   $('#view-dating').querySelectorAll('[data-filter-range]').forEach((el) => {
     el.addEventListener('input', () => {
       const key = el.dataset.filterRange;
@@ -2481,6 +2568,11 @@ function renderStats() {
   const stepsOn = !!state.consent?.steps;
   const stepsRunning = !!stepCounter?.running;
   const portrait = buildQuestionnairePortrait(state.profile?.questionnaireAnswers || {});
+  const catsInfo = portrait.categories || {};
+  const catsProgress = {
+    done: Object.values(catsInfo).filter((c) => c.answered > 0).length,
+    total: Object.keys(catsInfo).length
+  };
   const recs = Array.isArray(state.circle?.recommendations) ? state.circle.recommendations : [];
   const selfKey = normText(state.profile?.name || 'вы');
   const selfRecs = recs.filter((r) => normText(r.candidateName || r.candidateId || '') === selfKey && r.accepted);
@@ -2570,7 +2662,14 @@ function renderStats() {
           <button class="btn" type="button" data-action="openQuestionnaire">${portrait.answered ? 'Продолжить анкету' : 'Пройти анкету'}</button>
           <span class="pill">${portrait.answered || 0}/${portrait.total || ALL_QUESTIONS.length}</span>
         </div>
-        ${renderQuestionnaireCategories(state.profile)}
+        <button class="accordion-head" type="button" data-tree-toggle aria-expanded="${state.ui?.treeOpen ? 'true' : 'false'}">
+          <span class="accordion-title">Дерево решений — категории</span>
+          <span class="pill">${catsProgress.done}/${CATEGORY_ORDER.length}</span>
+          <span class="chevron" aria-hidden="true"></span>
+        </button>
+        <div class="accordion-body" ${state.ui?.treeOpen ? '' : 'hidden'}>
+          ${renderQuestionnaireCategories(state.profile)}
+        </div>
       </div>
 
       <div class="card">
@@ -2670,6 +2769,13 @@ function renderStats() {
   });
 
   $('#view-stats').querySelector('[data-action="openQuestionnaire"]')?.addEventListener('click', openQuestionnaire);
+
+  $('#view-stats').querySelector('[data-tree-toggle]')?.addEventListener('click', () => {
+    state.ui = state.ui || {};
+    state.ui.treeOpen = !state.ui.treeOpen;
+    save();
+    renderAll();
+  });
 
   $('#view-stats').querySelector('[data-action="toggleSteps"]')?.addEventListener('click', async () => {
     if (state.consent.steps && stepCounter?.running) {
@@ -3509,14 +3615,6 @@ function formatEventDate(iso) {
 function switchTab(tab) {
   const btn = document.querySelector(`.tab[data-tab="${tab}"]`);
   if (btn) btn.click();
-}
-
-function updateFooter() {
-  const el = $('#footerStatus');
-  const online = navigator.onLine;
-  const geo = state.consent.geo ? 'geo:on' : 'geo:off';
-  const steps = state.consent.steps ? 'steps:on' : 'steps:off';
-  el.textContent = `${online ? 'Онлайн' : 'Оффлайн'} • ${geo} • ${steps}`;
 }
 
 function toast(msg) {

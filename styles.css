@@ -140,24 +140,6 @@ a { color: inherit; }
 .view { display: block; }
 .hidden { display: none; }
 
-.footer {
-  position: fixed;
-  left: 50%;
-  right: auto;
-  transform: translateX(-50%);
-  width: min(640px, calc(100% - 28px));
-  bottom: calc(96px + env(safe-area-inset-bottom));
-  padding: 12px 14px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(16px);
-  box-shadow: 0 18px 60px rgba(15, 23, 42, 0.14);
-}
-@media (max-width: 560px) {
-  .footer { bottom: calc(108px + env(safe-area-inset-bottom)); }
-}
-
 .muted { color: var(--muted); line-height: 1.35; }
 
 .grid {
@@ -829,6 +811,64 @@ a { color: inherit; }
   gap: 10px;
 }
 
+.accordion-head,
+.tree-filter-cat-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.accordion-head { margin-top: 12px; }
+
+.accordion-title,
+.tree-filter-cat-head > span:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.chevron {
+  flex: 0 0 auto;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid currentColor;
+  transition: transform 0.2s ease;
+}
+
+[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+
+.accordion-body { margin-top: 12px; }
+
+.tree-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.tree-filter-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px 12px 2px;
+}
+
+.tree-filter-body[hidden],
+.accordion-body[hidden] { display: none; }
+
+.tree-filter-q .muted { margin-bottom: 6px; font-size: 13px; }
+
 .filter-select,
 .range {
   width: 100%;
@@ -1235,7 +1275,6 @@ a { color: inherit; }
 
 @media (min-width: 980px) {
   .tabs { left: 50%; right: auto; transform: translateX(-50%); width: min(640px, calc(100% - 24px)); }
-  .footer { left: 50%; right: auto; transform: translateX(-50%); width: min(640px, calc(100% - 28px)); }
 }
 
 .tinder-wrap {
