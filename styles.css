@@ -24,6 +24,7 @@
 html, body {
   height: 100%;
   margin: 0;
+  overflow-x: clip;
   background: radial-gradient(1200px 700px at 15% 10%, rgba(167, 139, 250, 0.10), transparent 55%),
     radial-gradient(900px 600px at 90% 10%, rgba(34, 211, 238, 0.08), transparent 50%),
     radial-gradient(700px 500px at 60% 90%, rgba(251, 113, 133, 0.07), transparent 55%),
@@ -161,18 +162,18 @@ a { color: inherit; }
 
 .grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
 .grid2 {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
 @media (min-width: 880px) {
-  .grid2 { grid-template-columns: 1fr 1fr; }
+  .grid2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 
 .card {
@@ -213,7 +214,7 @@ a { color: inherit; }
 
 .messages-shell {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   margin-top: 16px;
 }
@@ -290,7 +291,7 @@ a { color: inherit; }
 
 @media (min-width: 920px) {
   .messages-shell {
-    grid-template-columns: 360px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
     align-items: start;
   }
 }
@@ -640,6 +641,8 @@ a { color: inherit; }
   scrollbar-width: thin;
   margin-top: 10px;
   -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .qn-cat-chip {
