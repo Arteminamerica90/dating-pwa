@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#111827" />
+    <title>WalkDate</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  </head>
+  <body>
+    <div id="app" class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="logo" aria-hidden="true"></div>
+          <div>
+            <div class="brand-title">WalkDate</div>
+            <div class="brand-sub">PWA: портреты, анонимные рекомендации и события рядом</div>
+          </div>
+        </div>
+        <div class="top-actions">
+          <button id="btnInstall" class="btn ghost" type="button" hidden>Установить</button>
+          <button id="btnSettings" class="btn" type="button">Настройки</button>
+        </div>
+      </header>
+
+      <nav class="tabs" aria-label="Разделы">
+        <button class="tab" data-tab="home" type="button" aria-label="Сообщения">
+          <span class="tab-ico" aria-hidden="true">⌂</span>
+          <span class="tab-lbl">Сообщение</span>
+        </button>
+        <button class="tab" data-tab="events" type="button" aria-label="События">
+          <span class="tab-ico" aria-hidden="true">◎</span>
+          <span class="tab-lbl">События</span>
+        </button>
+        <button class="tab" data-tab="dating" type="button" aria-label="Знакомства">
+          <span class="tab-ico" aria-hidden="true">❤</span>
+          <span class="tab-lbl">Пары</span>
+        </button>
+        <button class="tab active" data-tab="stats" type="button" aria-label="Профиль">
+          <span class="tab-ico" aria-hidden="true">☺</span>
+          <span class="tab-lbl">Профиль</span>
+        </button>
+        <button class="tab" data-tab="circle" type="button" aria-label="Круг знакомств">
+          <span class="tab-ico" aria-hidden="true">◌</span>
+          <span class="tab-lbl">Круг</span>
+        </button>
+      </nav>
+
+      <main class="main">
+        <section class="view hidden" id="view-home"></section>
+        <section class="view hidden" id="view-events"></section>
+        <section class="view hidden" id="view-dating"></section>
+        <section class="view" id="view-stats"></section>
+        <section class="view hidden" id="view-circle"></section>
+      </main>
+
+      <footer class="footer">
+        <div id="footerStatus" class="muted">Оффлайн-режим: доступен после первой загрузки.</div>
+      </footer>
+    </div>
+
+    <dialog id="dlgSettings" class="dialog">
+      <form method="dialog" class="dialog-card">
+        <div class="dialog-head">
+          <div>
+            <div class="dialog-title">Настройки и приватность</div>
+            <div class="muted">Данные хранятся только на этом устройстве (localStorage).</div>
+          </div>
+          <button class="btn ghost" value="close" type="submit">Закрыть</button>
+        </div>
+
+        <div class="grid2">
+          <div class="card">
+            <div class="card-title">Геолокация</div>
+            <div class="row">
+              <label class="switch">
+                <input id="toggleGeo" type="checkbox" />
+                <span class="slider"></span>
+              </label>
+              <div>
+                <div>Отслеживать геометки</div>
+                <div class="muted">watchPosition; можно выключить в любой момент.</div>
+              </div>
+            </div>
+            <div class="row">
+              <label class="switch">
+                <input id="toggleMapShare" type="checkbox" />
+                <span class="slider"></span>
+              </label>
+              <div>
+                <div>Показывать меня на карте</div>
+                <div class="muted">Отправляет на сервер только текущую точку (при включенном синке).</div>
+              </div>
+            </div>
+            <div class="row">
+              <label class="switch">
+                <input id="togglePlanShare" type="checkbox" />
+                <span class="slider"></span>
+              </label>
+              <div>
+                <div>Публиковать планы сегодня</div>
+                <div class="muted">Покажет другим, куда вы планируете сходить сегодня (при включенном синке).</div>
+              </div>
+            </div>
+            <div class="row">
+              <label class="label">Город (если авто-определение не сработало)</label>
+              <select id="selectCity" class="select">
+                <option value="auto">Авто</option>
+                <option value="Moscow">Москва</option>
+                <option value="Saint Petersburg">Санкт-Петербург</option>
+                <option value="Kazan">Казань</option>
+                <option value="Novosibirsk">Новосибирск</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Шаги</div>
+            <div class="row">
+              <label class="switch">
+                <input id="toggleSteps" type="checkbox" />
+                <span class="slider"></span>
+              </label>
+              <div>
+                <div>Считать шаги</div>
+                <div class="muted">На вебе нет универсального шагомера; используем датчики, если доступны, иначе ручной ввод.</div>
+              </div>
+            </div>
+            <div class="row">
+              <label class="label">Ручной ввод (сегодня)</label>
+              <div class="row-inline">
+                <input id="inputSteps" class="input" inputmode="numeric" pattern="[0-9]*" placeholder="например 4200" />
+                <button id="btnSaveSteps" class="btn" type="button">Сохранить</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Интересы</div>
+            <div id="interestChips" class="chips"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Форматы общения</div>
+            <div class="muted">Выберите, как вам комфортно общаться.</div>
+            <div id="commChips" class="chips" style="margin-top:10px"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Работа</div>
+            <div class="muted">Укажите вашу вакансию/роль (будет использоваться как фильтр/совпадение).</div>
+            <div class="row" style="margin-top:10px">
+              <label class="label">Должность</label>
+              <input id="inputJob" class="input" list="jobList" placeholder="например: Product Manager" />
+              <datalist id="jobList">
+                <option value="Software Engineer"></option>
+                <option value="Designer"></option>
+                <option value="Product Manager"></option>
+                <option value="Data Analyst"></option>
+                <option value="Marketing"></option>
+                <option value="Sales"></option>
+                <option value="Student"></option>
+                <option value="Entrepreneur"></option>
+              </datalist>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Учёба</div>
+            <div class="muted">Где учитесь (вуз/курсы) или что изучаете.</div>
+            <div class="row" style="margin-top:10px">
+              <label class="label">Учёба</label>
+              <input id="inputEducation" class="input" placeholder="например: МГУ / курсы по дизайну" />
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Ценности и цель</div>
+            <div class="muted">Можно выбрать несколько.</div>
+            <div id="valuesChips" class="chips" style="margin-top:10px"></div>
+            <div class="row-inline" style="margin-top:10px">
+              <button id="btnAdultToggle" class="btn ghost" type="button">Показать 18+</button>
+            </div>
+            <div id="valuesAdultWrap" class="hidden" style="margin-top:10px">
+              <div class="muted">18+ варианты (скрытый раздел).</div>
+              <div id="valuesAdultChips" class="chips" style="margin-top:10px"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Здоровье (трекер)</div>
+            <div class="muted">Ежедневная отметка. Это не медицинская рекомендация.</div>
+            <div class="row" style="margin-top:10px">
+              <label class="label">Настроение (1-5)</label>
+              <input id="inputMood" class="input" inputmode="numeric" placeholder="3" />
+            </div>
+            <div class="row">
+              <label class="label">Энергия (1-5)</label>
+              <input id="inputEnergy" class="input" inputmode="numeric" placeholder="3" />
+            </div>
+            <div class="row">
+              <label class="label">Сон (часы)</label>
+              <input id="inputSleep" class="input" inputmode="decimal" placeholder="7" />
+            </div>
+            <div class="row">
+              <label class="label">Заметка</label>
+              <input id="inputHealthNote" class="input" placeholder="например: устал / отлично" />
+            </div>
+            <div class="row-inline">
+              <button id="btnSaveHealth" class="btn" type="button">Сохранить</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Безопасность</div>
+            <div class="muted" id="encStatus">Шифрование: выключено</div>
+            <div class="row" style="margin-top:10px">
+              <label class="label">Пароль</label>
+              <input id="inputPassphrase" class="input" type="password" placeholder="не хранится в приложении" />
+            </div>
+            <div class="row-inline">
+              <button id="btnEnableEnc" class="btn" type="button">Включить</button>
+              <button id="btnUnlockEnc" class="btn ghost" type="button">Разблокировать</button>
+              <button id="btnDisableEnc" class="btn danger" type="button">Выключить</button>
+            </div>
+            <div class="muted">Шифрование AES-GCM; ключ получается из пароля (PBKDF2). Без пароля данные не восстановить.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Синхронизация</div>
+            <div class="muted" id="cloudStatus">Синк: выключен</div>
+            <div class="row" style="margin-top:10px">
+              <label class="label">Server URL</label>
+              <input id="inputServerUrl" class="input" placeholder="http://localhost:8787" />
+            </div>
+            <div class="row">
+              <label class="label">Email</label>
+              <input id="inputEmail" class="input" inputmode="email" placeholder="name@example.com" />
+            </div>
+            <div class="row">
+              <label class="label">Пароль</label>
+              <input id="inputCloudPassword" class="input" type="password" placeholder="для логина/регистрации" />
+            </div>
+            <div class="row-inline">
+              <button id="btnRegister" class="btn" type="button">Регистрация</button>
+              <button id="btnLogin" class="btn ghost" type="button">Логин</button>
+              <button id="btnLogout" class="btn danger" type="button">Выход</button>
+            </div>
+            <div class="row-inline">
+              <button id="btnPull" class="btn ghost" type="button">Скачать</button>
+              <button id="btnPush" class="btn" type="button">Загрузить</button>
+            </div>
+            <div class="muted">Отправляем на сервер только зашифрованный payload (сервер не знает пароль).</div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Данные</div>
+            <div class="row-inline">
+              <button id="btnExport" class="btn" type="button">Экспорт JSON</button>
+              <label class="btn ghost" for="fileImport">Импорт JSON</label>
+              <input id="fileImport" type="file" accept="application/json" hidden />
+            </div>
+            <div class="row-inline">
+              <button id="btnClear" class="btn danger" type="button">Очистить всё</button>
+            </div>
+            <div class="muted">Важно: это демо. Для продакшна лучше IndexedDB + шифрование + сервер с явным согласием.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Анкета</div>
+            <div id="profilePhotosPreview" class="row-inline" style="margin:10px 0"></div>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="dlgQuestionnaire" class="dialog">
+      <div class="dialog-card questionnaire-dialog">
+        <div class="dialog-head">
+          <div>
+            <div class="dialog-title">Анкета совместимости</div>
+            <div class="muted" id="qnBlock"></div>
+          </div>
+          <button class="btn ghost" id="btnQuestionnaireClose" type="button">Закрыть</button>
+        </div>
+        <div class="qn-progress" aria-hidden="true"><div id="qnProgressBar" class="qn-progress-bar"></div></div>
+        <div class="qn-counter muted" id="qnCounter"></div>
+        <div class="qn-stage">
+          <div id="qnCard" class="qn-card"></div>
+        </div>
+        <div class="row-inline qn-actions">
+          <button class="btn ghost" id="btnQuestionnairePrev" type="button">← Назад</button>
+          <span class="muted qn-hint">Свайп влево/вправо — перелистать вопрос</span>
+          <button class="btn" id="btnQuestionnaireSkip" type="button">Пропустить</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="dlgConsent" class="dialog">
+      <form method="dialog" class="dialog-card">
+        <div class="dialog-title">Разрешения</div>
+        <div class="muted">Чтобы приложение работало, нужны разрешения. Можно отказаться и пользоваться частично.</div>
+        <div class="card">
+          <div class="row">
+            <div class="pill">Геолокация</div>
+            <div class="muted">Нужна, чтобы показывать события только вашего города и сохранять геометки.</div>
+          </div>
+          <div class="row">
+            <div class="pill">Датчики</div>
+            <div class="muted">Для приблизительного подсчёта шагов (если браузер поддерживает).</div>
+          </div>
+        </div>
+        <div class="row-inline right">
+          <button class="btn ghost" value="skip" type="submit">Пропустить</button>
+          <button id="btnConsentOk" class="btn" value="ok" type="submit">Разрешить</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script>
+      // Non-module watchdog so we can tell if module JS never starts.
+      window.__walkdateStarted = false;
+      window.__walkdateModuleLoaded = false;
+      window.__walkdateImportAttempted = false;
+      window.__walkdateImportOk = false;
+      window.__walkdateImportErr = null;
+
+      const renderWalkdateDebug = () => {
+        let el = document.getElementById('walkdateDebug');
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'walkdateDebug';
+          el.style.position = 'fixed';
+          el.style.left = '12px';
+          el.style.right = '12px';
+          el.style.top = '12px';
+          el.style.zIndex = '99999';
+          el.style.padding = '10px 12px';
+          el.style.borderRadius = '16px';
+          el.style.border = '1px solid rgba(255,255,255,0.14)';
+          el.style.background = 'rgba(17,24,39,0.92)';
+          el.style.backdropFilter = 'blur(12px)';
+          el.style.boxShadow = '0 18px 60px rgba(0,0,0,0.55)';
+          el.style.color = '#e5e7eb';
+          el.style.font = '600 12px ui-sans-serif, system-ui';
+          el.style.whiteSpace = 'pre-wrap';
+          el.style.display = 'none';
+          document.body.appendChild(el);
+        }
+        const lines = [
+          `WalkDate debug:`,
+          `import attempted: ${window.__walkdateImportAttempted}`,
+          `import ok: ${window.__walkdateImportOk}`,
+          `module loaded: ${window.__walkdateModuleLoaded}`,
+          `started: ${window.__walkdateStarted}`
+        ];
+        if (window.__walkdateImportErr) lines.push(`import err: ${String(window.__walkdateImportErr).slice(0, 220)}`);
+        el.textContent = lines.join('\n');
+        // Show only if something is wrong.
+        el.style.display = window.__walkdateStarted ? 'none' : 'block';
+      };
+
+      // Update debug overlay a few times during boot.
+      setInterval(renderWalkdateDebug, 500);
+      setTimeout(() => {
+        if (window.__walkdateStarted) return;
+        const el = document.createElement('div');
+        el.style.position = 'fixed';
+        el.style.left = '12px';
+        el.style.right = '12px';
+        el.style.top = '12px';
+        el.style.zIndex = '99999';
+        el.style.padding = '12px 14px';
+        el.style.borderRadius = '16px';
+        el.style.border = '1px solid rgba(255,255,255,0.14)';
+        el.style.background = 'rgba(17,24,39,0.92)';
+        el.style.backdropFilter = 'blur(12px)';
+        el.style.boxShadow = '0 18px 60px rgba(0,0,0,0.55)';
+        el.style.color = '#e5e7eb';
+        el.style.font = '600 13px ui-sans-serif, system-ui';
+        el.style.whiteSpace = 'pre-wrap';
+        el.textContent =
+          (window.__walkdateModuleLoaded
+            ? 'WalkDate: app.js загрузился, но инициализация зависла (скорее всего storage/IndexedDB).\\n'
+            : 'WalkDate: JS не стартовал (app.js не выполнился).\\n') +
+          'Откройте DevTools -> Console и Network и пришлите: status app.js и первую ошибку (не Vytal).\\n' +
+          'Также попробуйте Incognito (Cmd+Shift+N) и отключите расширения (Vytal мешает консолью).';
+        document.body.appendChild(el);
+      }, 1500);
+    </script>
+
+    <script type="module">
+      const showBootError = (err) => {
+        window.__walkdateImportErr = err?.message || err;
+        const el = document.createElement('div');
+        el.style.position = 'fixed';
+        el.style.left = '12px';
+        el.style.right = '12px';
+        el.style.top = '12px';
+        el.style.zIndex = '99999';
+        el.style.padding = '12px 14px';
+        el.style.borderRadius = '16px';
+        el.style.border = '1px solid rgba(255,255,255,0.14)';
+        el.style.background = 'rgba(17,24,39,0.92)';
+        el.style.backdropFilter = 'blur(12px)';
+        el.style.boxShadow = '0 18px 60px rgba(0,0,0,0.55)';
+        el.style.color = '#e5e7eb';
+        el.style.font = '600 13px ui-sans-serif, system-ui';
+        el.style.whiteSpace = 'pre-wrap';
+        const details = String(err?.stack || err?.message || err).slice(0, 1200);
+        el.textContent = `Не удалось загрузить app.js\\n${details}`;
+        document.body.appendChild(el);
+      };
+
+      window.__walkdateImportAttempted = true;
+      // Cache-bust to avoid stale SW cached JS after rapid iterations.
+      import('./app.js?v=33')
+        .then(() => {
+          window.__walkdateImportOk = true;
+        })
+        .catch(showBootError);
+    </script>
+  </body>
+</html>
