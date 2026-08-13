@@ -1490,67 +1490,6 @@ function renderQuestionnaireBlocks(profile = state.profile) {
     .join('');
 }
 
-function getQuestionnaireCategories() {
-  const cats = CATEGORY_ORDER.map((c) => ({ id: c, label: CATEGORY_LABELS[c] || c }));
-  cats.push({ id: 'psych', label: 'Психология' });
-  return cats;
-}
-
-function questionsForQuestionnaireCategory(catId) {
-  if (catId === 'psych') return ALL_QUESTIONS.filter((q) => !q.category);
-  return ALL_QUESTIONS.filter((q) => q.category === catId);
-}
-
-function activeQuestionnaireCategory() {
-  const active = state.ui?.qnCategory;
-  const cats = getQuestionnaireCategories();
-  return cats.some((c) => c.id === active) ? active : cats[0].id;
-}
-
-// Категории-кнопки — бесконечная карусель слева направо.
-function renderQuestionnaireCategoryNav() {
-  const active = activeQuestionnaireCategory();
-  const chips = getQuestionnaireCategories()
-    .map((c) => {
-      const count = questionsForQuestionnaireCategory(c.id).length;
-      return `<button class="chip qn-cat-chip ${active === c.id ? 'active' : ''}" type="button" data-qn-cat="${c.id}">${escapeHtml(c.label)} (${count})</button>`;
-    })
-    .join('');
-  const dur = Math.max(14, chips.length * 1.6);
-  return `
-    <div class="qn-cat-strip">
-      <div class="qn-cat-track" style="--qn-marquee-dur:${dur}s">
-        <div class="qn-cat-half">${chips}</div>
-        <div class="qn-cat-half" aria-hidden="true">${chips}</div>
-      </div>
-    </div>`;
-}
-
-// Вопросы выбранной категории — вертикальная прокрутка (сверху вниз).
-function renderQuestionnaireCategoryQuestions(profile = state.profile) {
-  const answers = getQuestionnaireAnswers(profile);
-  const active = activeQuestionnaireCategory();
-  const items = questionsForQuestionnaireCategory(active)
-    .map((q) => {
-      const selected = answers[q.id];
-      const opts = q.options
-        .map((opt) => {
-          const activeOpt = selected === opt.id;
-          return `<button class="chip questionnaire-chip ${activeOpt ? 'active' : ''}" type="button" data-question-answer="${q.id}" data-option="${opt.id}"><span>${escapeHtml(opt.label)}</span>${opt.hint ? `<small>${escapeHtml(opt.hint)}</small>` : ''}</button>`;
-        })
-        .join('');
-      return `
-        <div class="question-block">
-          <div class="question-title">${escapeHtml(q.question)}</div>
-          <div class="chip-row questionnaire-options">${opts}</div>
-        </div>
-      `;
-    })
-    .join('');
-  if (!items) return `<div class="muted">В этой категории пока нет вопросов.</div>`;
-  return `<div class="qn-question-list">${items}</div>`;
-}
-
 function renderQuestionnaireCategories(profile = state.profile) {
   const answers = getQuestionnaireAnswers(profile);
   const cats = answeredCategories(answers);
@@ -2632,9 +2571,6 @@ function renderStats() {
           <span class="pill">${portrait.answered || 0}/${portrait.total || ALL_QUESTIONS.length}</span>
         </div>
         ${renderQuestionnaireCategories(state.profile)}
-        <div class="muted" style="margin-top:12px">Категории-кнопки листаются слева направо; вопросы выбранной категории — сверху вниз.</div>
-        ${renderQuestionnaireCategoryNav()}
-        ${renderQuestionnaireCategoryQuestions(state.profile)}
       </div>
 
       <div class="card">
@@ -2734,16 +2670,6 @@ function renderStats() {
   });
 
   $('#view-stats').querySelector('[data-action="openQuestionnaire"]')?.addEventListener('click', openQuestionnaire);
-
-  $('#view-stats').querySelectorAll('[data-qn-cat]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state.ui = state.ui || {};
-      state.ui.qnCategory = btn.dataset.qnCat;
-      save();
-      renderAll();
-      haptic('light');
-    });
-  });
 
   $('#view-stats').querySelector('[data-action="toggleSteps"]')?.addEventListener('click', async () => {
     if (state.consent.steps && stepCounter?.running) {
