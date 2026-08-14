@@ -2381,7 +2381,7 @@ function renderDating() {
   })
     .map((p) => ({
       ...p,
-      compatibility: comparePortraits(userPortrait, p.persona || {}),
+      compatibility: buildPairCompatibility(state.profile, p),
       score:
         overlapCount(interests, new Set(p.interests)) +
         overlapCount(comm, new Set(p.communication || [])) +
@@ -2572,9 +2572,9 @@ function renderStats() {
   const interestsText = interests.join(', ');
   const zodiac = state.profile?.zodiac || '';
   const jobTitle = state.profile?.jobTitle || '';
-  const desiredPlace = state.profile?.desiredPlace || '';
-  const budget = state.profile?.budget || '';
   const wishlistPlaces = new Set(state.profile?.wishlistPlaces || []);
+  const budget = state.profile?.budget || '';
+  const customPlaces = Array.isArray(state.profile?.customPlaces) ? state.profile.customPlaces : [];
   const photos = state.profile?.photos || [];
   const stepsOn = !!state.consent?.steps;
   const stepsRunning = !!stepCounter?.running;
@@ -2642,14 +2642,21 @@ function renderStats() {
           <div class="muted">Сколько вы готовы потратить на партнера или совместную встречу.</div>
         </div>
         <div class="profile-field">
-          <div class="muted">Места, куда хотите пойти</div>
-          <div class="chip-row" data-wishlist-places>
+          <label class="label">Места, куда хотите пойти</label>
+          <div class="muted">Любые места посещения — список не ограничен.</div>
+          <div class="chip-row" data-wishlist-places style="margin-top:8px">
             ${WISHLIST_PLACES.map((x) => {
               const active = wishlistPlaces.has(x.id);
               return `<button class="chip ${active ? 'active' : ''}" type="button" data-wishlist-place="${x.id}">${x.label}</button>`;
             }).join('')}
           </div>
-          <input id="profileDesiredPlace" class="input" value="${escapeHtml(desiredPlace)}" placeholder="Например: кофейня, парк, бар" />
+          <div class="chip-row" data-custom-places style="margin-top:8px">
+            ${customPlaces.map((p) => `<span class="chip"><span>${escapeHtml(p)}</span><button class="chip-x" type="button" data-del-custom-place="${escapeHtml(p)}">✕</button></span>`).join('')}
+          </div>
+          <div class="row" style="margin-top:8px">
+            <input id="profileCustomPlace" class="input" placeholder="Другое место: каток, квест, боулинг..." />
+            <button class="btn ghost" type="button" data-add-custom-place>Добавить</button>
+          </div>
         </div>
         <div class="profile-field">
           <label class="label">Интересы</label>
@@ -2661,6 +2668,9 @@ function renderStats() {
             <div class="muted">Статус: ${stepsOn ? (stepsRunning ? 'датчики включены' : 'разрешение есть, датчики остановлены') : 'выключено'}</div>
             <button class="btn" type="button" data-action="toggleSteps">${stepsOn ? (stepsRunning ? 'Остановить шаги' : 'Запустить шаги') : 'Включить шаги'}</button>
           </div>
+        </div>
+        <div class="row-inline" style="margin-top:14px">
+          <button class="btn" type="button" data-action="saveProfileMini">Сохранить анкету</button>
         </div>
       </div>
 
@@ -2742,13 +2752,35 @@ function renderStats() {
     });
   });
 
+  $('#view-stats').querySelector('[data-add-custom-place]')?.addEventListener('click', () => {
+    const input = $('#view-stats').querySelector('#profileCustomPlace');
+    const value = String(input?.value || '').trim().slice(0, 80);
+    if (!value) return toast('Укажите место');
+    const list = Array.isArray(state.profile.customPlaces) ? state.profile.customPlaces : [];
+    if (list.some((x) => x.toLowerCase() === value.toLowerCase())) return toast('Такое место уже добавлено');
+    state.profile.customPlaces = [...list, value];
+    if (input) input.value = '';
+    save();
+    pushPublicProfileNow().catch(() => {});
+    renderAll();
+  });
+
+  $('#view-stats').querySelectorAll('[data-del-custom-place]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const value = btn.dataset.delCustomPlace;
+      state.profile.customPlaces = (state.profile.customPlaces || []).filter((x) => x !== value);
+      save();
+      pushPublicProfileNow().catch(() => {});
+      renderAll();
+    });
+  });
+
   $('#view-stats').querySelector('[data-action="saveProfileMini"]')?.addEventListener('click', () => {
     const nextName = String($('#view-stats').querySelector('#profileName')?.value || '').trim().slice(0, 40);
     const nextDescription = String($('#view-stats').querySelector('#profileDescription')?.value || '').slice(0, 2000);
     const nextZodiac = String($('#view-stats').querySelector('#profileZodiac')?.value || '').trim().slice(0, 30);
     const nextJobTitle = String($('#view-stats').querySelector('#profileJobTitle')?.value || '').trim().slice(0, 60);
     const nextBudget = String($('#view-stats').querySelector('#profileBudget')?.value || '').trim().slice(0, 40);
-    const nextDesiredPlace = String($('#view-stats').querySelector('#profileDesiredPlace')?.value || '').trim().slice(0, 120);
     const nextInterestsRaw = String($('#view-stats').querySelector('#profileInterestsText')?.value || '');
     const nextInterests = nextInterestsRaw
       .split(',')
@@ -2760,7 +2792,6 @@ function renderStats() {
     state.profile.zodiac = nextZodiac;
     state.profile.jobTitle = nextJobTitle;
     state.profile.budget = nextBudget;
-    state.profile.desiredPlace = nextDesiredPlace;
     state.profile.interests = nextInterests;
     state.profile.portrait = buildQuestionnairePortrait(state.profile.questionnaireAnswers || {});
     save();
@@ -3933,6 +3964,134 @@ function comparePortraits(userPortrait = {}, candidatePersona = {}) {
   }
 
   return { label, tone, shared, differences, neutral, support, tension };
+}
+
+const WISHLIST_PLACE_META = {
+  cafe: { interests: ['coffee'], places: [] },
+  park: { interests: ['walks'], places: [] },
+  gallery: { interests: ['art', 'museums'], places: ['culture'] },
+  restaurant: { interests: ['food'], places: ['restaurant'] },
+  club: { interests: ['night'], places: ['club'] },
+  events: { interests: ['theatre', 'cinema', 'music', 'art'], places: ['culture'] }
+};
+
+function parseBudgetAmount(s) {
+  const digits = String(s || '').replace(/[^\d.,]/g, '').replace(',', '.');
+  const n = parseFloat(digits);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function normToken(s) {
+  return String(s || '').toLowerCase().replace(/[^a-zа-яё0-9]+/g, ' ').trim();
+}
+
+function fmtAmount(n) {
+  return `${n.toLocaleString('ru-RU')} ₽`;
+}
+
+// Полная совместимость пары: дерево решений + гороскоп, работа, бюджет,
+// места для встреч (неограниченный список) и планы на сегодня.
+function buildPairCompatibility(user = {}, candidate = {}) {
+  const portrait = buildQuestionnairePortrait(user.questionnaireAnswers || {});
+  const base = comparePortraits(portrait, candidate.persona || {});
+  const out = {
+    ...base,
+    shared: [...(base.shared || [])],
+    differences: [...(base.differences || [])],
+    neutral: [...(base.neutral || [])]
+  };
+
+  const zodiacA = normToken(user.zodiac);
+  const zodiacB = normToken(candidate.zodiac);
+  if (zodiacA && zodiacB) {
+    if (zodiacA === zodiacB) {
+      out.support += 1;
+      out.shared.push(`Гороскоп: ${user.zodiac}`);
+    } else {
+      out.neutral.push(`Гороскоп: ${user.zodiac} ↔ ${candidate.zodiac}`);
+    }
+  }
+
+  const jobA = normToken(user.jobTitle);
+  const jobB = normToken(candidate.jobTitle);
+  if (jobA && jobB) {
+    if (jobA === jobB) {
+      out.support += 1;
+      out.shared.push(`Работа: ${user.jobTitle}`);
+    } else {
+      out.neutral.push(`Работа: ${user.jobTitle} ↔ ${candidate.jobTitle}`);
+    }
+  }
+
+  const budgetA = parseBudgetAmount(user.budget);
+  const budgetB = parseBudgetAmount(candidate.budget);
+  if (budgetA != null && budgetB != null) {
+    const diff = Math.abs(budgetA - budgetB) / Math.max(budgetA, budgetB);
+    if (diff <= 0.2) {
+      out.support += 1;
+      out.shared.push(`Бюджет: ${fmtAmount(budgetA)} ≈ ${fmtAmount(budgetB)}`);
+    } else if (diff <= 0.6) {
+      out.neutral.push(`Бюджет: ${fmtAmount(budgetA)} ↔ ${fmtAmount(budgetB)}`);
+    } else {
+      out.tension += 0.8;
+      out.differences.push(`Бюджет: ${fmtAmount(budgetA)} ↔ ${fmtAmount(budgetB)}`);
+    }
+  }
+
+  const candPlaces = new Set(candidate.meetingPlaces || []);
+  const candInterests = new Set(candidate.interests || []);
+  const candTokens = normToken(
+    `${candidate.about || ''} ${(candidate.interests || []).map((x) => interestLabel(x)).join(' ')}`
+  );
+
+  for (const id of new Set(user.wishlistPlaces || [])) {
+    const meta = WISHLIST_PLACE_META[id];
+    if (!meta) continue;
+    const hits = [];
+    if (meta.places.some((pl) => candPlaces.has(pl))) hits.push('место встречи');
+    for (const it of meta.interests) if (candInterests.has(it)) hits.push(interestLabel(it).toLowerCase());
+    if (hits.length) {
+      out.support += 0.5;
+      out.shared.push(`Место: ${WISHLIST_PLACES.find((x) => x.id === id)?.label || id} — ${hits.join(', ')}`);
+    }
+  }
+
+  for (const cs of [...(user.customPlaces || []), user.desiredPlace || '']) {
+    const t = normToken(cs);
+    if (!t) continue;
+    const toks = new Set(t.split(' ').filter((w) => w.length > 2));
+    if (toks.size && [...toks].some((w) => candTokens.includes(w))) {
+      out.support += 0.5;
+      out.shared.push(`Место: ${cs}`);
+    }
+  }
+
+  const plans = Array.isArray(user.plans?.items) ? user.plans.items.filter((p) => p && p.title) : [];
+  for (const p of plans) {
+    const t = normToken(p.title);
+    if (!t) continue;
+    const toks = new Set(t.split(' ').filter((w) => w.length > 2));
+    const matched = toks.size ? [...toks].some((w) => candTokens.includes(w)) : false;
+    const cityMatch = !!p.cityKey && !!candidate.city && normToken(p.cityKey) === normToken(candidate.city);
+    if (matched || cityMatch) {
+      out.support += 0.5;
+      out.shared.push(`Сегодня: ${p.title}${cityMatch ? ` (${cityLabel(p.cityKey)})` : ''}`);
+    }
+  }
+
+  let label = 'есть отличия, но можно обсудить';
+  let tone = 'warn';
+  const net = out.support - out.tension;
+  if (out.tension >= 3.2) {
+    label = 'существенные расхождения';
+    tone = 'bad';
+  } else if (net >= 5) {
+    label = 'много общего';
+    tone = 'good';
+  }
+  out.label = label;
+  out.tone = tone;
+  return out;
 }
 
 function verdictEmoji(tone) {
