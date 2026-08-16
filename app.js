@@ -1405,16 +1405,32 @@ function numericAnswerValue(answerId) {
   return String(answerId || '').startsWith('custom:') ? String(answerId).slice(7) : null;
 }
 
+function searchAnswerValue(answerId) {
+  return String(answerId || '').startsWith('search:') ? String(answerId).slice(7) : null;
+}
+
+function multiAnswerList(answerId) {
+  return String(answerId || '').split(',').map((x) => x.trim()).filter(Boolean);
+}
+
 function setQuestionnaireAnswer(questionId, optionId, { silent } = {}) {
+  const q = ALL_QUESTIONS.find((x) => x.id === questionId);
+  let stored = optionId;
+  if (q?.multi) {
+    const cur = multiAnswerList(state.profile.questionnaireAnswers?.[questionId]);
+    const idx = cur.indexOf(optionId);
+    if (idx >= 0) cur.splice(idx, 1);
+    else cur.push(optionId);
+    stored = [...new Set(cur)].sort().join(',');
+  }
   state.profile.questionnaireAnswers = {
     ...(state.profile.questionnaireAnswers || {}),
-    [questionId]: optionId
+    [questionId]: stored
   };
   state.profile.portrait = buildQuestionnairePortrait(state.profile.questionnaireAnswers);
 
   // Сливаем данные в профиль: гороскоп берётся из анкеты и не спрашивается дважды.
   if (questionId === 'q258' && !state.profile.zodiac) {
-    const q = ALL_QUESTIONS.find((x) => x.id === 'q258');
     const opt = q ? questionOptions(q).find((o) => o.id === optionId) : null;
     if (opt && QN_ZODIAC_MAP[opt.value]) state.profile.zodiac = QN_ZODIAC_MAP[opt.value];
   }
@@ -1431,20 +1447,28 @@ function buildQuestionnairePortrait(answers = {}) {
     const answerId = answers[q.id];
     if (!answerId) continue;
     const num = numericAnswerValue(answerId);
-    const traits = num != null
+    const searched = searchAnswerValue(answerId);
+    const traitsList = num != null
       ? (() => {
           const bucket = numericBucket(q, num);
-          return bucket ? { [q.category]: bucket } : null;
+          return bucket ? [{ [q.category]: bucket }] : [];
         })()
-      : (() => {
-          const opt = questionOptions(q).find((x) => x.id === answerId);
-          return opt ? getOptionTraits(q, opt) : null;
-        })();
-    if (!traits) continue;
+      : searched != null
+        ? (() => {
+            const cat = (q.searchMap || {})[searched] || '';
+            return cat ? [{ [q.category]: cat }] : [];
+          })()
+        : multiAnswerList(answerId).map((oid) => {
+            const opt = questionOptions(q).find((x) => x.id === oid);
+            return opt ? getOptionTraits(q, opt) : null;
+          }).filter(Boolean);
+    if (!traitsList.length) continue;
     answered += 1;
-    for (const [dim, val] of Object.entries(traits)) {
-      if (!dimensionBuckets[dim]) dimensionBuckets[dim] = {};
-      dimensionBuckets[dim][val] = (dimensionBuckets[dim][val] || 0) + 1;
+    for (const traits of traitsList) {
+      for (const [dim, val] of Object.entries(traits)) {
+        if (!dimensionBuckets[dim]) dimensionBuckets[dim] = {};
+        dimensionBuckets[dim][val] = (dimensionBuckets[dim][val] || 0) + 1;
+      }
     }
   }
 
@@ -1528,21 +1552,31 @@ function renderQuestionnaireBlocks(profile = state.profile) {
         .map((q) => {
           const selected = answers[q.id];
           const custom = numericAnswerValue(selected);
+          const searched = searchAnswerValue(selected);
           if (q.numeric) {
             return `
             <div class="question-block">
               <div class="question-title">${escapeHtml(questionText(q))}</div>
-              ${custom != null ? `<div class="row-inline"><span class="pill">${escapeHtml(fmtAmount(Number(custom)))}</span></div>` : `<div class="muted">Точная сумма — в анкете совместимости</div>`}
+              ${custom != null ? `<div class="row-inline"><span class="pill">${escapeHtml(fmtNumeric(q, Number(custom)))}</span></div>` : `<div class="muted">Точное значение — в анкете совместимости</div>`}
             </div>
           `;
           }
-          return `
+          if (q.search) {
+            return `
             <div class="question-block">
               <div class="question-title">${escapeHtml(questionText(q))}</div>
+              ${searched != null ? `<div class="row-inline"><span class="pill">${escapeHtml(searched)}</span></div>` : `<div class="muted">Профессия — в анкете совместимости</div>`}
+            </div>
+          `;
+          }
+          const multiSel = q.multi ? new Set(multiAnswerList(selected)) : null;
+          return `
+            <div class="question-block">
+              <div class="question-title">${escapeHtml(questionText(q))}${q.multi ? ' <span class="pill">несколько</span>' : ''}</div>
               <div class="chip-row questionnaire-options" data-question="${q.id}">
                 ${questionOptions(q)
                   .map((opt) => {
-                    const active = selected === opt.id;
+                    const active = multiSel ? multiSel.has(opt.id) : selected === opt.id;
                     return `<button class="chip questionnaire-chip ${active ? 'active' : ''}" type="button" data-question-answer="${q.id}" data-option="${opt.id}"><span>${escapeHtml(opt.label)}</span><small>${escapeHtml(opt.hint)}</small></button>`;
                   })
                   .join('')}
@@ -1600,19 +1634,28 @@ function setQuestionCard() {
   const answers = getQuestionnaireAnswers();
   const selected = answers[q.id];
   const custom = numericAnswerValue(selected);
+  const searched = searchAnswerValue(selected);
   let inner;
   if (q.numeric) {
     inner = `
       <div class="qn-num">
-        <input id="qnNumInput" class="input qn-num-input" type="number" inputmode="numeric" min="0" step="500" placeholder="Введите сумму в рублях" value="${custom != null ? escapeHtml(custom) : ''}" />
+        <input id="qnNumInput" class="input qn-num-input" type="number" inputmode="numeric" min="0" step="1" placeholder="Введите ${q.numericSymbol ? q.numericSymbol.trim() : 'сумму в рублях'}" value="${custom != null ? escapeHtml(custom) : ''}" />
         <div class="muted">Укажите точную цифру — она попадёт в дерево совместимости</div>
         <button class="btn" type="button" id="qnNumSave" disabled>Сохранить ответ</button>
       </div>
     `;
+  } else if (q.search) {
+    inner = `
+      <div class="qn-search">
+        <input id="qnSearchInput" class="input qn-search-input" type="search" placeholder="Начните вводить профессию..." autocomplete="off" />
+        <div class="qn-search-results" id="qnSearchResults">${renderSearchResults(q, searched, '')}</div>
+      </div>
+    `;
   } else {
+    const multiSel = q.multi ? new Set(multiAnswerList(selected)) : null;
     const opts = questionOptions(q)
       .map((o, idx) => {
-        const active = selected === o.id;
+        const active = multiSel ? multiSel.has(o.id) : selected === o.id;
         const hint = o.hint ? `<span class="qn-opt-hint">${escapeHtml(o.hint)}</span>` : '';
         const letter = String.fromCharCode(97 + (idx % 26)).toUpperCase();
         return `
@@ -1626,10 +1669,10 @@ function setQuestionCard() {
         `;
       })
       .join('');
-    inner = `<div class="qn-opts">${opts}</div>`;
+    inner = `<div class="qn-opts">${opts}</div>${q.multi ? `<button class="btn qn-multi-done" type="button" id="qnMultiDone" disabled>Готово →</button>` : ''}`;
   }
   $('#qnCard').innerHTML = `
-    <div class="qn-q">${escapeHtml(questionText(q))}</div>
+    <div class="qn-q">${escapeHtml(questionText(q))}${q.multi ? ` <span class="pill">можно выбрать несколько</span>` : ''}</div>
     ${inner}
   `;
   $('#qnBlock').textContent = q.block || (q.category ? CATEGORY_LABELS[q.category] : '');
@@ -1653,7 +1696,40 @@ function setQuestionCard() {
       });
       setTimeout(() => input?.focus(), 120);
     }
+  } else if (q.search) {
+    const input = document.getElementById('qnSearchInput');
+    if (input) {
+      const refresh = () => {
+        const results = document.getElementById('qnSearchResults');
+        if (results) results.innerHTML = renderSearchResults(q, searched, input.value);
+      };
+      input.addEventListener('input', refresh);
+      setTimeout(() => {
+        input.focus();
+        refresh();
+      }, 120);
+    }
+  } else if (q.multi) {
+    const doneBtn = document.getElementById('qnMultiDone');
+    if (doneBtn) doneBtn.addEventListener('click', () => qnGo(1));
   }
+}
+
+function renderSearchResults(q, chosen, query) {
+  const list = Array.isArray(q.searchList) ? q.searchList : [];
+  const needle = String(query || '').toLowerCase().trim();
+  const items = needle
+    ? list.filter((p) => String(p).toLowerCase().includes(needle))
+    : list;
+  const top = items.slice(0, needle ? 30 : 12);
+  if (chosen && !items.includes(chosen)) {
+    return `<button class="qn-search-item chosen" type="button" data-qn-search="${escapeHtml(chosen)}"><span>✓ ${escapeHtml(chosen)}</span></button>${top.map((p) => `<button class="qn-search-item" type="button" data-qn-search="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join('')}`;
+  }
+  if (!top.length) return '<div class="muted">Ничего не найдено — выберите ближайший вариант или введите точное название</div>';
+  return top.map((p) => {
+    const isChosen = chosen === p;
+    return `<button class="qn-search-item ${isChosen ? 'chosen' : ''}" type="button" data-qn-search="${escapeHtml(p)}">${isChosen ? '✓ ' : ''}${escapeHtml(p)}</button>`;
+  }).join('');
 }
 
 function qnGo(dir) {
@@ -1728,13 +1804,34 @@ function wireQuestionnaire() {
 
   card.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-qn-opt]');
-    if (!btn) return;
-    const oid = btn.dataset.qnOpt;
-    const q = ALL_QUESTIONS[qnIndex];
-    if (!q || !oid) return;
-    setQuestionnaireAnswer(q.id, oid, { silent: true });
-    haptic('light');
-    qnGo(1);
+    if (btn) {
+      const oid = btn.dataset.qnOpt;
+      const q = ALL_QUESTIONS[qnIndex];
+      if (!q || !oid) return;
+      if (q.multi) {
+        setQuestionnaireAnswer(q.id, oid, { silent: true });
+        haptic('light');
+        const sel = new Set(multiAnswerList(getQuestionnaireAnswers()[q.id]));
+        card.querySelectorAll('[data-qn-opt]').forEach((b) => {
+          b.classList.toggle('selected', sel.has(b.dataset.qnOpt));
+        });
+        const doneBtn = document.getElementById('qnMultiDone');
+        if (doneBtn) doneBtn.disabled = !sel.size;
+        return;
+      }
+      setQuestionnaireAnswer(q.id, oid, { silent: true });
+      haptic('light');
+      qnGo(1);
+      return;
+    }
+    const searchBtn = e.target.closest('[data-qn-search]');
+    if (searchBtn) {
+      const q = ALL_QUESTIONS[qnIndex];
+      if (!q) return;
+      setQuestionnaireAnswer(q.id, `search:${searchBtn.dataset.qnSearch}`, { silent: true });
+      haptic('light');
+      qnGo(1);
+    }
   });
 }
 
@@ -2391,7 +2488,7 @@ function renderTreeFilterGroup(catId, label, questions, tree, catKey, treeOpen =
       </button>
       <div class="tree-filter-body" ${open ? '' : 'hidden'}>
         ${qs
-          .filter((q) => !q.numeric)
+          .filter((q) => !q.numeric && !q.search)
           .map((q) => {
             const sel = new Set(tree[q.id] || []);
             const opts = questionOptions(q)
@@ -2429,7 +2526,7 @@ function matchesTreeFilters(p, treeFilter = {}) {
   for (const [qid, opts] of Object.entries(treeFilter)) {
     if (!Array.isArray(opts) || !opts.length) continue;
     const q = ALL_QUESTIONS.find((x) => x.id === qid);
-    if (!q || q.numeric) continue;
+    if (!q || q.numeric || q.search) continue;
     const matches = opts.some((optId) => {
       const opt = questionOptions(q).find((o) => o.id === optId);
       if (!opt) return false;
@@ -4109,6 +4206,10 @@ function normToken(s) {
 
 function fmtAmount(n) {
   return `${n.toLocaleString('ru-RU')} ₽`;
+}
+
+function fmtNumeric(q, n) {
+  return `${n.toLocaleString('ru-RU')}${q?.numericSymbol || ' ₽'}`;
 }
 
 // Полная совместимость пары: дерево решений + гороскоп, работа, бюджет,

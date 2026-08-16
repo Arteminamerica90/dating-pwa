@@ -76,7 +76,7 @@ a { color: inherit; }
   right: auto;
   bottom: calc(12px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
-  z-index: 10;
+  z-index: 1200;
   width: min(640px, calc(100% - 24px));
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -1395,16 +1395,16 @@ a { color: inherit; }
   transition: width 260ms ease;
 }
 .qn-counter { font-size: 12px; text-align: right; }
-.qn-stage { position: relative; min-height: 300px; overflow: visible; touch-action: pan-y; }
+.qn-stage { position: relative; min-height: 260px; overflow: visible; touch-action: pan-y; }
 .qn-card {
   background: rgba(15, 23, 42, 0.045);
   border: 1px solid rgba(15, 23, 42, 0.12);
   border-radius: 20px;
-  padding: 18px;
-  min-height: 300px;
+  padding: 14px;
+  min-height: 260px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   transition: transform 240ms ease, opacity 220ms ease;
   will-change: transform;
   user-select: none;
@@ -1413,26 +1413,47 @@ a { color: inherit; }
 .qn-card.slide-left { transform: translateX(-40%); opacity: 0; }
 .qn-card.slide-right { transform: translateX(40%); opacity: 0; }
 .qn-q {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 650;
-  line-height: 1.35;
+  line-height: 1.32;
   flex: 0 0 auto;
 }
 .qn-opts {
   display: flex;
   flex-direction: column;
-  gap: 13px;
+  gap: 8px;
 }
-.qn-num { display: flex; flex-direction: column; gap: 14px; padding: 4px 0 8px; }
+.qn-num { display: flex; flex-direction: column; gap: 12px; padding: 2px 0 6px; }
 .qn-num-input { font-size: 17px; font-weight: 650; text-align: left; }
 .qn-num .btn { align-self: flex-start; min-width: 160px; }
+.qn-search { display: flex; flex-direction: column; gap: 10px; padding: 2px 0 6px; }
+.qn-search-input { font-size: 15px; }
+.qn-search-results { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow: auto; }
+.qn-search-item {
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(15, 23, 42, 0.03);
+  color: var(--text, #e5e7eb);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.qn-search-item:hover { background: rgba(15, 23, 42, 0.07); }
+.qn-search-item.chosen {
+  background: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.55);
+}
+.qn-multi-done { align-self: flex-start; min-width: 160px; }
 .qn-opt {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
   text-align: left;
-  padding: 14px 16px;
-  border-radius: 15px;
+  padding: 10px 12px;
+  border-radius: 13px;
   border: 1px solid rgba(15, 23, 42, 0.12);
   background: rgba(15, 23, 42, 0.03);
   color: var(--text, #e5e7eb);
