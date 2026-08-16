@@ -22,6 +22,7 @@ export function defaultState() {
     version: 2,
     profile: {
       name: 'Вы',
+      gender: '',
       description: '',
       zodiac: '',
       cityOverride: 'auto',

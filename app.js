@@ -73,9 +73,18 @@ const MEETING_INTENTS = [
 
 const MEETING_PLACES = [
   { id: 'all', label: 'Все места' },
-  { id: 'club', label: 'Клубы' },
+  { id: 'cafe', label: 'Кофейни' },
+  { id: 'park', label: 'Парки' },
   { id: 'restaurant', label: 'Рестораны' },
-  { id: 'culture', label: 'Культурные события' }
+  { id: 'gallery', label: 'Галереи' },
+  { id: 'culture', label: 'Культурные события' },
+  { id: 'club', label: 'Клубы' },
+  { id: 'theatre', label: 'Театр' },
+  { id: 'cinema', label: 'Кино' },
+  { id: 'bowling', label: 'Боулинг / квесты' },
+  { id: 'sport', label: 'Спорт и активный отдых' },
+  { id: 'home', label: 'Дома' },
+  { id: 'work', label: 'Совместная работа' }
 ];
 
 const WISHLIST_PLACES = [
@@ -1356,6 +1365,46 @@ function getOptionTraits(q, opt) {
   return {};
 }
 
+function profileGender() {
+  const g = String(state.profile?.gender || '');
+  if (g === 'female' || g === 'f') return 'f';
+  if (g === 'male' || g === 'm') return 'm';
+  return '';
+}
+
+function questionOptions(q) {
+  const g = profileGender();
+  return g === 'f' && Array.isArray(q.optionsF)
+    ? q.optionsF
+    : g === 'm' && Array.isArray(q.optionsM)
+      ? q.optionsM
+      : q.options || [];
+}
+
+function questionText(q) {
+  const g = profileGender();
+  return g === 'f' && q.questionF ? q.questionF : g === 'm' && q.questionM ? q.questionM : q.question;
+}
+
+function numericBucket(q, value) {
+  if (!q.numeric) return null;
+  const n = Number(String(value || '').replace(/[^\d.]/g, ''));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const steps = Array.isArray(q.numeric) && q.numeric.length ? q.numeric : [{ min: 0, value: `${q.id}_низкий` }];
+  let bucket = steps[steps.length - 1].value;
+  for (const s of steps) {
+    if (n <= s.min) {
+      bucket = s.value;
+      break;
+    }
+  }
+  return bucket;
+}
+
+function numericAnswerValue(answerId) {
+  return String(answerId || '').startsWith('custom:') ? String(answerId).slice(7) : null;
+}
+
 function setQuestionnaireAnswer(questionId, optionId, { silent } = {}) {
   state.profile.questionnaireAnswers = {
     ...(state.profile.questionnaireAnswers || {}),
@@ -1365,7 +1414,8 @@ function setQuestionnaireAnswer(questionId, optionId, { silent } = {}) {
 
   // Сливаем данные в профиль: гороскоп берётся из анкеты и не спрашивается дважды.
   if (questionId === 'q258' && !state.profile.zodiac) {
-    const opt = ALL_QUESTIONS.find((x) => x.id === 'q258')?.options.find((o) => o.id === optionId);
+    const q = ALL_QUESTIONS.find((x) => x.id === 'q258');
+    const opt = q ? questionOptions(q).find((o) => o.id === optionId) : null;
     if (opt && QN_ZODIAC_MAP[opt.value]) state.profile.zodiac = QN_ZODIAC_MAP[opt.value];
   }
 
@@ -1380,10 +1430,19 @@ function buildQuestionnairePortrait(answers = {}) {
   for (const q of ALL_QUESTIONS) {
     const answerId = answers[q.id];
     if (!answerId) continue;
-    const opt = q.options.find((x) => x.id === answerId);
-    if (!opt) continue;
+    const num = numericAnswerValue(answerId);
+    const traits = num != null
+      ? (() => {
+          const bucket = numericBucket(q, num);
+          return bucket ? { [q.category]: bucket } : null;
+        })()
+      : (() => {
+          const opt = questionOptions(q).find((x) => x.id === answerId);
+          return opt ? getOptionTraits(q, opt) : null;
+        })();
+    if (!traits) continue;
     answered += 1;
-    for (const [dim, val] of Object.entries(getOptionTraits(q, opt))) {
+    for (const [dim, val] of Object.entries(traits)) {
       if (!dimensionBuckets[dim]) dimensionBuckets[dim] = {};
       dimensionBuckets[dim][val] = (dimensionBuckets[dim][val] || 0) + 1;
     }
@@ -1445,12 +1504,9 @@ function renderQuestionnaireSummary(profile = state.profile) {
     : `<span class="pill">Портрет ещё строится</span>`;
   const confidence = portrait.answered >= 7 ? 'Портрет уже достаточно выражен' : 'Портрет будет точнее после нескольких ответов';
   return `
-    <div class="card">
-      <div class="card-title">Психологический портрет</div>
-      <div class="muted">Без баллов: мы собираем ответы в дерево решений и строим портрет, который потом помогает подбирать пару.</div>
-      <div class="row-inline" style="margin-top:10px">${snippet}</div>
-      <div class="muted" style="margin-top:10px">Прогресс: ${progress}. ${confidence}</div>
-    </div>
+    <div class="muted">Без баллов: мы собираем ответы в дерево решений и строим портрет, который потом помогает подбирать пару.</div>
+    <div class="row-inline" style="margin-top:10px">${snippet}</div>
+    <div class="muted" style="margin-top:10px">Прогресс: ${progress}. ${confidence}</div>
   `;
 }
 
@@ -1471,11 +1527,20 @@ function renderQuestionnaireBlocks(profile = state.profile) {
       const questionsHtml = group.items
         .map((q) => {
           const selected = answers[q.id];
+          const custom = numericAnswerValue(selected);
+          if (q.numeric) {
+            return `
+            <div class="question-block">
+              <div class="question-title">${escapeHtml(questionText(q))}</div>
+              ${custom != null ? `<div class="row-inline"><span class="pill">${escapeHtml(fmtAmount(Number(custom)))}</span></div>` : `<div class="muted">Точная сумма — в анкете совместимости</div>`}
+            </div>
+          `;
+          }
           return `
             <div class="question-block">
-              <div class="question-title">${escapeHtml(q.question)}</div>
+              <div class="question-title">${escapeHtml(questionText(q))}</div>
               <div class="chip-row questionnaire-options" data-question="${q.id}">
-                ${q.options
+                ${questionOptions(q)
                   .map((opt) => {
                     const active = selected === opt.id;
                     return `<button class="chip questionnaire-chip ${active ? 'active' : ''}" type="button" data-question-answer="${q.id}" data-option="${opt.id}"><span>${escapeHtml(opt.label)}</span><small>${escapeHtml(opt.hint)}</small></button>`;
@@ -1534,29 +1599,61 @@ function setQuestionCard() {
   if (!q) return;
   const answers = getQuestionnaireAnswers();
   const selected = answers[q.id];
-  const opts = q.options
-    .map((o) => {
-      const active = selected === o.id;
-      const hint = o.hint ? `<span class="qn-opt-hint">${escapeHtml(o.hint)}</span>` : '';
-      return `
-        <button class="qn-opt ${active ? 'selected' : ''}" type="button" data-qn-opt="${escapeHtml(o.id)}">
-          <span class="qn-opt-letter">${escapeHtml(o.id.toUpperCase())}</span>
-          <span class="qn-opt-text">
-            <span class="qn-opt-label">${escapeHtml(o.label)}</span>
-            ${hint}
-          </span>
-        </button>
-      `;
-    })
-    .join('');
+  const custom = numericAnswerValue(selected);
+  let inner;
+  if (q.numeric) {
+    inner = `
+      <div class="qn-num">
+        <input id="qnNumInput" class="input qn-num-input" type="number" inputmode="numeric" min="0" step="500" placeholder="Введите сумму в рублях" value="${custom != null ? escapeHtml(custom) : ''}" />
+        <div class="muted">Укажите точную цифру — она попадёт в дерево совместимости</div>
+        <button class="btn" type="button" id="qnNumSave" disabled>Сохранить ответ</button>
+      </div>
+    `;
+  } else {
+    const opts = questionOptions(q)
+      .map((o, idx) => {
+        const active = selected === o.id;
+        const hint = o.hint ? `<span class="qn-opt-hint">${escapeHtml(o.hint)}</span>` : '';
+        const letter = String.fromCharCode(97 + (idx % 26)).toUpperCase();
+        return `
+          <button class="qn-opt ${active ? 'selected' : ''}" type="button" data-qn-opt="${escapeHtml(o.id)}">
+            <span class="qn-opt-letter">${letter}</span>
+            <span class="qn-opt-text">
+              <span class="qn-opt-label">${escapeHtml(o.label)}</span>
+              ${hint}
+            </span>
+          </button>
+        `;
+      })
+      .join('');
+    inner = `<div class="qn-opts">${opts}</div>`;
+  }
   $('#qnCard').innerHTML = `
-    <div class="qn-q">${escapeHtml(q.question)}</div>
-    <div class="qn-opts">${opts}</div>
+    <div class="qn-q">${escapeHtml(questionText(q))}</div>
+    ${inner}
   `;
   $('#qnBlock').textContent = q.block || (q.category ? CATEGORY_LABELS[q.category] : '');
   $('#qnCounter').textContent = `Вопрос ${qnIndex + 1} из ${ALL_QUESTIONS.length} • отвечено: ${Object.keys(answers).length}`;
   $('#qnProgressBar').style.width = Math.round(((qnIndex + 1) / ALL_QUESTIONS.length) * 100) + '%';
   $('#btnQuestionnairePrev').disabled = qnIndex === 0;
+  if (q.numeric) {
+    const input = document.getElementById('qnNumInput');
+    const saveBtn = document.getElementById('qnNumSave');
+    if (input && saveBtn) {
+      input.addEventListener('input', () => {
+        const v = numericAnswerValue(`custom:${input.value}`);
+        saveBtn.disabled = v == null;
+      });
+      saveBtn.addEventListener('click', () => {
+        const v = numericAnswerValue(`custom:${input?.value || ''}`);
+        if (v == null) return;
+        setQuestionnaireAnswer(q.id, `custom:${v}`, { silent: true });
+        haptic('light');
+        qnGo(1);
+      });
+      setTimeout(() => input?.focus(), 120);
+    }
+  }
 }
 
 function qnGo(dir) {
@@ -1607,7 +1704,6 @@ function wireQuestionnaire() {
     startY = e.clientY;
     tracking = true;
     pointerId = e.pointerId;
-    card.setPointerCapture?.(pointerId);
   };
 
   const onMove = (e) => {
@@ -2282,27 +2378,29 @@ function categorizeEvents(list) {
   })).filter((g) => g.events.length || g.id === 'culture');
 }
 
-function renderTreeFilterGroup(catId, label, questions, tree, catKey) {
+function renderTreeFilterGroup(catId, label, questions, tree, catKey, treeOpen = []) {
   const qs = questions.filter((q) => (catKey ? q.category === catKey : !q.category));
   const selectedCount = qs.reduce((n, q) => n + ((tree[q.id] || []).length ? 1 : 0), 0);
+  const open = treeOpen.includes(catId);
   return `
     <div class="tree-filter-cat">
-      <button class="tree-filter-cat-head" type="button" data-tree-filter-cat="${catId}" aria-expanded="false">
+      <button class="tree-filter-cat-head" type="button" data-tree-filter-cat="${catId}" aria-expanded="${open ? 'true' : 'false'}">
         <span>${escapeHtml(label)}</span>
         ${selectedCount ? `<span class="pill">${selectedCount}</span>` : ''}
         <span class="chevron" aria-hidden="true"></span>
       </button>
-      <div class="tree-filter-body" hidden>
+      <div class="tree-filter-body" ${open ? '' : 'hidden'}>
         ${qs
+          .filter((q) => !q.numeric)
           .map((q) => {
             const sel = new Set(tree[q.id] || []);
-            const opts = q.options
+            const opts = questionOptions(q)
               .map((o) => {
                 const active = sel.has(o.id);
                 return `<button class="chip ${active ? 'active' : ''}" type="button" data-tree-answer="${q.id}" data-option="${o.id}">${escapeHtml(o.label)}</button>`;
               })
               .join('');
-            return `<div class="tree-filter-q"><div class="muted">${escapeHtml(q.question)}</div><div class="chip-row">${opts}</div></div>`;
+            return `<div class="tree-filter-q"><div class="muted">${escapeHtml(questionText(q))}</div><div class="chip-row">${opts}</div></div>`;
           })
           .join('')}
       </div>
@@ -2312,10 +2410,11 @@ function renderTreeFilterGroup(catId, label, questions, tree, catKey) {
 
 function renderTreeFilters(filters = {}) {
   const tree = filters.tree || {};
+  const treeOpen = Array.isArray(filters.treeOpen) ? filters.treeOpen : [];
   const cats = CATEGORY_ORDER.map((catId) =>
-    renderTreeFilterGroup(catId, CATEGORY_LABELS[catId] || catId, FULL_QUESTIONNAIRE, tree, catId)
+    renderTreeFilterGroup(catId, CATEGORY_LABELS[catId] || catId, FULL_QUESTIONNAIRE, tree, catId, treeOpen)
   ).join('');
-  const psych = renderTreeFilterGroup('psych', 'Психология', QUESTIONNAIRE, tree);
+  const psych = renderTreeFilterGroup('psych', 'Психология', QUESTIONNAIRE, tree, null, treeOpen);
   const totalActive = Object.values(tree).reduce((n, a) => n + a.length, 0);
   return `
     <div class="filter-group">
@@ -2330,9 +2429,9 @@ function matchesTreeFilters(p, treeFilter = {}) {
   for (const [qid, opts] of Object.entries(treeFilter)) {
     if (!Array.isArray(opts) || !opts.length) continue;
     const q = ALL_QUESTIONS.find((x) => x.id === qid);
-    if (!q) continue;
+    if (!q || q.numeric) continue;
     const matches = opts.some((optId) => {
-      const opt = q.options.find((o) => o.id === optId);
+      const opt = questionOptions(q).find((o) => o.id === optId);
       if (!opt) return false;
       if (q.category) return p.factual?.[q.category] === opt.value;
       return Object.entries(getOptionTraits(q, opt)).some(([dim, val]) => p.persona?.[dim] === val);
@@ -2502,9 +2601,21 @@ function renderDating() {
     btn.addEventListener('click', () => {
       const body = btn.closest('.tree-filter-cat')?.querySelector('.tree-filter-body');
       if (!body) return;
-      const open = body.hidden;
-      body.hidden = !open;
-      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      state.dating.filters = state.dating.filters || {};
+      const open = Array.isArray(state.dating.filters.treeOpen) ? state.dating.filters.treeOpen : [];
+      const catId = btn.dataset.treeFilterCat;
+      const idx = open.indexOf(catId);
+      if (body.hidden) {
+        if (idx < 0 && catId) open.push(catId);
+        body.hidden = false;
+        btn.setAttribute('aria-expanded', 'true');
+      } else {
+        if (idx >= 0) open.splice(idx, 1);
+        body.hidden = true;
+        btn.setAttribute('aria-expanded', 'false');
+      }
+      state.dating.filters.treeOpen = open;
+      save();
     });
   });
 
@@ -2568,6 +2679,7 @@ function renderDating() {
 function renderStats() {
   const name = state.profile?.name || '';
   const description = state.profile?.description || '';
+  const gender = String(state.profile?.gender || '');
   const interests = state.profile?.interests || [];
   const interestsText = interests.join(', ');
   const zodiac = state.profile?.zodiac || '';
@@ -2624,6 +2736,15 @@ function renderStats() {
           <input id="profileName" class="input" maxlength="40" value="${escapeHtml(name)}" placeholder="Ваше имя" />
         </div>
         <div class="profile-field">
+          <label class="label">Вы кто</label>
+          <select id="profileGender" class="select">
+            <option value="" ${!gender ? 'selected' : ''}>Не указано</option>
+            <option value="female" ${gender === 'female' ? 'selected' : ''}>Женщина</option>
+            <option value="male" ${gender === 'male' ? 'selected' : ''}>Мужчина</option>
+          </select>
+          <div class="muted">От этого зависят формулировки вопросов и варианты ответов в анкете.</div>
+        </div>
+        <div class="profile-field">
           <label class="label">Описание</label>
           <textarea id="profileDescription" class="input" maxlength="2000" placeholder="Расскажите о себе (до 2000 символов)">${escapeHtml(description)}</textarea>
         </div>
@@ -2674,11 +2795,10 @@ function renderStats() {
         </div>
       </div>
 
-      ${renderQuestionnaireSummary(state.profile)}
-
       <div class="card">
         <div class="card-title">Анкета совместимости</div>
         <div class="muted">Отвечайте карточками — вопросы перелистываются слева направо. Ответы попадают в портрет без баллов (дерево решений) и используются для подбора пары.</div>
+        ${renderQuestionnaireSummary(state.profile)}
         <div class="row-inline" style="margin-top:10px">
           <button class="btn" type="button" data-action="openQuestionnaire">${portrait.answered ? 'Продолжить анкету' : 'Пройти анкету'}</button>
           <span class="pill">${portrait.answered || 0}/${portrait.total || ALL_QUESTIONS.length}</span>
@@ -2777,6 +2897,7 @@ function renderStats() {
 
   $('#view-stats').querySelector('[data-action="saveProfileMini"]')?.addEventListener('click', () => {
     const nextName = String($('#view-stats').querySelector('#profileName')?.value || '').trim().slice(0, 40);
+    const nextGender = String($('#view-stats').querySelector('#profileGender')?.value || '');
     const nextDescription = String($('#view-stats').querySelector('#profileDescription')?.value || '').slice(0, 2000);
     const nextZodiac = String($('#view-stats').querySelector('#profileZodiac')?.value || '').trim().slice(0, 30);
     const nextJobTitle = String($('#view-stats').querySelector('#profileJobTitle')?.value || '').trim().slice(0, 60);
@@ -2788,6 +2909,7 @@ function renderStats() {
       .filter(Boolean)
       .slice(0, 30);
     state.profile.name = nextName || state.profile.name;
+    state.profile.gender = nextGender;
     state.profile.description = nextDescription;
     state.profile.zodiac = nextZodiac;
     state.profile.jobTitle = nextJobTitle;
