@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel } from './events.js';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js';
 import {
   clearState,
   defaultState,
@@ -15,6 +15,7 @@ import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js';
 import { StepCounter } from './steps.js';
 import { decryptJson, encryptJson } from './encryption.js';
 import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js';
+import { partnerFilterText } from './partner-filter-text.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1604,14 +1605,42 @@ function renderQuestionnaireCategories(profile = state.profile) {
     const done = info.answered >= info.total;
     const pct = info.total ? Math.round((info.answered / info.total) * 100) : 0;
     return `
-      <div class="cat-progress-item ${done ? 'cat-progress-done' : ''}">
+      <button type="button" class="cat-progress-item ${done ? 'cat-progress-done' : ''}" data-open-cat="${c}">
         <div class="cat-progress-name">${escapeHtml(CATEGORY_LABELS[c] || c)}</div>
         <div class="cat-progress-bar"><div class="cat-progress-fill" style="width:${pct}%"></div></div>
-        <div class="cat-progress-count">${info.answered}/${info.total}</div>
-      </div>
+        <div class="cat-progress-count">${info.answered}/${info.total} — открыть</div>
+      </button>
     `;
   }).join('');
-  return `<div class="cat-progress-grid">${items}</div>`;
+  const psychAnswered = QUESTIONNAIRE.filter((q) => answers[q.id]).length;
+  const psychTotal = QUESTIONNAIRE.length;
+  const psychPct = psychTotal ? Math.round((psychAnswered / psychTotal) * 100) : 0;
+  const psychItem = `
+    <button type="button" class="cat-progress-item ${psychAnswered >= psychTotal ? 'cat-progress-done' : ''}" data-open-cat="__psych">
+      <div class="cat-progress-name">Психология</div>
+      <div class="cat-progress-bar"><div class="cat-progress-fill" style="width:${psychPct}%"></div></div>
+      <div class="cat-progress-count">${psychAnswered}/${psychTotal} — открыть</div>
+    </button>
+  `;
+  return `<div class="cat-progress-grid">${items}${psychItem}</div>`;
+}
+
+function openQuestionnaireAt(qid) {
+  const idx = ALL_QUESTIONS.findIndex((q) => q.id === qid);
+  if (idx < 0) return openQuestionnaire();
+  qnIndex = idx;
+  qnAnimating = false;
+  setQuestionCard();
+  $('#dlgQuestionnaire').showModal();
+  haptic('open');
+}
+
+function openQuestionnaireCategory(catId) {
+  const answers = getQuestionnaireAnswers();
+  const list = catId === '__psych' ? QUESTIONNAIRE : FULL_QUESTIONNAIRE.filter((q) => q.category === catId);
+  const target = list.find((q) => !answers[q.id]) || list[0];
+  if (!target) return toast('В этой категории нет вопросов');
+  openQuestionnaireAt(target.id);
 }
 
 function openQuestionnaire() {
@@ -1761,6 +1790,7 @@ function qnGo(dir) {
 
 function wireQuestionnaire() {
   $('#btnQuestionnaireClose').addEventListener('click', closeQuestionnaire);
+  $('#btnBookingClose')?.addEventListener('click', () => $('#dlgBooking')?.close());
   $('#btnQuestionnairePrev').addEventListener('click', () => qnGo(-1));
   $('#btnQuestionnaireSkip').addEventListener('click', () => qnGo(1));
   $('#dlgQuestionnaire').addEventListener('close', () => renderAll());
@@ -2292,11 +2322,167 @@ function renderHome() {
   wireHomeContentHandlers('#view-home');
 }
 
+const VENUE_KIND_LABELS = {
+  food: 'Рестораны',
+  coffee: 'Кофейни',
+  cinema: 'Кино',
+  museums: 'Музеи',
+  sport: 'Спортзалы',
+  spa: 'СПА и массаж',
+  walks: 'Парки и прогулки',
+  games: 'Квесты и настолки',
+  art: 'Театры и искусство',
+  night: 'Бары и клубы'
+};
+
+function venueKindLabel(kind) {
+  return VENUE_KIND_LABELS[kind] || kind || 'Место';
+}
+
+function tomorrowKey() {
+  const d = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function openBookingDialog(venue) {
+  const dlg = $('#dlgBooking');
+  if (!dlg) return toast('Окно брони недоступно');
+  $('#bkVenueTitle').textContent = `${venue.imageEmoji || ''} ${venue.title}`;
+  $('#bkVenueMeta').textContent = `${venue.address || ''} • от ${venue.priceFrom ? `${venue.priceFrom} ₽` : 'бесплатно'} • ${venue.openHours || ''}`;
+  const timeOptions = [];
+  for (let h = 10; h <= 21; h++) timeOptions.push(`${String(h).padStart(2, '0')}:00`);
+  $('#bkBody').innerHTML = `
+    <div class="bk-form">
+      <div class="bk-row">
+        <label class="label">Дата</label>
+        <input class="input" type="date" id="bkDate" value="${tomorrowKey()}" />
+      </div>
+      <div class="bk-row">
+        <label class="label">Время</label>
+        <select class="select" id="bkTime">${timeOptions.map((t) => `<option>${t}</option>`).join('')}</select>
+      </div>
+      <div class="bk-row">
+        <label class="label">Гостей</label>
+        <select class="select" id="bkGuests">${[1, 2, 3, 4, 5, 6].map((n) => `<option value="${n}" ${n === 2 ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      </div>
+      <div class="bk-row">
+        <label class="label">Максимальный бюджет (аукцион найдёт лучшую цену)</label>
+        <input class="input" type="number" inputmode="numeric" id="bkBudget" value="${venue.priceFrom * 2}" placeholder="Ваш бюджет, ₽" />
+      </div>
+      <button class="btn" type="button" id="bkGetQuote">Получить предложения (аукцион) →</button>
+      <div id="bkOffers" class="bk-offers"></div>
+      <div id="bkResult"></div>
+    </div>
+  `;
+  dlg.showModal();
+  dlg.querySelector('#bkGetQuote')?.addEventListener('click', async () => {
+    const guests = dlg.querySelector('#bkGuests')?.value || '2';
+    const date = dlg.querySelector('#bkDate')?.value || '';
+    const time = dlg.querySelector('#bkTime')?.value || '19:00';
+    const budget = dlg.querySelector('#bkBudget')?.value || '';
+    const zone = dlg.querySelector('#bkOffers');
+    if (!zone) return;
+    zone.innerHTML = '<div class="muted">Аукцион объявляет цены…</div>';
+    try {
+      const offers = await apiLocalsBookQuote(venue, guests, date, budget);
+      if (!Array.isArray(offers) || !offers.length) throw new Error('Нет предложений');
+      zone.innerHTML = `
+        <div class="muted" style="margin:10px 0">Выберите предложение:</div>
+        ${offers
+          .map(
+            (o, i) => `
+        <label class="bk-offer ${o.available === false ? 'disabled' : ''}">
+          <input type="radio" name="bkOffer" value="${i}" ${i === 0 ? 'checked' : ''} ${o.available === false ? 'disabled' : ''} />
+          <span class="bk-offer-name">${escapeHtml(o.partner)}</span>
+          <span class="pill">${o.discountPct > 0 ? `−${o.discountPct}%` : 'базовая'}</span>
+          <span class="bk-offer-price">${o.price} ₽</span>
+        </label>
+        `
+          )
+          .join('')}
+        <button class="btn" type="button" id="bkConfirm">Подтвердить бронь</button>
+      `;
+      zone.querySelector('#bkConfirm')?.addEventListener('click', async () => {
+        const radio = zone.querySelector('input[name="bkOffer"]:checked');
+        const offer = offers[Number(radio?.value)];
+        if (!offer) return;
+        const btn = zone.querySelector('#bkConfirm');
+        if (btn) btn.disabled = true;
+        try {
+          const booking = await apiLocalsBook(venue, {
+            venueId: venue.id,
+            guests: Number(guests),
+            date,
+            time,
+            partner: offer.partner,
+            price: offer.price
+          });
+          zone.innerHTML = `
+            <div class="bk-success">
+              <div class="pill good">✓ Запись подтверждена</div>
+              <div class="muted">${escapeHtml(booking.title)} • ${escapeHtml(booking.date)} ${escapeHtml(booking.time)} • ${Number(booking.guests)} гостей • ${booking.partner} — ${Number(booking.price)} ₽</div>
+              <div class="muted">Код брони: ${escapeHtml(String(booking.id))}</div>
+              <div class="row-inline" style="margin-top:10px">
+                <button class="btn" type="button" id="bkAddPlan">Добавить в планы</button>
+                <button class="btn ghost" type="button" id="bkDone">Готово</button>
+              </div>
+            </div>
+          `;
+          zone.querySelector('#bkAddPlan')?.addEventListener('click', () => {
+            addPlan({
+              title: booking.title,
+              kind: 'venue',
+              venueId: venue.id,
+              cityKey: venue.city,
+              lat: venue.lat,
+              lon: venue.lon
+            });
+            toast(`Добавлено в планы: ${booking.title}`);
+            haptic('light');
+          });
+          zone.querySelector('#bkDone')?.addEventListener('click', () => dlg.close());
+          toast('Бронь подтверждена');
+          haptic('medium');
+        } catch (err) {
+          zone.innerHTML = `<div class="bk-error">Не удалось забронировать: ${escapeHtml(err?.message || 'ошибка')}</div>`;
+        }
+      });
+    } catch (err) {
+      zone.innerHTML = `<div class="bk-error">Не удалось получить предложения: ${escapeHtml(err?.message || 'ошибка')}</div>`;
+    }
+  });
+}
+
 function renderEvents() {
   const cityKey = currentCityKey();
   const list = filterEventsByCity(cityKey);
   const eventsView = state.ui?.eventsView || 'places';
   const categorized = categorizeEvents(list);
+
+  const venues = cityKey ? VENUES.filter((v) => v.city === cityKey) : VENUES;
+  const venuesBody = venues.length
+    ? `<div class="card">
+        <div class="card-title">Записаться на свидание/досуг</div>
+        <div class="muted">Рестораны, кафе, кино, спортзалы, СПА и парки — выберите место, укажите бюджет, и аукцион предложит лучшую цену.</div>
+        <div class="venues-grid">
+          ${venues
+            .map(
+              (v) => `
+            <div class="venue-card">
+              <div class="venue-emoji">${v.imageEmoji || '📍'}</div>
+              <div class="venue-title">${escapeHtml(v.title)}</div>
+              <div class="muted venue-addr">${escapeHtml(v.address)}</div>
+              <div class="venue-meta"><span class="pill">${escapeHtml(venueKindLabel(v.kind))}</span><span class="pill">${v.openHours}</span></div>
+              <div class="venue-price">от ${v.priceFrom ? `${v.priceFrom} ₽` : 'бесплатно'}</div>
+              <button class="btn" type="button" data-book-venue="${v.id}">Записаться</button>
+            </div>
+          `
+            )
+            .join('')}
+        </div>
+      </div>`
+    : '';
 
   const header = `
     <div class="card">
@@ -2352,11 +2538,19 @@ function renderEvents() {
         .join('')}</div></div>`
     : `<div class="card"><div class="card-title">Подходящие события</div><div class="muted">Пока нет событий для этого города. Добавьте свой источник событий на бекенде или расширьте локальный список.</div></div>`;
 
-  $('#view-events').innerHTML = `<div class="grid">${header}${eventsView === 'map' ? mapBody : placesBody}</div>`;
+  $('#view-events').innerHTML = `<div class="grid">${header}${eventsView === 'map' ? mapBody : placesBody}${eventsView === 'places' ? venuesBody : ''}</div>`;
 
   if (eventsView === 'map') {
     renderEventsMap(list, cityKey);
   }
+
+  $('#view-events').querySelectorAll('[data-book-venue]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const venue = venueById(btn.dataset.bookVenue);
+      if (venue) openBookingDialog(venue);
+      haptic('light');
+    });
+  });
 
   $('#view-events').querySelector('[data-action="refresh"]')?.addEventListener('click', () => {
     refreshRemoteEvents(cityKey)
@@ -2449,8 +2643,29 @@ function renderEventsMap(list, cityKey) {
     eventMarkers.push(m);
   }
 
-  if (eventMarkers.length) {
-    const group = L.featureGroup(eventMarkers);
+  const venueMarkers = [];
+  const cityKeyHere = currentCityKey();
+  const venuesHere = cityKeyHere ? VENUES.filter((v) => v.city === cityKeyHere) : VENUES;
+  for (const v of venuesHere) {
+    if (typeof v.lat !== 'number' || typeof v.lon !== 'number') continue;
+    const m = L.circleMarker([v.lat, v.lon], {
+      radius: 8,
+      color: '#0d9488',
+      fillColor: '#14b8a6',
+      fillOpacity: 0.85
+    }).addTo(map);
+    m.bindPopup(`
+      <div style="font-weight:700;margin-bottom:4px">${escapeHtml(v.imageEmoji || '')} ${escapeHtml(v.title)}</div>
+      <div style="opacity:.8">${escapeHtml(v.address || '')}</div>
+      <div style="opacity:.8;margin-top:4px">${escapeHtml(venueKindLabel(v.kind))} • от ${v.priceFrom ? `${v.priceFrom} ₽` : 'бесплатно'}</div>
+      <div style="opacity:.8">Часы: ${escapeHtml(v.openHours || '')}</div>
+    `);
+    venueMarkers.push(m);
+  }
+
+  const combined = [...eventMarkers, ...venueMarkers];
+  if (combined.length) {
+    const group = L.featureGroup(combined);
     map.fitBounds(group.getBounds().pad(0.2));
   } else if (cityKey) {
     const center = cityCenter(cityKey);
@@ -2497,7 +2712,7 @@ function renderTreeFilterGroup(catId, label, questions, tree, catKey, treeOpen =
                 return `<button class="chip ${active ? 'active' : ''}" type="button" data-tree-answer="${q.id}" data-option="${o.id}">${escapeHtml(o.label)}</button>`;
               })
               .join('');
-            return `<div class="tree-filter-q"><div class="muted">${escapeHtml(questionText(q))}</div><div class="chip-row">${opts}</div></div>`;
+            return `<div class="tree-filter-q"><div class="muted">${escapeHtml(partnerFilterText(q))}</div><div class="chip-row">${opts}</div></div>`;
           })
           .join('')}
       </div>
@@ -2514,7 +2729,7 @@ function renderTreeFilters(filters = {}) {
   const psych = renderTreeFilterGroup('psych', 'Психология', QUESTIONNAIRE, tree, null, treeOpen);
   const totalActive = Object.values(tree).reduce((n, a) => n + a.length, 0);
   return `
-    <div class="filter-group">
+    <div class="filter-group tree-filter-group">
       <div class="label">Анкета (дерево решений)${totalActive ? ` <span class="pill">${totalActive}</span>` : ''}</div>
       <div class="tree-filter">${cats}${psych}</div>
       ${totalActive ? '<button class="btn ghost" type="button" data-tree-filter-reset>Сбросить фильтры анкеты</button>' : ''}
@@ -2780,9 +2995,7 @@ function renderStats() {
   const interests = state.profile?.interests || [];
   const interestsText = interests.join(', ');
   const zodiac = state.profile?.zodiac || '';
-  const jobTitle = state.profile?.jobTitle || '';
   const wishlistPlaces = new Set(state.profile?.wishlistPlaces || []);
-  const budget = state.profile?.budget || '';
   const customPlaces = Array.isArray(state.profile?.customPlaces) ? state.profile.customPlaces : [];
   const photos = state.profile?.photos || [];
   const stepsOn = !!state.consent?.steps;
@@ -2849,15 +3062,6 @@ function renderStats() {
         <div class="profile-field">
           <label class="label">Гороскоп</label>
           <input id="profileZodiac" class="input" value="${escapeHtml(zodiac)}" placeholder="Например: Овен" />
-        </div>
-        <div class="profile-field">
-          <label class="label">Работа</label>
-          <input id="profileJobTitle" class="input" value="${escapeHtml(jobTitle)}" placeholder="Например: Product Manager" />
-        </div>
-        <div class="profile-field">
-          <label class="label">Бюджет на партнера</label>
-          <input id="profileBudget" class="input" inputmode="numeric" value="${escapeHtml(budget)}" placeholder="Например: 10000 ₽" />
-          <div class="muted">Сколько вы готовы потратить на партнера или совместную встречу.</div>
         </div>
         <div class="profile-field">
           <label class="label">Места, куда хотите пойти</label>
@@ -2997,8 +3201,6 @@ function renderStats() {
     const nextGender = String($('#view-stats').querySelector('#profileGender')?.value || '');
     const nextDescription = String($('#view-stats').querySelector('#profileDescription')?.value || '').slice(0, 2000);
     const nextZodiac = String($('#view-stats').querySelector('#profileZodiac')?.value || '').trim().slice(0, 30);
-    const nextJobTitle = String($('#view-stats').querySelector('#profileJobTitle')?.value || '').trim().slice(0, 60);
-    const nextBudget = String($('#view-stats').querySelector('#profileBudget')?.value || '').trim().slice(0, 40);
     const nextInterestsRaw = String($('#view-stats').querySelector('#profileInterestsText')?.value || '');
     const nextInterests = nextInterestsRaw
       .split(',')
@@ -3009,8 +3211,6 @@ function renderStats() {
     state.profile.gender = nextGender;
     state.profile.description = nextDescription;
     state.profile.zodiac = nextZodiac;
-    state.profile.jobTitle = nextJobTitle;
-    state.profile.budget = nextBudget;
     state.profile.interests = nextInterests;
     state.profile.portrait = buildQuestionnairePortrait(state.profile.questionnaireAnswers || {});
     save();
@@ -3025,6 +3225,13 @@ function renderStats() {
       const oid = btn.dataset.option;
       if (!qid || !oid) return;
       setQuestionnaireAnswer(qid, oid);
+      haptic('light');
+    });
+  });
+
+  $('#view-stats').querySelectorAll('[data-open-cat]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      openQuestionnaireCategory(btn.dataset.openCat);
       haptic('light');
     });
   });
@@ -3138,7 +3345,6 @@ function renderCircle() {
     <div class="grid circle-layout">
       <div class="card">
         <div class="card-title">Круг знакомств</div>
-        <div class="muted">Мы храним всё локально. Имена авторов рекомендаций не показываются — только анонимные теги и качество согласия.</div>
         <div class="row-inline" style="margin-top:10px">
           <span class="pill ${selfSummary.tone === 'good' ? 'status-pill good' : selfSummary.tone === 'bad' ? 'status-pill bad' : 'status-pill warn'}">${selfSummary.label}</span>
           ${selfHighlights.values.length ? `<span class="pill status-pill good">${escapeHtml(selfHighlights.values[0])}</span>` : ''}
@@ -3516,6 +3722,98 @@ async function apiGetEvents(serverUrl, cityKey) {
   return data.events || [];
 }
 
+async function apiGetVenues(serverUrl, cityKey) {
+  const base = normalizeServerUrl(serverUrl);
+  const url = cityKey ? `${base}/api/venues?city=${encodeURIComponent(cityKey)}` : `${base}/api/venues`;
+  const res = await fetch(url, { method: 'GET' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ? String(data.error) : `HTTP ${res.status}`);
+  return data.venues || [];
+}
+
+async function apiGetBookingQuote(serverUrl, venueId, guests, date, budget) {
+  const base = normalizeServerUrl(serverUrl);
+  const url = `${base}/api/book/quote?venueId=${encodeURIComponent(venueId)}&guests=${encodeURIComponent(guests)}&date=${encodeURIComponent(date || '')}&budget=${encodeURIComponent(budget || '')}`;
+  const res = await fetch(url, { method: 'GET' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ? String(data.error) : `HTTP ${res.status}`);
+  return data.offers || [];
+}
+
+async function apiBookVenue(serverUrl, body) {
+  const base = normalizeServerUrl(serverUrl);
+  const res = await fetch(`${base}/api/book`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ? String(data.error) : `HTTP ${res.status}`);
+  return data.booking;
+}
+
+// Локальная симуляция аукциона, если сервер не подключён (демо-режим).
+function simulateLocalOffers(venue, guests, date, budget) {
+  const guestsN = Math.max(1, Number(guests) || 1);
+  const budgetN = Number(budget) || venue.priceFrom * guestsN;
+  const base = Math.max(venue.priceFrom, 300) * guestsN;
+  const seedStr = `${venue.id}|${date}|${guestsN}`;
+  let seed = 0;
+  for (let i = 0; i < seedStr.length; i++) seed = (seed * 31 + seedStr.charCodeAt(i)) >>> 0;
+  const rnd = () => {
+    seed = (seed * 1103515245 + 12345) >>> 0;
+    return seed / 4294967296;
+  };
+  const partners = [
+    { name: 'Место напрямую', tag: 'direct' },
+    { name: 'Партнёрский сервис', tag: 'partner' },
+    { name: 'Спецпредложение', tag: 'deal' }
+  ];
+  return partners.map((p, i) => {
+    const jitter = 0.92 + rnd() * 0.12 - i * 0.045;
+    let price = Math.round((base * jitter) / 50) * 50;
+    if (budgetN > 0 && price > budgetN) price = Math.max(Math.floor(venue.priceFrom / 2 / 50) * 50, Math.round((budgetN * 0.85) / 50) * 50);
+    return { partner: p.name, tag: p.tag, price, discountPct: Math.round((1 - price / base) * 100), available: i < 2 || rnd() > 0.15 };
+  });
+}
+
+async function apiLocalsBookQuote(venue, guests, date, budget) {
+  const serverUrl = state.cloud?.serverUrl;
+  if (serverUrl) {
+    try {
+      return await apiGetBookingQuote(serverUrl, venue.id, guests, date, budget);
+    } catch {
+      // fall through to local simulation
+    }
+  }
+  return simulateLocalOffers(venue, guests, date, budget);
+}
+
+async function apiLocalsBook(venue, body) {
+  const serverUrl = state.cloud?.serverUrl;
+  if (serverUrl) {
+    try {
+      return await apiBookVenue(serverUrl, body);
+    } catch {
+      // fall through to local simulation
+    }
+  }
+  const booking = {
+    id: `bk-local-${Date.now().toString(36)}`,
+    venueId: venue.id,
+    title: venue.title,
+    city: venue.city,
+    guests: body.guests,
+    date: body.date,
+    time: body.time,
+    partner: body.partner,
+    price: body.price,
+    status: 'confirmed',
+    createdAt: new Date().toISOString()
+  };
+  return booking;
+}
+
 async function apiGetSync(serverUrl, token) {
   return apiJson(serverUrl, '/api/sync', { method: 'GET', headers: { authorization: `Bearer ${token}` } });
 }
@@ -3608,9 +3906,10 @@ function initMapIfNeeded(containerId = 'map') {
   const zoom = state.lastKnown ? 14 : fallback.zoom;
 
   map = L.map(el, { zoomControl: false });
-  mapLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  // Яндекс-тайлы: компании и POI подписаны на карте. При желании можно вернуть OSM.
+  mapLayer = L.tileLayer('https://core-renderer-tiles.maps.yandex.net/tiles?l=map&v=21.02.07&z={z}&x={x}&y={y}&scale=1&lang=ru_RU', {
     maxZoom: 19,
-    attribution: '&copy; OpenStreetMap'
+    attribution: '&copy; Яндекс Карты'
   }).addTo(map);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
   map.setView([lat, lon], zoom);

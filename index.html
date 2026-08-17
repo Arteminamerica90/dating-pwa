@@ -296,6 +296,19 @@
       </div>
     </dialog>
 
+    <dialog id="dlgBooking" class="dialog">
+      <div class="dialog-card">
+        <div class="dialog-head">
+          <div>
+            <div class="dialog-title">Запись: <span id="bkVenueTitle"></span></div>
+            <div class="muted" id="bkVenueMeta"></div>
+          </div>
+          <button class="btn ghost" id="btnBookingClose" type="button">Закрыть</button>
+        </div>
+        <div id="bkBody"></div>
+      </div>
+    </dialog>
+
     <dialog id="dlgConsent" class="dialog">
       <form method="dialog" class="dialog-card">
         <div class="dialog-title">Разрешения</div>
@@ -414,7 +427,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=33')
+      import('./app.js?v=36')
         .then(() => {
           window.__walkdateImportOk = true;
         })

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'walkdate-v66';
+const CACHE_NAME = 'walkdate-v69';
 const CORE = [
   './',
   './index.html',
@@ -11,6 +11,7 @@ const CORE = [
   './steps.js',
   './events.js',
   './questionnaire-data.js',
+  './partner-filter-text.js',
   './manifest.webmanifest',
   './icons/icon.svg',
   './assets/profile/photo-1024.jpg',
