@@ -18,6 +18,7 @@ export function getSupabase() {
 }
 
 export async function supabaseSignUp(email, password) {
+  if (!isSupabaseConfigured()) throw new Error('Supabase не настроен');
   const supabase = await getSupabase();
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw new Error(error.message);
@@ -26,6 +27,7 @@ export async function supabaseSignUp(email, password) {
 }
 
 export async function supabaseSignIn(email, password) {
+  if (!isSupabaseConfigured()) throw new Error('Supabase не настроен');
   const supabase = await getSupabase();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw new Error(error.message);
@@ -34,6 +36,7 @@ export async function supabaseSignIn(email, password) {
 }
 
 export async function supabaseSignOut() {
+  if (!isSupabaseConfigured()) return;
   const supabase = await getSupabase();
   const { error } = await supabase.auth.signOut();
   if (error) throw new Error(error.message);
@@ -69,10 +72,12 @@ export async function supabaseSaveProfile(userId, payload) {
 
 export function supabaseOnAuth(cb) {
   if (!isSupabaseConfigured()) return () => {};
-  getSupabase().then((supabase) => {
-    supabase.auth.onAuthStateChange((event, session) => {
-      cb(event, session?.user || null);
-    });
-  });
+  getSupabase()
+    .then((supabase) => {
+      supabase.auth.onAuthStateChange((event, session) => {
+        cb(event, session?.user || null);
+      });
+    })
+    .catch(() => {});
   return () => {};
 }
