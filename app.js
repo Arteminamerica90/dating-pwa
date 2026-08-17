@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=43';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=44';
 import {
   clearState,
   defaultState,
@@ -10,12 +10,12 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=43';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=43';
-import { StepCounter } from './steps.js?v=43';
-import { decryptJson, encryptJson } from './encryption.js?v=43';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=43';
-import { partnerFilterText } from './partner-filter-text.js?v=43';
+} from './storage.js?v=44';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=44';
+import { StepCounter } from './steps.js?v=44';
+import { decryptJson, encryptJson } from './encryption.js?v=44';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=44';
+import { partnerFilterText } from './partner-filter-text.js?v=44';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -25,7 +25,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=43';
+} from './supabase.js?v=44';
 
 const $ = (sel) => document.querySelector(sel);
 
