@@ -60,37 +60,7 @@
 
         <div class="grid2">
           <div class="card">
-            <div class="card-title">Геолокация</div>
-            <div class="row">
-              <label class="switch">
-                <input id="toggleGeo" type="checkbox" />
-                <span class="slider"></span>
-              </label>
-              <div>
-                <div>Отслеживать геометки</div>
-                <div class="muted">watchPosition; можно выключить в любой момент.</div>
-              </div>
-            </div>
-            <div class="row">
-              <label class="switch">
-                <input id="toggleMapShare" type="checkbox" />
-                <span class="slider"></span>
-              </label>
-              <div>
-                <div>Показывать меня на карте</div>
-                <div class="muted">Отправляет на сервер только текущую точку (при включенном синке).</div>
-              </div>
-            </div>
-            <div class="row">
-              <label class="switch">
-                <input id="togglePlanShare" type="checkbox" />
-                <span class="slider"></span>
-              </label>
-              <div>
-                <div>Публиковать планы сегодня</div>
-                <div class="muted">Покажет другим, куда вы планируете сходить сегодня (при включенном синке).</div>
-              </div>
-            </div>
+            <div class="card-title">Город</div>
             <div class="row">
               <label class="label">Город (если авто-определение не сработало)</label>
               <select id="selectCity" class="select">
@@ -100,27 +70,6 @@
                 <option value="Kazan">Казань</option>
                 <option value="Novosibirsk">Новосибирск</option>
               </select>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-title">Шаги</div>
-            <div class="row">
-              <label class="switch">
-                <input id="toggleSteps" type="checkbox" />
-                <span class="slider"></span>
-              </label>
-              <div>
-                <div>Считать шаги</div>
-                <div class="muted">На вебе нет универсального шагомера; используем датчики, если доступны, иначе ручной ввод.</div>
-              </div>
-            </div>
-            <div class="row">
-              <label class="label">Ручной ввод (сегодня)</label>
-              <div class="row-inline">
-                <input id="inputSteps" class="input" inputmode="numeric" pattern="[0-9]*" placeholder="например 4200" />
-                <button id="btnSaveSteps" class="btn" type="button">Сохранить</button>
-              </div>
             </div>
           </div>
 
@@ -298,27 +247,6 @@
       </div>
     </dialog>
 
-    <dialog id="dlgConsent" class="dialog">
-      <form method="dialog" class="dialog-card">
-        <div class="dialog-title">Разрешения</div>
-        <div class="muted">Чтобы приложение работало, нужны разрешения. Можно отказаться и пользоваться частично.</div>
-        <div class="card">
-          <div class="row">
-            <div class="pill">Геолокация</div>
-            <div class="muted">Нужна, чтобы показывать события только вашего города и сохранять геометки.</div>
-          </div>
-          <div class="row">
-            <div class="pill">Датчики</div>
-            <div class="muted">Для приблизительного подсчёта шагов (если браузер поддерживает).</div>
-          </div>
-        </div>
-        <div class="row-inline right">
-          <button class="btn ghost" value="skip" type="submit">Пропустить</button>
-          <button id="btnConsentOk" class="btn" value="ok" type="submit">Разрешить</button>
-        </div>
-      </form>
-    </dialog>
-
     <script>
       // Non-module watchdog so we can tell if module JS never starts.
       window.__walkdateStarted = false;
@@ -416,7 +344,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=39')
+      import('./app.js?v=40')
         .then(() => {
           window.__walkdateImportOk = true;
         })

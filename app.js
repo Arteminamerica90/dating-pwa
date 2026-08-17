@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=39';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=40';
 import {
   clearState,
   defaultState,
@@ -10,12 +10,12 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=39';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=39';
-import { StepCounter } from './steps.js?v=39';
-import { decryptJson, encryptJson } from './encryption.js?v=39';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=39';
-import { partnerFilterText } from './partner-filter-text.js?v=39';
+} from './storage.js?v=40';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=40';
+import { StepCounter } from './steps.js?v=40';
+import { decryptJson, encryptJson } from './encryption.js?v=40';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=40';
+import { partnerFilterText } from './partner-filter-text.js?v=40';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -564,29 +564,8 @@ function boot() {
   renderAll();
   maybeStartOnboarding();
 
-  // Ask once, then let user decide.
-  if (!state.consent.asked) {
-    const dlg = $('#dlgConsent');
-    dlg.showModal();
-    $('#btnConsentOk').addEventListener('click', () => {
-      state.consent.asked = true;
-      // We only enable toggles; actual permission prompts happen on start.
-      state.consent.geo = true;
-      state.consent.steps = true;
-      save();
-      startGeoIfNeeded();
-      startStepsIfNeeded();
-      renderAll();
-    });
-    dlg.addEventListener('close', () => {
-      state.consent.asked = true;
-      save();
-      renderAll();
-    }, { once: true });
-  } else {
-    startGeoIfNeeded();
-    startStepsIfNeeded();
-  }
+  // Гео-трекинг и датчики отключены (UI убран); город выбирается вручную в настройках.
+  save();
 }
 
 async function safeLoadState() {
@@ -752,51 +731,12 @@ function openSettingsDialog() {
 function wireSettings() {
   $('#btnSettings')?.addEventListener('click', openSettingsDialog);
 
-  $('#toggleGeo').addEventListener('change', async (e) => {
-    state.consent.geo = e.target.checked;
-    save();
-    await startGeoIfNeeded();
-    renderAll();
-  });
-
-  $('#toggleMapShare').addEventListener('change', (e) => {
-    state.geo.mapShare = e.target.checked;
-    save();
-    renderAll();
-    maybeShareLocation();
-  });
-
-  $('#togglePlanShare').addEventListener('change', (e) => {
-    state.geo.planShare = e.target.checked;
-    save();
-    renderAll();
-    maybeSharePlans();
-  });
-
-  $('#toggleSteps').addEventListener('change', async (e) => {
-    state.consent.steps = e.target.checked;
-    save();
-    await startStepsIfNeeded();
-    renderAll();
-  });
-
-  $('#btnSaveSteps').addEventListener('click', () => {
-    const n = Number(String($('#inputSteps').value || '').replace(/[^0-9]/g, ''));
-    if (!Number.isFinite(n) || n < 0) return toast('Введите число шагов');
-    state.steps.day = todayKey();
-    state.steps.value = Math.floor(n);
-    save();
-    if (stepCounter) stepCounter.reset(state.steps.value);
-    renderAll();
-    haptic('light');
-    toast('Сохранено');
-  });
-
   $('#selectCity').addEventListener('change', (e) => {
-    state.profile.cityOverride = e.target.value;
+    state.profile.cityOverride = e.target.value || 'auto';
     save();
     renderAll();
   });
+
 
   $('#inputJob').addEventListener('change', (e) => {
     state.profile.jobTitle = String(e.target.value || '').trim().slice(0, 60);
@@ -1062,11 +1002,6 @@ function wireSettings() {
 }
 
 function syncSettingsUi() {
-  $('#toggleGeo').checked = !!state.consent.geo;
-  $('#toggleMapShare').checked = !!state.geo?.mapShare;
-  $('#togglePlanShare').checked = !!state.geo?.planShare;
-  $('#toggleSteps').checked = !!state.consent.steps;
-  $('#inputSteps').value = String(state.steps.value || '');
   $('#selectCity').value = state.profile.cityOverride || 'auto';
   $('#inputJob').value = state.profile.jobTitle || '';
   $('#inputEducation').value = state.profile.education || '';
@@ -1088,7 +1023,7 @@ function syncSettingsUi() {
               `<img alt="profile photo" src="${src}" style="width:64px;height:64px;object-fit:cover;border-radius:16px;border:1px solid rgba(255,255,255,0.12)" />`
           )
           .join('')
-      : `<span class="muted">Фото не добавлено</span>`;
+      : '';
   }
 
   $('#encStatus').textContent = state.encryption?.enabled
@@ -1540,7 +1475,6 @@ function renderQuestionnaireSummary(profile = state.profile) {
     : `<span class="pill">Портрет ещё строится</span>`;
   const confidence = portrait.answered >= 7 ? 'Портрет уже достаточно выражен' : 'Портрет будет точнее после нескольких ответов';
   return `
-    <div class="muted">Без баллов: мы собираем ответы в дерево решений и строим портрет, который потом помогает подбирать пару.</div>
     <div class="row-inline" style="margin-top:10px">${snippet}</div>
     <div class="muted" style="margin-top:10px">Прогресс: ${progress}. ${confidence}</div>
   `;
@@ -2019,19 +1953,6 @@ function renderHomeFeedHtml() {
 
   return `
     <div class="grid">
-      <div class="card">
-        <div class="card-title">Сегодня</div>
-        <div class="kpis">
-          <div class="kpi"><div class="n">${steps}</div><div class="l">шагов (примерно)</div></div>
-          <div class="kpi"><div class="n">${interests.length}</div><div class="l">интересов</div></div>
-          <div class="kpi"><div class="n">${points.length}</div><div class="l">геометок</div></div>
-          <div class="kpi"><div class="n">${cityKey ? cityLabel(cityKey) : '—'}</div><div class="l">город</div></div>
-        </div>
-        <div class="muted" style="margin-top:10px">
-          ${last ? `Последняя геопозиция: ${formatLatLon(last.lat, last.lon)} (±${Math.round(last.acc)}м)` : 'Геопозиция не определена.'}
-        </div>
-      </div>
-
       <div class="card">
         <div class="card-title">Планы на сегодня</div>
         ${
@@ -3023,15 +2944,6 @@ function renderStats() {
 
   $('#view-stats').innerHTML = `
     <div class="grid">
-      <div class="card">
-        <div class="card-title">Ваш профиль</div>
-        <div class="muted">Базовая анкета и психологический портрет собраны в одном месте. Ниже мы строим карту совместимости без баллов.</div>
-        <div class="row-inline" style="margin-top:10px">
-          <span class="pill">${portrait.answered || 0}/${portrait.total || QUESTIONNAIRE.length} вопросов</span>
-          <span class="pill">${selfRecs.length >= 3 ? 'Анонимных отзывов достаточно' : 'Недостаточно анонимных отзывов'}</span>
-        </div>
-      </div>
-
       <div class="card profile-editor">
         <div class="card-title">Анкета</div>
         <div class="photo-hero">
@@ -3049,7 +2961,7 @@ function renderStats() {
                   .slice(0, 6)
                   .map((src, idx) => `<button class="photo-thumb" type="button" data-photo-index="${idx}"><img alt="photo ${idx + 1}" src="${src}" /></button>`)
                   .join('')
-              : `<div class="muted">Фото не добавлено</div>`}
+              : ''}
           </div>
         </div>
         <div class="profile-field">
@@ -3071,36 +2983,8 @@ function renderStats() {
         </div>
         <div class="muted" id="descCounter">${description.length}/2000</div>
         <div class="profile-field">
-          <label class="label">Гороскоп</label>
-          <input id="profileZodiac" class="input" value="${escapeHtml(zodiac)}" placeholder="Например: Овен" />
-        </div>
-        <div class="profile-field">
-          <label class="label">Места, куда хотите пойти</label>
-          <div class="muted">Любые места посещения — список не ограничен.</div>
-          <div class="chip-row" data-wishlist-places style="margin-top:8px">
-            ${WISHLIST_PLACES.map((x) => {
-              const active = wishlistPlaces.has(x.id);
-              return `<button class="chip ${active ? 'active' : ''}" type="button" data-wishlist-place="${x.id}">${x.label}</button>`;
-            }).join('')}
-          </div>
-          <div class="chip-row" data-custom-places style="margin-top:8px">
-            ${customPlaces.map((p) => `<span class="chip"><span>${escapeHtml(p)}</span><button class="chip-x" type="button" data-del-custom-place="${escapeHtml(p)}">✕</button></span>`).join('')}
-          </div>
-          <div class="row" style="margin-top:8px">
-            <input id="profileCustomPlace" class="input" placeholder="Другое место: каток, квест, боулинг..." />
-            <button class="btn ghost" type="button" data-add-custom-place>Добавить</button>
-          </div>
-        </div>
-        <div class="profile-field">
           <label class="label">Интересы</label>
           <input id="profileInterestsText" class="input" value="${escapeHtml(interestsText)}" placeholder="Например: кофе, прогулки, кино" />
-        </div>
-        <div class="profile-field">
-          <label class="label">Шаги</label>
-          <div class="profile-steps">
-            <div class="muted">Статус: ${stepsOn ? (stepsRunning ? 'датчики включены' : 'разрешение есть, датчики остановлены') : 'выключено'}</div>
-            <button class="btn" type="button" data-action="toggleSteps">${stepsOn ? (stepsRunning ? 'Остановить шаги' : 'Запустить шаги') : 'Включить шаги'}</button>
-          </div>
         </div>
         <div class="row-inline" style="margin-top:14px">
           <button class="btn" type="button" data-action="saveProfileMini">Сохранить анкету</button>
@@ -3110,7 +2994,6 @@ function renderStats() {
 
       <div class="card">
         <div class="card-title">Анкета совместимости</div>
-        <div class="muted">Отвечайте карточками — вопросы перелистываются слева направо. Ответы попадают в портрет без баллов (дерево решений) и используются для подбора пары.</div>
         ${renderQuestionnaireSummary(state.profile)}
         <div class="row-inline" style="margin-top:10px">
           <button class="btn" type="button" data-action="openQuestionnaire">${portrait.answered ? 'Продолжить анкету' : 'Пройти анкету'}</button>
@@ -3214,7 +3097,6 @@ function renderStats() {
     const nextName = String($('#view-stats').querySelector('#profileName')?.value || '').trim().slice(0, 40);
     const nextGender = String($('#view-stats').querySelector('#profileGender')?.value || '');
     const nextDescription = String($('#view-stats').querySelector('#profileDescription')?.value || '').slice(0, 2000);
-    const nextZodiac = String($('#view-stats').querySelector('#profileZodiac')?.value || '').trim().slice(0, 30);
     const nextInterestsRaw = String($('#view-stats').querySelector('#profileInterestsText')?.value || '');
     const nextInterests = nextInterestsRaw
       .split(',')
@@ -3224,7 +3106,6 @@ function renderStats() {
     state.profile.name = nextName || state.profile.name;
     state.profile.gender = nextGender;
     state.profile.description = nextDescription;
-    state.profile.zodiac = nextZodiac;
     state.profile.interests = nextInterests;
     state.profile.portrait = buildQuestionnairePortrait(state.profile.questionnaireAnswers || {});
     save();
@@ -3256,18 +3137,6 @@ function renderStats() {
     state.ui = state.ui || {};
     state.ui.treeOpen = !state.ui.treeOpen;
     save();
-    renderAll();
-  });
-
-  $('#view-stats').querySelector('[data-action="toggleSteps"]')?.addEventListener('click', async () => {
-    if (state.consent.steps && stepCounter?.running) {
-      stopSteps();
-      renderAll();
-      return;
-    }
-    state.consent.steps = true;
-    save();
-    await startStepsIfNeeded();
     renderAll();
   });
 
