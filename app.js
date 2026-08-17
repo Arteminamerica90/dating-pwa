@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=41';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=42';
 import {
   clearState,
   defaultState,
@@ -10,12 +10,22 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=41';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=41';
-import { StepCounter } from './steps.js?v=41';
-import { decryptJson, encryptJson } from './encryption.js?v=41';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=41';
-import { partnerFilterText } from './partner-filter-text.js?v=41';
+} from './storage.js?v=42';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=42';
+import { StepCounter } from './steps.js?v=42';
+import { decryptJson, encryptJson } from './encryption.js?v=42';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=42';
+import { partnerFilterText } from './partner-filter-text.js?v=42';
+import {
+  isSupabaseConfigured,
+  supabaseCurrentUser,
+  supabaseLoadProfile,
+  supabaseOnAuth,
+  supabaseSaveProfile,
+  supabaseSignIn,
+  supabaseSignOut,
+  supabaseSignUp
+} from './supabase.js?v=42';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -563,6 +573,13 @@ function boot() {
   wireQuestionnaire();
   renderAll();
   maybeStartOnboarding();
+  supabaseOnAuth((event) => {
+    if (event === 'SIGNED_IN' || (event === 'INITIAL_SESSION' && isSupabaseConfigured())) {
+      syncProfileAfterAuth();
+    } else if (event === 'SIGNED_OUT') {
+      renderAll();
+    }
+  });
 
   // Гео-трекинг и датчики отключены (UI убран); город выбирается вручную в настройках.
   save();
@@ -626,12 +643,49 @@ function showFatal(message) {
 
 let cloudPushTimer = null;
 function scheduleCloudSync() {
-  if (!state.cloud?.enabled || !state.cloud?.token) return;
-  if (!state.encryption?.enabled || state.__locked || !state.__cryptoKey) return;
+  if (state.__locked || !state.__cryptoKey) return;
   clearTimeout(cloudPushTimer);
   cloudPushTimer = setTimeout(() => {
-    cloudPush().catch(() => {});
+    if (state.cloud?.enabled && state.cloud?.token) {
+      cloudPush().catch(() => {});
+    } else if (isSupabaseConfigured()) {
+      supabasePushProfile().catch(() => {});
+    }
   }, 4000);
+}
+
+async function supabasePushProfile() {
+  try {
+    const user = await supabaseCurrentUser();
+    if (!user) return;
+    const payload = {
+      profile: state.profile,
+      plans: state.plans,
+      dating: { likes: state.dating?.likes || {}, matches: state.dating?.matches || [] },
+      updated_at: new Date().toISOString()
+    };
+    await supabaseSaveProfile(user.id, payload);
+  } catch (err) {
+    console.warn('supabase push', err?.message);
+  }
+}
+
+async function syncProfileAfterAuth() {
+  try {
+    const user = await supabaseCurrentUser();
+    if (!user) return;
+    const payload = await supabaseLoadProfile(user.id);
+    if (payload) {
+      if (payload.profile) state.profile = { ...state.profile, ...payload.profile };
+      if (payload.plans) state.plans = payload.plans;
+      if (payload.dating?.likes) state.dating.likes = { ...state.dating.likes, ...payload.dating.likes };
+      if (payload.dating?.matches) state.dating.matches = payload.dating.matches;
+    }
+    await supabasePushProfile();
+    renderAll();
+  } catch (err) {
+    console.warn('supabase pull', err?.message);
+  }
 }
 
 function save() {
@@ -811,31 +865,22 @@ function wireSettings() {
     }
   });
 
-  $('#inputServerUrl').addEventListener('change', (e) => {
-    state.cloud.serverUrl = String(e.target.value || '').trim() || state.cloud.serverUrl;
-    save();
-    renderAll();
-  });
-
-  $('#inputEmail').addEventListener('change', (e) => {
+  $('#accountEmail').addEventListener('change', (e) => {
     state.cloud.email = String(e.target.value || '').trim();
     save();
-    renderAll();
   });
 
-  $('#btnRegister').addEventListener('click', async () => {
+  $('#btnAccountRegister').addEventListener('click', async () => {
+    const email = String($('#accountEmail').value || state.cloud.email || '').trim();
+    const password = String($('#accountPassword').value || '');
+    if (!email || password.length < 6) return toast('Нужны email и пароль от 6 символов');
     try {
-      const serverUrl = String($('#inputServerUrl').value || state.cloud.serverUrl || '').trim();
-      const email = String($('#inputEmail').value || state.cloud.email || '').trim();
-      const password = String($('#inputCloudPassword').value || '');
-      const r = await apiRegister(serverUrl, email, password);
-      state.cloud.serverUrl = serverUrl;
-      state.cloud.email = r.email;
-      state.cloud.token = r.token;
+      await supabaseSignUp(email, password);
+      state.cloud.email = email;
       state.cloud.enabled = true;
       save();
-      pushPublicProfileNow().catch(() => {});
-      toast('Регистрация ок');
+      await syncProfileAfterAuth();
+      toast('Регистрация ок — проверьте почту для подтверждения');
       haptic('light');
       renderAll();
     } catch (err) {
@@ -843,55 +888,36 @@ function wireSettings() {
     }
   });
 
-  $('#btnLogin').addEventListener('click', async () => {
+  $('#btnAccountLogin').addEventListener('click', async () => {
+    const email = String($('#accountEmail').value || state.cloud.email || '').trim();
+    const password = String($('#accountPassword').value || '');
+    if (!email || !password) return toast('Введите email и пароль');
     try {
-      const serverUrl = String($('#inputServerUrl').value || state.cloud.serverUrl || '').trim();
-      const email = String($('#inputEmail').value || state.cloud.email || '').trim();
-      const password = String($('#inputCloudPassword').value || '');
-      const r = await apiLogin(serverUrl, email, password);
-      state.cloud.serverUrl = serverUrl;
-      state.cloud.email = r.email;
-      state.cloud.token = r.token;
+      await supabaseSignIn(email, password);
+      state.cloud.email = email;
       state.cloud.enabled = true;
       save();
-      pushPublicProfileNow().catch(() => {});
-      toast('Логин ок');
+      await syncProfileAfterAuth();
+      toast('Вход выполнен');
       haptic('light');
       renderAll();
     } catch (err) {
-      toast(err?.message || 'Ошибка логина');
+      toast(err?.message || 'Ошибка входа');
     }
   });
 
-  $('#btnLogout').addEventListener('click', () => {
+  $('#btnAccountLogout').addEventListener('click', async () => {
+    try {
+      await supabaseSignOut();
+    } catch (err) {
+      toast(err?.message || 'Ошибка выхода');
+    }
     state.cloud.token = null;
     state.cloud.enabled = false;
     save();
     toast('Выход');
     haptic('light');
     renderAll();
-  });
-
-  $('#btnPull').addEventListener('click', async () => {
-    try {
-      await cloudPull();
-      toast('Скачано');
-      haptic('light');
-      renderAll();
-    } catch (err) {
-      toast(err?.message || 'Ошибка скачивания');
-    }
-  });
-
-  $('#btnPush').addEventListener('click', async () => {
-    try {
-      await cloudPush();
-      toast('Загружено');
-      haptic('light');
-      renderAll();
-    } catch (err) {
-      toast(err?.message || 'Ошибка загрузки');
-    }
   });
 
   $('#btnExport').addEventListener('click', () => {
@@ -1032,12 +1058,17 @@ function syncSettingsUi() {
       : 'Шифрование: включено'
     : 'Шифрование: выключено';
 
-  $('#inputServerUrl').value = state.cloud?.serverUrl || '';
-  $('#inputEmail').value = state.cloud?.email || '';
-
-  const cloudOn = !!state.cloud?.enabled;
-  const authed = !!state.cloud?.token;
-  $('#cloudStatus').textContent = cloudOn ? (authed ? 'Синк: включен (вход выполнен)' : 'Синк: включен (нет токена)') : 'Синк: выключен';
+  $('#accountEmail').value = state.cloud?.email || '';
+  supabaseCurrentUser().then((u) => {
+    const el = document.getElementById('accountStatus');
+    if (el) {
+      el.textContent = u?.email
+        ? `Вход выполнен: ${u.email}`
+        : isSupabaseConfigured()
+          ? 'Вход не выполнен'
+          : 'Бэкенд не настроен — вставьте ключи Supabase в supabase-config.js';
+    }
+  });
 
   $('#interestChips').innerHTML = INTERESTS.map((x) => {
     const active = state.profile.interests.includes(x.id);

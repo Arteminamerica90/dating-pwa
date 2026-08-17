@@ -161,30 +161,22 @@
           </div>
 
           <div class="card">
-            <div class="card-title">Синхронизация</div>
-            <div class="muted" id="cloudStatus">Синк: выключен</div>
+            <div class="card-title">Аккаунт</div>
+            <div class="muted" id="accountStatus">Вход не выполнен</div>
             <div class="row" style="margin-top:10px">
-              <label class="label">Server URL</label>
-              <input id="inputServerUrl" class="input" placeholder="http://localhost:8787" />
-            </div>
-            <div class="row">
               <label class="label">Email</label>
-              <input id="inputEmail" class="input" inputmode="email" placeholder="name@example.com" />
+              <input id="accountEmail" class="input" inputmode="email" autocomplete="email" placeholder="name@example.com" />
             </div>
             <div class="row">
               <label class="label">Пароль</label>
-              <input id="inputCloudPassword" class="input" type="password" placeholder="для логина/регистрации" />
+              <input id="accountPassword" class="input" type="password" autocomplete="current-password" placeholder="минимум 6 символов" />
             </div>
             <div class="row-inline">
-              <button id="btnRegister" class="btn" type="button">Регистрация</button>
-              <button id="btnLogin" class="btn ghost" type="button">Логин</button>
-              <button id="btnLogout" class="btn danger" type="button">Выход</button>
+              <button id="btnAccountRegister" class="btn" type="button">Регистрация</button>
+              <button id="btnAccountLogin" class="btn ghost" type="button">Войти</button>
+              <button id="btnAccountLogout" class="btn danger" type="button">Выход</button>
             </div>
-            <div class="row-inline">
-              <button id="btnPull" class="btn ghost" type="button">Скачать</button>
-              <button id="btnPush" class="btn" type="button">Загрузить</button>
-            </div>
-            <div class="muted">Отправляем на сервер только зашифрованный payload (сервер не знает пароль).</div>
+            <div class="muted">Вход по email: аккаунт нужен, чтобы профиль и анкета сохранялись на сервере (Supabase) и были доступны с любого устройства.</div>
           </div>
 
           <div class="card">
@@ -340,7 +332,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=41')
+      import('./app.js?v=42')
         .then(() => {
           window.__walkdateImportOk = true;
         })
