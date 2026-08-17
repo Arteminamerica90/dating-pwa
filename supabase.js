@@ -1,4 +1,4 @@
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from './supabase-config.js?v=42';
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from './supabase-config.js?v=43';
 
 let clientPromise = null;
 

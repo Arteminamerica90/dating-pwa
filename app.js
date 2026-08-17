@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=42';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=43';
 import {
   clearState,
   defaultState,
@@ -10,12 +10,12 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=42';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=42';
-import { StepCounter } from './steps.js?v=42';
-import { decryptJson, encryptJson } from './encryption.js?v=42';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=42';
-import { partnerFilterText } from './partner-filter-text.js?v=42';
+} from './storage.js?v=43';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=43';
+import { StepCounter } from './steps.js?v=43';
+import { decryptJson, encryptJson } from './encryption.js?v=43';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=43';
+import { partnerFilterText } from './partner-filter-text.js?v=43';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -25,7 +25,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=42';
+} from './supabase.js?v=43';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -2801,11 +2801,11 @@ function renderDating() {
   $('#view-dating').innerHTML = `
     <div class="grid">
       <div class="card">
-        <button class="accordion-head" type="button" data-filter-toggle aria-expanded="${state.ui?.filtersOpen ? 'true' : 'false'}">
+        <button class="accordion-head" type="button" data-filter-toggle aria-expanded="${state.ui?.filtersOpen !== false ? 'true' : 'false'}">
           <span class="accordion-title">Фильтры</span>
           <span class="chevron" aria-hidden="true"></span>
         </button>
-        <div class="accordion-body" ${state.ui?.filtersOpen ? '' : 'hidden'}>
+        <div class="accordion-body" ${state.ui?.filtersOpen !== false ? '' : 'hidden'}>
           <div class="filters-grid">
             <div class="filter-group">
               <div class="label">Характер встречи</div>
@@ -2839,7 +2839,7 @@ function renderDating() {
         <div class="card-title">Анкета</div>
         ${visible.length ? `<div class="tinder-wrap" id="tinderWrap"></div>` : `<div class="muted">Новых анкет нет. Сбросьте лайки или поменяйте интересы.</div>`}
         ${visible.length ? `<div class="tinder-actions"><button class="tbtn nope" type="button" data-tinder="nope">✕</button><button class="tbtn like" type="button" data-tinder="like">❤</button></div>` : ``}
-        ${userPortrait.answered < 7 ? `<div class="qn-cta" style="margin-top:12px"><span>Подбор станет точнее после анкеты</span><button class="btn" type="button" data-action="openQuestionnaire">Пройти анкету</button></div>` : ''}
+        ${userPortrait.answered < 7 ? `<div class="qn-cta"><span>Подбор станет точнее после анкеты</span><button class="btn" type="button" data-action="openQuestionnaire">Пройти анкету</button></div>` : ''}
       </div>
     </div>
   `;

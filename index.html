@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="interactive-widget" content="resizes-content" />
     <meta name="theme-color" content="#f4f5fa" />
     <title>WalkDate</title>
     <link rel="manifest" href="./manifest.webmanifest" />
@@ -332,7 +333,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=42')
+      import('./app.js?v=43')
         .then(() => {
           window.__walkdateImportOk = true;
         })
