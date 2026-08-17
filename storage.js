@@ -1,5 +1,5 @@
-import { idbDel, idbGet, idbSet } from './idb.js';
-import { decryptJson, deriveKeyFromPassphrase, encryptJson } from './encryption.js';
+import { idbDel, idbGet, idbSet } from './idb.js?v=39';
+import { decryptJson, deriveKeyFromPassphrase, encryptJson } from './encryption.js?v=39';
 
 const STATE_KEY = 'state';
 const CRYPTO_KEY = 'crypto';

@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=39';
 import {
   clearState,
   defaultState,
@@ -10,12 +10,12 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js';
-import { StepCounter } from './steps.js';
-import { decryptJson, encryptJson } from './encryption.js';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js';
-import { partnerFilterText } from './partner-filter-text.js';
+} from './storage.js?v=39';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=39';
+import { StepCounter } from './steps.js?v=39';
+import { decryptJson, encryptJson } from './encryption.js?v=39';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=39';
+import { partnerFilterText } from './partner-filter-text.js?v=39';
 
 const $ = (sel) => document.querySelector(sel);
 
