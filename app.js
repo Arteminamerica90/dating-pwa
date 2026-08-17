@@ -25,7 +25,6 @@ window.__walkdateModuleLoaded = true;
 let state = null;
 let geoWatchId = null;
 let stepCounter = null;
-let deferredInstallPrompt = null;
 let tinder = null;
 let remoteEvents = [];
 let remoteEventsCity = null;
@@ -719,13 +718,14 @@ function wireSwipes() {
   main.addEventListener('pointercancel', onUp, { passive: true });
 }
 
+function openSettingsDialog() {
+  syncSettingsUi();
+  $('#dlgSettings').showModal();
+  haptic('open');
+}
+
 function wireSettings() {
-  const dlg = $('#dlgSettings');
-  $('#btnSettings').addEventListener('click', () => {
-    syncSettingsUi();
-    dlg.showModal();
-    haptic('open');
-  });
+  $('#btnSettings')?.addEventListener('click', openSettingsDialog);
 
   $('#toggleGeo').addEventListener('change', async (e) => {
     state.consent.geo = e.target.checked;
@@ -1107,20 +1107,6 @@ function wirePwa() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./service-worker.js').catch(() => {});
   }
-
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredInstallPrompt = e;
-    $('#btnInstall').hidden = false;
-  });
-
-  $('#btnInstall').addEventListener('click', async () => {
-    if (!deferredInstallPrompt) return;
-    deferredInstallPrompt.prompt();
-    await deferredInstallPrompt.userChoice;
-    deferredInstallPrompt = null;
-    $('#btnInstall').hidden = true;
-  });
 }
 
 async function startGeoIfNeeded() {
@@ -3093,6 +3079,7 @@ function renderStats() {
         </div>
         <div class="row-inline" style="margin-top:14px">
           <button class="btn" type="button" data-action="saveProfileMini">Сохранить анкету</button>
+          <button class="btn ghost" type="button" id="btnSettings">Настройки</button>
         </div>
       </div>
 
@@ -3133,6 +3120,8 @@ function renderStats() {
     const len = String(descInput.value || '').length;
     if (counter) counter.textContent = `${len}/2000`;
   });
+
+  $('#view-stats').querySelector('#btnSettings')?.addEventListener('click', openSettingsDialog);
 
   $('#view-stats').querySelector('#profilePhotoInput')?.addEventListener('change', async (e) => {
     const file = e.target.files?.[0];

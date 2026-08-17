@@ -14,18 +14,7 @@
   <body>
     <div id="app" class="app">
       <header class="topbar">
-        <div class="brand">
-          <div class="logo" aria-hidden="true"></div>
-          <div>
-            <div class="brand-title">WalkDate</div>
-            <div class="brand-sub">PWA: портреты, анонимные рекомендации и события рядом</div>
-          </div>
-        </div>
-        <div class="top-actions">
-          <button id="btnInstall" class="btn ghost" type="button" hidden>Установить</button>
-          <button id="btnSettings" class="btn" type="button">Настройки</button>
-        </div>
-      </header>
+        </header>
 
       <nav class="tabs" aria-label="Разделы">
         <button class="tab" data-tab="home" type="button" aria-label="Сообщения">
@@ -427,7 +416,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=36')
+      import('./app.js?v=37')
         .then(() => {
           window.__walkdateImportOk = true;
         })
