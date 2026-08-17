@@ -312,26 +312,36 @@ const DATING_PROFILES = [
 const QUESTIONNAIRE = [
   {
     block: 'Блок 1: Конфликт и стратегия',
-    question: 'Вы с партнёром поссорились. Она ушла в другую комнату и не разговаривает. Ваши действия:',
+    question: 'Вы с партнёром поссорились. Как вы ведёте себя при ссоре?',
     id: 'conflict_break',
     dimension: 'conflict',
     options: [
-      { id: 'space', label: 'Даёте пространство и ждёте, пока остынет', hint: 'Стратегия: избегание • темперамент: флегматик', traits: { conflict: 'avoid', temperament: 'phlegmatic', game: 'avoid' } },
-      { id: 'talk', label: 'Идёте следом и пытаетесь поговорить, даже если не хочет', hint: 'Стратегия: настойчивость • темперамент: холерик', traits: { conflict: 'pursue', temperament: 'choleric', game: 'control' } },
-      { id: 'note', label: 'Оставляете записку с извинением или шуткой', hint: 'Стратегия: сотрудничество • темперамент: сангвиник', traits: { conflict: 'cooperate', temperament: 'sanguine', game: 'cooperate', humor: 'high' } },
-      { id: 'freeze', label: 'Замолкаете и уходите в себя', hint: 'Стратегия: уход в себя • темперамент: меланхолик', traits: { conflict: 'avoid', temperament: 'melancholic', game: 'avoid', attribution: 'internal' } }
+      { id: 'space', label: 'Сразу идёт мириться и говорить', hint: 'Стратегия: сотрудничество • сангвиник', traits: { conflict: 'cooperate', temperament: 'sanguine', game: 'cooperate' } },
+      { id: 'talk', label: 'Даёт время остыть и ждёт первого шага', hint: 'Стратегия: избегание • флегматик', traits: { conflict: 'avoid', temperament: 'phlegmatic', game: 'avoid' } },
+      { id: 'note', label: 'Замыкается и уходит в себя', hint: 'Стратегия: уход в себя • меланхолик', traits: { conflict: 'avoid', temperament: 'melancholic', attribution: 'internal' } },
+      { id: 'freeze', label: 'Настойчиво договаривается, даже если я не готова', hint: 'Стратегия: настойчивость • холерик', traits: { conflict: 'pursue', temperament: 'choleric', game: 'control' } },
+      { id: 'note2', label: 'Переводит всё в шутку и разряжает обстановку', hint: 'Стратегия: юмор • сангвиник', traits: { conflict: 'cooperate', humor: 'high', game: 'cooperate' } },
+      { id: 'letter', label: 'Оставляет записку, пишет сообщение с извинением', hint: 'Стратегия: мягкое сотрудничество', traits: { conflict: 'cooperate', attachment: 'safe', humor: 'medium' } },
+      { id: 'cool2', label: 'Сначала остывает, потом спокойно возвращается к разговору', hint: 'Стратегия: пауза + диалог • флегматик', traits: { conflict: 'cooperate', temperament: 'phlegmatic', pace: 'steady' } },
+      { id: 'third', label: 'Привлекает посредника — друга или родственника', hint: 'Стратегия: внешняя поддержка', traits: { conflict: 'cooperate', social: 'open', game: 'cooperate' } },
+      { id: 'wait', label: 'Ждёт, пока я сама начну разговор', hint: 'Стратегия: избегание инициативы', traits: { conflict: 'avoid', game: 'avoid', attribution: 'balanced' } },
+      { id: 'deal', label: 'Предлагает компромисс и новую договорённость', hint: 'Стратегия: переговоры', traits: { conflict: 'cooperate', game: 'cooperate', attribution: 'balanced' } }
     ]
   },
   {
     block: 'Блок 1: Конфликт и стратегия',
-    question: 'Партнёр долго не отвечает. Что вы скорее подумаете?',
+    question: 'Партнёр долго не отвечает. Ваша реакция:',
     id: 'silence',
     dimension: 'attribution',
     options: [
-      { id: 'busy', label: 'Он/она, скорее всего, просто занят(а)', hint: 'Теория атрибуции: балансовая интерпретация', traits: { attribution: 'balanced', attachment: 'safe' } },
-      { id: 'panic', label: 'Наверное, я стал(а) менее важен(на)', hint: 'Тревожная привязанность', traits: { attribution: 'anxious', attachment: 'anxious' } },
-      { id: 'distance', label: 'Лучше не навязываться — отступлю', hint: 'Избегающая привязанность', traits: { attribution: 'avoidant', attachment: 'avoidant' } },
-      { id: 'check', label: 'Проверю ещё раз и пошучу, чтобы снять напряжение', hint: 'Комбинация контроля и юмора', traits: { attribution: 'suspicious', attachment: 'chaotic', humor: 'medium' } }
+      { id: 'busy', label: 'Решит, что я просто занят(а) — ничего страшного', hint: 'Сбалансированная интерпретация', traits: { attribution: 'balanced', attachment: 'safe' } },
+      { id: 'panic', label: 'Начнёт переживать, что я охладел(а)', hint: 'Тревожная привязанность', traits: { attribution: 'anxious', attachment: 'anxious' } },
+      { id: 'distance', label: 'Не будет навязываться и просто отступит', hint: 'Избегающая привязанность', traits: { attribution: 'avoidant', attachment: 'avoidant' } },
+      { id: 'check', label: 'Напишет ещё раз или пошутит, чтобы снять напряжение', hint: 'Комбинация контроля и юмора', traits: { attribution: 'suspicious', attachment: 'chaotic', humor: 'medium' } },
+      { id: 'offended', label: 'Обидится и будет ждать моей инициативы', hint: 'Обида как стратегия', traits: { attribution: 'anxious', conflict: 'avoid', game: 'avoid' } },
+      { id: 'search', label: 'Проверит мои сети или позвонит, чтобы найти меня', hint: 'Контроль и тревога', traits: { attribution: 'suspicious', attachment: 'anxious', game: 'control' } },
+      { id: 'call', label: 'Позвонит, чтобы убедиться, что я в порядке', hint: 'Забота и безопасная привязанность', traits: { attachment: 'safe', attribution: 'balanced', conflict: 'cooperate' } },
+      { id: 'cool', label: 'Отнесётся спокойно: у каждого своя жизнь', hint: 'Здоровый баланс', traits: { attribution: 'balanced', attachment: 'avoidant', social: 'adaptive' } }
     ]
   },
   {
@@ -346,28 +356,20 @@ const QUESTIONNAIRE = [
       { id: 'pullaway', label: 'То сближаюсь, то резко отдаляюсь', hint: 'Тревожно-избегающий стиль', traits: { attachment: 'chaotic', conflict: 'pursue', game: 'control' } }
     ]
   },
-  {
-    block: 'Блок 2: Привязанность и доверие',
-    question: 'Зачем вы чаще всего вступаете в отношения?',
-    id: 'motivation',
-    dimension: 'motivation',
-    options: [
-      { id: 'love', label: 'Чтобы любить и быть любимым(ой)', hint: 'Мотивация близости', traits: { motivation: 'love', attachment: 'safe' } },
-      { id: 'family', label: 'Чтобы строить семью и ритуалы', hint: 'Стабильность и семья', traits: { motivation: 'family', game: 'cooperate' } },
-      { id: 'status', label: 'Чтобы расти, усиливать статус или самооценку', hint: 'Рациональная цель, которая может выглядеть иррационально', traits: { motivation: 'status', game: 'defect' } },
-      { id: 'play', label: 'Чтобы жить легче, интереснее и свободнее', hint: 'Свобода и игра', traits: { motivation: 'play', humor: 'high', temperament: 'sanguine' } }
-    ]
-  },
-  {
+{
     block: 'Блок 3: Темперамент и ритм',
-    question: 'Под давлением вы скорее:',
+    question: 'Как вы ведёте себя под давлением?',
     id: 'stress',
     dimension: 'temperament',
     options: [
-      { id: 'fast', label: 'Действуете быстро и резко', hint: 'Холерик', traits: { temperament: 'choleric', pace: 'fast', conflict: 'pursue' } },
-      { id: 'talk', label: 'Разговариваете, шутите и разряжаете обстановку', hint: 'Сангвиник', traits: { temperament: 'sanguine', humor: 'high', conflict: 'cooperate' } },
-      { id: 'steady', label: 'Сохраняете спокойствие и двигаетесь ровно', hint: 'Флегматик', traits: { temperament: 'phlegmatic', pace: 'steady', conflict: 'avoid' } },
-      { id: 'deep', label: 'Глубоко переживаете и потом долго перевариваете', hint: 'Меланхолик', traits: { temperament: 'melancholic', pace: 'slow', attribution: 'internal' } }
+      { id: 'fast', label: 'Действует быстро и решительно', hint: 'Холерик', traits: { temperament: 'choleric', pace: 'fast', conflict: 'pursue' } },
+      { id: 'talk', label: 'Разговаривает, шутит и разряжает обстановку', hint: 'Сангвиник', traits: { temperament: 'sanguine', humor: 'high', conflict: 'cooperate' } },
+      { id: 'steady', label: 'Сохраняет спокойствие и идёт по плану', hint: 'Флегматик', traits: { temperament: 'phlegmatic', pace: 'steady', conflict: 'avoid' } },
+      { id: 'deep', label: 'Глубоко переживает и переваривает молча', hint: 'Меланхолик', traits: { temperament: 'melancholic', pace: 'slow', attribution: 'internal' } },
+      { id: 'panic2', label: 'Паникует и суетится', hint: 'Тревожная реакция', traits: { temperament: 'choleric', attribution: 'anxious', conflict: 'avoid' } },
+      { id: 'support', label: 'Ищет поддержку у близких', hint: 'Опора на окружение', traits: { attachment: 'safe', social: 'open', conflict: 'cooperate' } },
+      { id: 'close2', label: 'Закрывается и откладывает решение', hint: 'Избегание и отсрочка', traits: { conflict: 'avoid', attribution: 'avoidant', pace: 'slow' } },
+      { id: 'plan2', label: 'Берёт паузу, а потом возвращается с чётким планом', hint: 'Хладнокровие и стратегия', traits: { temperament: 'phlegmatic', game: 'cooperate', pace: 'steady' } }
     ]
   },
   {
@@ -379,7 +381,11 @@ const QUESTIONNAIRE = [
       { id: 'fast', label: 'Быстрый, насыщенный, много параллельных дел', hint: 'Высокая скорость реакции', traits: { pace: 'fast', temperament: 'choleric' } },
       { id: 'steady', label: 'Ровный, устойчивый, без резких рывков', hint: 'Стабильность', traits: { pace: 'steady', temperament: 'phlegmatic' } },
       { id: 'slow', label: 'Медленный, вдумчивый, с паузами', hint: 'Глубина и чувствительность', traits: { pace: 'slow', temperament: 'melancholic' } },
-      { id: 'mixed', label: 'Зависит от людей и ситуации', hint: 'Адаптивность', traits: { pace: 'mixed', temperament: 'sanguine' } }
+      { id: 'mixed', label: 'Зависит от людей и ситуации', hint: 'Адаптивность', traits: { pace: 'mixed', temperament: 'sanguine' } },
+      { id: 'burst', label: 'Рваный: всплеск энергии, потом затишье', hint: 'Импульсивность', traits: { pace: 'mixed', temperament: 'choleric' } },
+      { id: 'two', label: 'Спокойный дома, быстрый в делах', hint: 'Разные скорости', traits: { pace: 'mixed', temperament: 'sanguine' } },
+      { id: 'rush', label: 'Всегда спешит и почти всегда не успевает', hint: 'Постоянная гонка', traits: { pace: 'fast', attribution: 'anxious' } },
+      { id: 'warmup', label: 'Медленно раскачивается, зато работает надолго', hint: 'Долгий разгон', traits: { pace: 'slow', temperament: 'melancholic' } }
     ]
   },
   {
@@ -388,22 +394,30 @@ const QUESTIONNAIRE = [
     id: 'game',
     dimension: 'game',
     options: [
-      { id: 'cooperate', label: 'Играю честно и жду взаимности', hint: 'Tit-for-Tat / сотрудничество', traits: { game: 'cooperate', conflict: 'cooperate', attribution: 'balanced' } },
-      { id: 'defect', label: 'Сначала защищаю свои интересы', hint: 'Рациональный выбор ради собственной выгоды', traits: { game: 'defect', conflict: 'control', motivation: 'status' } },
-      { id: 'avoid', label: 'Стараюсь не ввязываться в лишние споры', hint: 'Избегание', traits: { game: 'avoid', conflict: 'avoid', temperament: 'phlegmatic' } },
-      { id: 'control', label: 'Пытаюсь держать рамку и управлять исходом', hint: 'Контроль стратегии', traits: { game: 'control', conflict: 'pursue', temperament: 'choleric' } }
+      { id: 'cooperate', label: 'Играет честно и ждёт взаимности', hint: 'Tit-for-Tat / сотрудничество', traits: { game: 'cooperate', conflict: 'cooperate', attribution: 'balanced' } },
+      { id: 'defect', label: 'Сначала защищает свои интересы', hint: 'Рациональный выбор ради выгоды', traits: { game: 'defect', conflict: 'control' } },
+      { id: 'avoid', label: 'Избегает лишних споров', hint: 'Избегание', traits: { game: 'avoid', conflict: 'avoid', temperament: 'phlegmatic' } },
+      { id: 'control', label: 'Держит рамку и контролирует исход', hint: 'Контроль стратегии', traits: { game: 'control', conflict: 'pursue', temperament: 'choleric' } },
+      { id: 'word', label: 'Соблюдает слово, даже если это невыгодно', hint: 'Надёжность', traits: { game: 'cooperate', temperament: 'phlegmatic', attribution: 'balanced' } },
+      { id: 'bargain', label: 'Торгуется до последнего', hint: 'Переговоры и выгода', traits: { game: 'defect', conflict: 'control', temperament: 'choleric' } },
+      { id: 'forget', label: 'Легко забывает о своих обещаниях', hint: 'Ненадёжность договорённостей', traits: { game: 'defect', temperament: 'sanguine', attribution: 'avoidant' } },
+      { id: 'flex', label: 'Гибко меняет условия, если жизнь изменилась', hint: 'Адаптивные правила', traits: { game: 'cooperate', pace: 'mixed', social: 'adaptive' } }
     ]
   },
   {
     block: 'Блок 4: Теория игр и границы',
-    question: 'Если вы чувствуете ревность, то чаще всего:',
+    question: 'Когда вы чувствуете ревность, то чаще всего:',
     id: 'jealousy',
     dimension: 'attachment',
     options: [
-      { id: 'talk', label: 'Сразу обсуждаю это спокойно', hint: 'Стабильная, зрелая привязанность', traits: { attachment: 'safe', game: 'cooperate', attribution: 'balanced' } },
-      { id: 'ask', label: 'Ищу подтверждение и успокоение', hint: 'Тревожная привязанность', traits: { attachment: 'anxious', attribution: 'anxious' } },
-      { id: 'cool', label: 'Остываю и держу дистанцию', hint: 'Избегание', traits: { attachment: 'avoidant', conflict: 'avoid' } },
-      { id: 'test', label: 'Проверяю границы или провоцирую', hint: 'Контроль и сложная динамика', traits: { attachment: 'chaotic', game: 'control', conflict: 'control' } }
+      { id: 'talk', label: 'Спокойно обсуждает это сразу', hint: 'Стабильная, зрелая привязанность', traits: { attachment: 'safe', game: 'cooperate', attribution: 'balanced' } },
+      { id: 'ask', label: 'Ищет подтверждение и успокоение', hint: 'Тревожная привязанность', traits: { attachment: 'anxious', attribution: 'anxious' } },
+      { id: 'cool', label: 'Остывает и держит дистанцию', hint: 'Избегание', traits: { attachment: 'avoidant', conflict: 'avoid' } },
+      { id: 'test', label: 'Проверяет границы или провоцирует', hint: 'Контроль и сложная динамика', traits: { attachment: 'chaotic', game: 'control', conflict: 'control' } },
+      { id: 'self', label: 'Ревнует, но честно признаётся и смеётся над собой', hint: 'Здоровая самоирония', traits: { attachment: 'safe', humor: 'high', attribution: 'balanced' } },
+      { id: 'spy', label: 'Контролирует переписки и перемещения', hint: 'Контроль и недоверие', traits: { attachment: 'chaotic', game: 'control', conflict: 'control' } },
+      { id: 'silent2', label: 'Ревнует молча и копит', hint: 'Накопление обиды', traits: { attachment: 'anxious', conflict: 'avoid', attribution: 'internal' } },
+      { id: 'none', label: 'Не ревнует совсем — полностью доверяет', hint: 'Максимальное доверие', traits: { attachment: 'safe', attribution: 'balanced' } }
     ]
   },
   {
@@ -412,10 +426,11 @@ const QUESTIONNAIRE = [
     id: 'humor',
     dimension: 'humor',
     options: [
-      { id: 'high', label: 'Очень важную: он сближает и снимает напряжение', hint: 'Юмор как инструмент сотрудничества', traits: { humor: 'high', temperament: 'sanguine', conflict: 'cooperate' } },
-      { id: 'medium', label: 'Умеренную: шутки нужны, но не всегда', hint: 'Юмор есть, но он не решает всё', traits: { humor: 'medium', social: 'adaptive' } },
-      { id: 'low', label: 'Небольшую: важнее надёжность и смысл', hint: 'Юмор не определяет, но может помогать', traits: { humor: 'low', temperament: 'phlegmatic' } },
-      { id: 'sharp', label: 'Острый / ироничный — это мой способ выживания', hint: 'Иногда помогает, иногда ранит', traits: { humor: 'sharp', temperament: 'melancholic', attribution: 'humor' } }
+      { id: 'high', label: 'Очень важную: сближает и снимает напряжение', hint: 'Юмор как инструмент сотрудничества', traits: { humor: 'high', temperament: 'sanguine', conflict: 'cooperate' } },
+      { id: 'medium', label: 'Умеренную: шутит, но не всё время', hint: 'Юмор есть, но не решает всё', traits: { humor: 'medium', social: 'adaptive' } },
+      { id: 'low', label: 'Небольшую: важнее надёжность и смысл', hint: 'Юмор не определяет', traits: { humor: 'low', temperament: 'phlegmatic' } },
+      { id: 'sharp', label: 'Острый, ироничный — это его/её способ общаться', hint: 'Иногда помогает, иногда ранит', traits: { humor: 'sharp', temperament: 'melancholic', attribution: 'humor' } },
+      { id: 'mood', label: 'Зависит от компании и настроения', hint: 'Ситуативный юмор', traits: { humor: 'medium', social: 'adaptive', temperament: 'sanguine' } }
     ]
   },
   {
@@ -427,7 +442,8 @@ const QUESTIONNAIRE = [
       { id: 'open', label: 'Много общения и новые люди', hint: 'Открытая социальность', traits: { social: 'open', temperament: 'sanguine' } },
       { id: 'close', label: 'Небольшой круг своих', hint: 'Выборочная открытость', traits: { social: 'close', attachment: 'safe' } },
       { id: 'alone', label: 'Чаще нужен личный простор и тишина', hint: 'Интроверсия / приватность', traits: { social: 'alone', temperament: 'melancholic' } },
-      { id: 'adaptive', label: 'Подстраиваюсь под человека и ситуацию', hint: 'Гибкость', traits: { social: 'adaptive', game: 'cooperate' } }
+      { id: 'adaptive', label: 'Подстраивается под человека и ситуацию', hint: 'Гибкость', traits: { social: 'adaptive', game: 'cooperate' } },
+      { id: 'dosed', label: 'Дозированно: яркие встречи и паузы восстановления', hint: 'Баланс общения и отдыха', traits: { social: 'adaptive', pace: 'mixed', attachment: 'safe' } }
     ]
   }
 ];
@@ -491,13 +507,22 @@ const QUESTIONNAIRE_LABELS = {
 
 // Полная анкета = психологический блок (дерево решений) + фактические категории.
 const ALL_QUESTIONS = [...QUESTIONNAIRE, ...FULL_QUESTIONNAIRE];
-const PSYCH_FIELDS = ['attachment', 'conflict', 'temperament', 'motivation', 'game', 'humor', 'social', 'pace', 'attribution'];
+const PSYCH_FIELDS = ['attachment', 'conflict', 'temperament', 'game', 'humor', 'social', 'pace', 'attribution'];
 const DEALBREAKER_CATS = new Set(['habits', 'family', 'relationship', 'finance', 'extra']);
 
 const QN_ZODIAC_MAP = {
   зодиак_овен: 'Овен',
   зодиак_телец: 'Телец',
-  зодиак_близнецы: 'Близнецы'
+  зодиак_близнецы: 'Близнецы',
+  зодиак_рак: 'Рак',
+  зодиак_лев: 'Лев',
+  зодиак_дева: 'Дева',
+  зодиак_весы: 'Весы',
+  зодиак_скорпион: 'Скорпион',
+  зодиак_стрелец: 'Стрелец',
+  зодиак_козерог: 'Козерог',
+  зодиак_водолей: 'Водолей',
+  зодиак_рыбы: 'Рыбы'
 };
 
 let qnIndex = 0;
@@ -1603,7 +1628,7 @@ function renderQuestionnaireCategories(profile = state.profile) {
   const psychPct = psychTotal ? Math.round((psychAnswered / psychTotal) * 100) : 0;
   const psychItem = `
     <button type="button" class="cat-progress-item ${psychAnswered >= psychTotal ? 'cat-progress-done' : ''}" data-open-cat="__psych">
-      <div class="cat-progress-name">Психология</div>
+      <div class="cat-progress-name">ПСИХОЛОГИЯ</div>
       <div class="cat-progress-bar"><div class="cat-progress-fill" style="width:${psychPct}%"></div></div>
       <div class="cat-progress-count">${psychAnswered}/${psychTotal} — открыть</div>
     </button>
@@ -2712,7 +2737,7 @@ function renderTreeFilters(filters = {}) {
   const cats = CATEGORY_ORDER.map((catId) =>
     renderTreeFilterGroup(catId, CATEGORY_LABELS[catId] || catId, FULL_QUESTIONNAIRE, tree, catId, treeOpen)
   ).join('');
-  const psych = renderTreeFilterGroup('psych', 'Психология', QUESTIONNAIRE, tree, null, treeOpen);
+  const psych = renderTreeFilterGroup('psych', 'ПСИХОЛОГИЯ', QUESTIONNAIRE, tree, null, treeOpen);
   const totalActive = Object.values(tree).reduce((n, a) => n + a.length, 0);
   return `
     <div class="filter-group tree-filter-group">
