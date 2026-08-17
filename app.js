@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=40';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=41';
 import {
   clearState,
   defaultState,
@@ -10,12 +10,12 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=40';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=40';
-import { StepCounter } from './steps.js?v=40';
-import { decryptJson, encryptJson } from './encryption.js?v=40';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=40';
-import { partnerFilterText } from './partner-filter-text.js?v=40';
+} from './storage.js?v=41';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=41';
+import { StepCounter } from './steps.js?v=41';
+import { decryptJson, encryptJson } from './encryption.js?v=41';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=41';
+import { partnerFilterText } from './partner-filter-text.js?v=41';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1469,14 +1469,14 @@ function pickTopEntry(bucket) {
 function renderQuestionnaireSummary(profile = state.profile) {
   const portrait = profile?.portrait || buildQuestionnairePortrait(profile?.questionnaireAnswers || {});
   const labels = portrait.labels || [];
-  const progress = `${portrait.answered || 0}/${portrait.total || QUESTIONNAIRE.length}`;
   const snippet = labels.length
     ? labels.slice(0, 4).map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ')
     : `<span class="pill">Портрет ещё строится</span>`;
   const confidence = portrait.answered >= 7 ? 'Портрет уже достаточно выражен' : 'Портрет будет точнее после нескольких ответов';
   return `
+    <div class="muted">Ответы строят портрет и помогают подбирать пару — без баллов.</div>
     <div class="row-inline" style="margin-top:10px">${snippet}</div>
-    <div class="muted" style="margin-top:10px">Прогресс: ${progress}. ${confidence}</div>
+    <div class="muted" style="margin-top:10px">${confidence}</div>
   `;
 }
 
@@ -1643,7 +1643,15 @@ function setQuestionCard() {
         `;
       })
       .join('');
-    inner = `<div class="qn-opts">${opts}</div>${q.multi ? `<button class="btn qn-multi-done" type="button" id="qnMultiDone" disabled>Готово →</button>` : ''}`;
+    inner = `
+      <div class="qn-opts-wrap">
+        <div class="qn-opts" id="qnOptsStrip">${opts}</div>
+        <div class="qn-opts-nav">
+          <button class="btn ghost" type="button" data-qn-scroll="-1">‹ Назад</button>
+          <button class="btn ghost" type="button" data-qn-scroll="1">Вперёд ›</button>
+        </div>
+      </div>
+      ${q.multi ? `<button class="btn qn-multi-done" type="button" id="qnMultiDone" disabled>Готово →</button>` : ''}`;
   }
   $('#qnCard').innerHTML = `
     <div class="qn-q">${escapeHtml(questionText(q))}${q.multi ? ` <span class="pill">можно выбрать несколько</span>` : ''}</div>
@@ -1653,6 +1661,12 @@ function setQuestionCard() {
   $('#qnCounter').textContent = `Вопрос ${qnIndex + 1} из ${ALL_QUESTIONS.length} • отвечено: ${Object.keys(answers).length}`;
   $('#qnProgressBar').style.width = Math.round(((qnIndex + 1) / ALL_QUESTIONS.length) * 100) + '%';
   $('#btnQuestionnairePrev').disabled = qnIndex === 0;
+  const optsStrip = document.getElementById('qnOptsStrip');
+  if (optsStrip) {
+    const sel = optsStrip.querySelector('.qn-opt.selected');
+    if (sel) sel.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    else optsStrip.scrollTo({ left: 0 });
+  }
   if (q.numeric) {
     const input = document.getElementById('qnNumInput');
     const saveBtn = document.getElementById('qnNumSave');
@@ -1751,6 +1765,7 @@ function wireQuestionnaire() {
   const onDown = (e) => {
     if (e.pointerType === 'mouse') return;
     if (e.button != null && e.button !== 0) return;
+    if (e.target.closest('.qn-opts')) return;
     startX = e.clientX;
     startY = e.clientY;
     tracking = true;
@@ -1767,6 +1782,7 @@ function wireQuestionnaire() {
   const onUp = (e) => {
     if (!tracking || e.pointerId !== pointerId) return;
     tracking = false;
+    if (e.type === 'pointercancel') return;
     const dx = e.clientX - startX;
     if (Math.abs(dx) < 60) return;
     qnGo(dx < 0 ? 1 : -1);
@@ -1778,6 +1794,15 @@ function wireQuestionnaire() {
   card.addEventListener('pointercancel', onUp, { passive: true });
 
   card.addEventListener('click', (e) => {
+    const navBtn = e.target.closest('[data-qn-scroll]');
+    if (navBtn) {
+      const strip = document.getElementById('qnOptsStrip');
+      const dir = Number(navBtn.dataset.qnScroll);
+      if (strip && dir) {
+        strip.scrollBy({ left: (strip.clientWidth - 130) * dir, behavior: 'smooth' });
+      }
+      return;
+    }
     const btn = e.target.closest('[data-qn-opt]');
     if (btn) {
       const oid = btn.dataset.qnOpt;
@@ -2745,23 +2770,20 @@ function renderDating() {
   $('#view-dating').innerHTML = `
     <div class="grid">
       <div class="card">
-        <div class="card-title">Фильтры</div>
-        <div class="filters-grid">
-          <div class="filter-group">
-            <div class="label">Характер встречи</div>
+        <button class="accordion-head" type="button" data-filter-toggle aria-expanded="${state.ui?.filtersOpen ? 'true' : 'false'}">
+          <span class="accordion-title">Фильтры</span>
+          <span class="chevron" aria-hidden="true"></span>
+        </button>
+        <div class="accordion-body" ${state.ui?.filtersOpen ? '' : 'hidden'}>
+          <div class="filters-grid">
+            <div class="filter-group">
+              <div class="label">Характер встречи</div>
             <div class="chip-row" data-filter-group="meetingIntent">
               ${MEETING_INTENTS.map((x) => {
                 const active = selectedIntents.has(x.id);
                 return `<button class="chip ${active ? 'active' : ''}" type="button" data-filter-chip="meetingIntent" data-value="${x.id}">${x.label}</button>`;
               }).join('')}
             </div>
-          </div>
-          <div class="filter-group">
-            <div class="label">Шаги</div>
-            <select class="select filter-select" data-filter-select="stepsBucket">
-              <option value="">Все</option>
-              ${STEP_BUCKETS.map((x) => `<option value="${x.id}" ${stepsBucket === x.id ? 'selected' : ''}>${x.label}</option>`).join('')}
-            </select>
           </div>
           <div class="filter-group">
             <div class="label">Дальность: ${radiusKm} км</div>
@@ -2778,6 +2800,7 @@ function renderDating() {
             </div>
           </div>
           ${renderTreeFilters(filters)}
+          </div>
         </div>
       </div>
 
@@ -2785,32 +2808,23 @@ function renderDating() {
         <div class="card-title">Анкета</div>
         ${visible.length ? `<div class="tinder-wrap" id="tinderWrap"></div>` : `<div class="muted">Новых анкет нет. Сбросьте лайки или поменяйте интересы.</div>`}
         ${visible.length ? `<div class="tinder-actions"><button class="tbtn nope" type="button" data-tinder="nope">✕</button><button class="tbtn like" type="button" data-tinder="like">❤</button></div>` : ``}
-        ${userPortrait.answered < 7 ? `<div class="muted" style="margin-top:10px">Подбор станет точнее после анкеты: <button class="btn ghost" type="button" data-action="openQuestionnaire">Пройти анкету</button></div>` : ''}
-      </div>
-
-      <div class="card">
-        <div class="card-title">Знакомства</div>
-        <div class="muted">Фильтр по городу: ${cityKey ? cityLabel(cityKey) : 'выключен'}; сортировка по общим интересам.</div>
-        <div class="row" style="margin-top:10px">
-          <button class="btn ghost" type="button" data-action="resetLikes">Сбросить лайки</button>
-        </div>
+        ${userPortrait.answered < 7 ? `<div class="qn-cta" style="margin-top:12px"><span>Подбор станет точнее после анкеты</span><button class="btn" type="button" data-action="openQuestionnaire">Пройти анкету</button></div>` : ''}
       </div>
     </div>
   `;
-
-  $('#view-dating').querySelector('[data-action="resetLikes"]')?.addEventListener('click', () => {
-    state.dating.likes = {};
-    state.dating.matches = [];
-    state.dating.seenMatches = {};
-    save();
-    renderAll();
-    haptic('light');
-  });
 
   $('#view-dating').querySelector('[data-action="openQuestionnaire"]')?.addEventListener('click', openQuestionnaire);
 
   $('#view-dating').querySelectorAll('[data-open-tab]').forEach((b) => {
     b.addEventListener('click', () => switchTab(b.dataset.openTab));
+  });
+
+  $('#view-dating').querySelector('[data-filter-toggle]')?.addEventListener('click', () => {
+    state.ui = state.ui || {};
+    state.ui.filtersOpen = !state.ui.filtersOpen;
+    save();
+    renderAll();
+    haptic('light');
   });
 
   $('#view-dating').querySelectorAll('[data-filter-chip]').forEach((btn) => {

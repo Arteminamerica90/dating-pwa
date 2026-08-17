@@ -51,10 +51,6 @@
     <dialog id="dlgSettings" class="dialog">
       <form method="dialog" class="dialog-card">
         <div class="dialog-head">
-          <div>
-            <div class="dialog-title">Настройки и приватность</div>
-            <div class="muted">Данные хранятся только на этом устройстве (localStorage).</div>
-          </div>
           <button class="btn ghost" value="close" type="submit">Закрыть</button>
         </div>
 
@@ -344,7 +340,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=40')
+      import('./app.js?v=41')
         .then(() => {
           window.__walkdateImportOk = true;
         })
