@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=45';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=46';
 import {
   clearState,
   defaultState,
@@ -10,12 +10,12 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=45';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=45';
-import { StepCounter } from './steps.js?v=45';
-import { decryptJson, encryptJson } from './encryption.js?v=45';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=45';
-import { partnerFilterText } from './partner-filter-text.js?v=45';
+} from './storage.js?v=46';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=46';
+import { StepCounter } from './steps.js?v=46';
+import { decryptJson, encryptJson } from './encryption.js?v=46';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=46';
+import { partnerFilterText } from './partner-filter-text.js?v=46';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -25,7 +25,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=45';
+} from './supabase.js?v=46';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -562,6 +562,52 @@ async function init() {
   }
 }
 
+let accountInfo = null;
+
+async function refreshAccountInfo() {
+  try {
+    accountInfo = await supabaseCurrentUser();
+  } catch {
+    accountInfo = null;
+  }
+  renderAccountBadge();
+}
+
+function renderAccountBadge() {
+  const el = document.getElementById('accountBadge');
+  if (!el) return;
+  if (!isSupabaseConfigured()) {
+    el.innerHTML = `<span class="muted">Бэкенд не настроен</span>`;
+    return;
+  }
+  if (accountInfo?.email) {
+    el.innerHTML = `
+      <span class="account-badge-info">Вход: <b>${escapeHtml(accountInfo.email)}</b></span>
+      <button class="btn danger" type="button" data-account-action="logout">Выйти</button>`;
+    el.querySelector('[data-account-action="logout"]')?.addEventListener('click', async () => {
+      try {
+        await supabaseSignOut();
+      } catch {
+        // ignore
+      }
+      accountInfo = null;
+      save();
+      toast('Выход');
+      haptic('light');
+      renderAll();
+    });
+  } else {
+    el.innerHTML = `
+      <span class="muted">Вход не выполнен</span>
+      <button class="btn" type="button" data-account-action="login">Войти / Регистрация</button>`;
+    el.querySelector('[data-account-action="login"]')?.addEventListener('click', () => {
+      openSettingsDialog();
+      const emailEl = document.getElementById('accountEmail');
+      if (emailEl) emailEl.focus();
+    });
+  }
+}
+
 function boot() {
   installGlobalErrorOverlay();
   ensureTodaySteps();
@@ -575,8 +621,11 @@ function boot() {
   maybeStartOnboarding();
   supabaseOnAuth((event) => {
     if (event === 'SIGNED_IN' || (event === 'INITIAL_SESSION' && isSupabaseConfigured())) {
+      refreshAccountInfo();
       syncProfileAfterAuth();
     } else if (event === 'SIGNED_OUT') {
+      accountInfo = null;
+      renderAccountBadge();
       renderAll();
     }
   });
@@ -1266,6 +1315,7 @@ function renderAll() {
   renderDating();
   renderStats();
   renderCircle();
+  renderAccountBadge();
 }
 
 function maybeStartOnboarding() {
@@ -3037,6 +3087,7 @@ function renderStats() {
           <button class="btn" type="button" data-action="saveProfileMini">Сохранить анкету</button>
           <button class="btn ghost" type="button" id="btnSettings">Настройки</button>
         </div>
+        <div class="account-badge" id="accountBadge"></div>
       </div>
 
       <div class="card">
