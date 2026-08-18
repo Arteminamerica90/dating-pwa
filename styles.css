@@ -1543,6 +1543,22 @@ a { color: inherit; }
 .qn-actions { justify-content: space-between; align-items: center; }
 .qn-hint { font-size: 12px; }
 
+.account-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.account-badge-info { overflow-wrap: anywhere; }
+.account-badge .btn { padding: 8px 12px; font-size: 13px; flex: 0 0 auto; }
+
 /* ==== Прогресс по категориям в профиле ==== */
 .cat-progress-grid {
   display: grid;
