@@ -1,4 +1,4 @@
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from './supabase-config.js?v=44';
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from './supabase-config.js?v=45';
 
 let clientPromise = null;
 
@@ -17,13 +17,17 @@ export function getSupabase() {
   return clientPromise;
 }
 
-export async function supabaseSignUp(email, password) {
+export async function supabaseSignUp(email, password, options) {
   if (!isSupabaseConfigured()) throw new Error('Supabase не настроен');
   const supabase = await getSupabase();
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: options || {}
+  });
   if (error) throw new Error(error.message);
   if (!data.user) throw new Error('Не удалось создать аккаунт (проверьте почту)');
-  return data.user;
+  return { user: data.user, session: data.session };
 }
 
 export async function supabaseSignIn(email, password) {

@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=44';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=45';
 import {
   clearState,
   defaultState,
@@ -10,12 +10,12 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=44';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=44';
-import { StepCounter } from './steps.js?v=44';
-import { decryptJson, encryptJson } from './encryption.js?v=44';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=44';
-import { partnerFilterText } from './partner-filter-text.js?v=44';
+} from './storage.js?v=45';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=45';
+import { StepCounter } from './steps.js?v=45';
+import { decryptJson, encryptJson } from './encryption.js?v=45';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=45';
+import { partnerFilterText } from './partner-filter-text.js?v=45';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -25,7 +25,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=44';
+} from './supabase.js?v=45';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -875,12 +875,14 @@ function wireSettings() {
     const password = String($('#accountPassword').value || '');
     if (!email || password.length < 6) return toast('Нужны email и пароль от 6 символов');
     try {
-      await supabaseSignUp(email, password);
+      const reg = await supabaseSignUp(email, password, {
+        emailRedirectTo: location.origin + location.pathname
+      });
       state.cloud.email = email;
       state.cloud.enabled = true;
       save();
       await syncProfileAfterAuth();
-      toast('Регистрация ок — проверьте почту для подтверждения');
+      toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
       haptic('light');
       renderAll();
     } catch (err) {
