@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=56';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=57';
 import {
   clearState,
   defaultState,
@@ -10,13 +10,13 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=56';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=56';
-import { StepCounter } from './steps.js?v=56';
-import { decryptJson, encryptJson } from './encryption.js?v=56';
-import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=56';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=56';
-import { partnerFilterText } from './partner-filter-text.js?v=56';
+} from './storage.js?v=57';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=57';
+import { StepCounter } from './steps.js?v=57';
+import { decryptJson, encryptJson } from './encryption.js?v=57';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=57';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=57';
+import { partnerFilterText } from './partner-filter-text.js?v=57';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -38,7 +38,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=56';
+} from './supabase.js?v=57';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -2123,7 +2123,7 @@ function renderHomeMessagesHtml() {
     ? `<div class="matches-strip">${matches
         .map((id) => renderMatchCard(id, { seen: !!seenMatches[id] }))
         .join('')}</div>`
-    : `<div class="muted">Пока нет матчей. Матч появляется, когда вы оба поставите друг другу лайк.</div>`;
+    : `<div class="muted">У вас ещё нет метчей. Матч появляется, когда вы оба поставите друг другу лайк.</div>`;
 
   const list = threadIds.length
     ? threadIds

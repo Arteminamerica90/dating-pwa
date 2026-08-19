@@ -50,7 +50,9 @@ export async function encryptChatText(key, text) {
 }
 
 export async function decryptChatText(key, payload) {
-  if (!payload || payload.v !== 1 || payload.alg !== 'AES-GCM') throw new Error('Неподдерживаемый формат сообщения');
+  if (!payload || typeof payload.iv !== 'string' || typeof payload.ct !== 'string') {
+    throw new Error('Неподдерживаемый формат сообщения');
+  }
   const pt = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: b64decode(payload.iv) },
     key,
