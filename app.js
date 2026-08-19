@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=54';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=55';
 import {
   clearState,
   defaultState,
@@ -10,13 +10,13 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=54';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=54';
-import { StepCounter } from './steps.js?v=54';
-import { decryptJson, encryptJson } from './encryption.js?v=54';
-import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=54';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=54';
-import { partnerFilterText } from './partner-filter-text.js?v=54';
+} from './storage.js?v=55';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=55';
+import { StepCounter } from './steps.js?v=55';
+import { decryptJson, encryptJson } from './encryption.js?v=55';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=55';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=55';
+import { partnerFilterText } from './partner-filter-text.js?v=55';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -35,7 +35,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=54';
+} from './supabase.js?v=55';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -2020,6 +2020,15 @@ function ensureMessageThread(profileId) {
 
   const profile = DATING_PROFILES.find((x) => x.id === profileId) || liveProfiles.find((x) => x.id === profileId);
   const name = profile?.name || 'Профиль';
+
+  if (isRealChat(profileId)) {
+    state.messages.threads[profileId] = {
+      unread: !state.dating.seenMatches?.[profileId] && !!profile,
+      messages: []
+    };
+    return state.messages.threads[profileId];
+  }
+
   const threads = {
     p1: [
       { from: 'them', text: 'Привет. Какой у тебя план на вечер?', ts: Date.now() - 1000 * 60 * 42 },
@@ -2116,11 +2125,12 @@ function renderHomeMessagesHtml() {
   const list = threadIds.length
     ? threadIds
         .map((id) => {
-          const profile = DATING_PROFILES.find((x) => x.id === id);
+          const profile = DATING_PROFILES.find((x) => x.id === id) || liveProfiles.find((x) => x.id === id);
           if (!profile) return '';
           const t = ensureMessageThread(id);
           const lastMsg = t.messages?.[t.messages.length - 1];
           const unread = !!t.unread;
+          const secured = isRealChat(id);
           return `
             <button class="chat-item" type="button" data-chat-id="${id}">
               <div class="chat-avatar-wrap ${unread ? 'unread' : ''}">
@@ -2128,7 +2138,7 @@ function renderHomeMessagesHtml() {
               </div>
               <div class="chat-main">
                 <div class="chat-topline">
-                  <div class="chat-name">${escapeHtml(profile.name)}, ${profile.age}</div>
+                  <div class="chat-name">${escapeHtml(profile.name)}, ${profile.age}${secured ? ' 🔒' : ''}</div>
                   <div class="chat-time">${lastMsg ? formatMessageTime(lastMsg.ts) : ''}</div>
                 </div>
                 <div class="chat-preview">${escapeHtml(lastMsg?.text || profile.about || 'Новое совпадение')}</div>
@@ -2831,7 +2841,9 @@ function renderDating() {
     loadLiveProfiles();
   }
 
-  const candidates = [...DATING_PROFILES, ...liveProfiles].filter((p) => {
+  const liveMode = !!accountInfo?.id && isSupabaseConfigured();
+  const candidatePool = liveMode && liveProfiles.length ? liveProfiles : DATING_PROFILES;
+  const candidates = [...candidatePool].filter((p) => {
     if (!matchesTreeFilters(p, filters.tree)) return false;
 
     if (selectedIntents.size) {
@@ -2872,6 +2884,8 @@ function renderDating() {
     });
 
   const visible = candidates.filter((p) => !state.dating.likes[p.id]).slice(0, 6);
+  const matches = getMutualMatches();
+  const seenMatches = state.dating.seenMatches || {};
 
   $('#view-dating').innerHTML = `
     <div class="grid">
@@ -2929,6 +2943,18 @@ function renderDating() {
           ${renderTreeFilters(filters)}
           </div>
         </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Мои пары</div>
+        ${
+          matches.length
+            ? `<div class="matches-strip">${matches.map((id) => renderMatchCard(id, { seen: !!seenMatches[id] })).join('')}</div>
+               <div class="row-inline" style="margin-top:10px">
+                 <button class="btn ghost" type="button" data-open-match-chat>Открыть переписку</button>
+               </div>`
+            : `<div class="muted">Пока нет пар. Матч появляется, когда вы оба поставите друг другу лайк.</div>`
+        }
       </div>
 
       <div class="card">
@@ -3094,14 +3120,29 @@ function renderDating() {
     el.addEventListener('click', () => {
       const matchId = el.dataset.matchId;
       if (!matchId) return;
-      state.dating.seenMatches = state.dating.seenMatches || {};
-      state.dating.seenMatches[matchId] = true;
-      if (accountInfo?.id) supabaseMarkMatchSeen(accountInfo.id, matchId).catch(() => {});
-      save();
-      renderAll();
-      loadRemoteChat(matchId);
+      openMatchChat(matchId);
     });
   });
+
+  $('#view-dating').querySelector('[data-open-match-chat]')?.addEventListener('click', () => {
+    const first = getMutualMatches()[0];
+    if (first) openMatchChat(first);
+  });
+}
+
+function openMatchChat(matchId) {
+  state.dating.seenMatches = state.dating.seenMatches || {};
+  state.dating.seenMatches[matchId] = true;
+  state.messages = state.messages || { activeThreadId: null, threads: {} };
+  state.messages.activeThreadId = matchId;
+  state.messages.openChat = matchId;
+  state.ui = state.ui || {};
+  state.ui.homePanel = 'messages';
+  if (accountInfo?.id) supabaseMarkMatchSeen(accountInfo.id, matchId).catch(() => {});
+  save();
+  switchTab('home');
+  renderAll();
+  loadRemoteChat(matchId);
 }
 
 
