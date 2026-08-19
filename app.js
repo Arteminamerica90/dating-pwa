@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=57';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=58';
 import {
   clearState,
   defaultState,
@@ -10,13 +10,13 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=57';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=57';
-import { StepCounter } from './steps.js?v=57';
-import { decryptJson, encryptJson } from './encryption.js?v=57';
-import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=57';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=57';
-import { partnerFilterText } from './partner-filter-text.js?v=57';
+} from './storage.js?v=58';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=58';
+import { StepCounter } from './steps.js?v=58';
+import { decryptJson, encryptJson } from './encryption.js?v=58';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=58';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=58';
+import { partnerFilterText } from './partner-filter-text.js?v=58';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -38,7 +38,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=57';
+} from './supabase.js?v=58';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -166,6 +166,7 @@ const DATING_PROFILES = [
     id: 'p1',
     likesYou: true,
     name: 'Алина',
+    gender: 'female',
     age: 26,
     city: 'Moscow',
     stepCount: 8400,
@@ -208,6 +209,7 @@ const DATING_PROFILES = [
     id: 'p2',
     likesYou: true,
     name: 'Илья',
+    gender: 'male',
     age: 29,
     city: 'Moscow',
     stepCount: 12600,
@@ -250,6 +252,7 @@ const DATING_PROFILES = [
     id: 'p3',
     likesYou: false,
     name: 'Катя',
+    gender: 'female',
     age: 24,
     city: 'Saint Petersburg',
     stepCount: 4200,
@@ -292,6 +295,7 @@ const DATING_PROFILES = [
     id: 'p4',
     likesYou: true,
     name: 'Данил',
+    gender: 'male',
     age: 31,
     city: 'Kazan',
     stepCount: 21800,
@@ -341,6 +345,7 @@ function toDatingProfile(p) {
     id: p.id,
     likesYou: false,
     name: p.name || 'Аноним',
+    gender: p.gender || '',
     age: p.age,
     city: p.cityOverride || p.city || '',
     stepCount: p.stepCount || 0,
@@ -2845,8 +2850,16 @@ function renderDating() {
   }
 
   const liveMode = !!accountInfo?.id && isSupabaseConfigured();
+  const myGender = String(state.profile?.gender || '');
+  const myName = normText(state.profile?.name || '');
   const candidatePool = liveMode && liveProfiles.length ? liveProfiles : DATING_PROFILES;
   const candidates = [...candidatePool].filter((p) => {
+    if (myGender) {
+      const g = String(p.gender || '');
+      if (g === myGender) return false;
+    }
+    if (myName && normText(p.name || '') === myName) return false;
+
     if (!matchesTreeFilters(p, filters.tree)) return false;
 
     if (selectedIntents.size) {
