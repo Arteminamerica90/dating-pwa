@@ -49,158 +49,6 @@
       </main>
     </div>
 
-    <dialog id="dlgSettings" class="dialog">
-      <form method="dialog" class="dialog-card">
-        <div class="dialog-head">
-          <button class="btn ghost" value="close" type="submit">Закрыть</button>
-        </div>
-
-        <div class="grid2">
-          <div class="card">
-            <div class="card-title">Город</div>
-            <div class="row">
-              <label class="label">Город (если авто-определение не сработало)</label>
-              <select id="selectCity" class="select">
-                <option value="auto">Авто</option>
-                <option value="Moscow">Москва</option>
-                <option value="Saint Petersburg">Санкт-Петербург</option>
-                <option value="Kazan">Казань</option>
-                <option value="Novosibirsk">Новосибирск</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-title">Интересы</div>
-            <div id="interestChips" class="chips"></div>
-          </div>
-
-          <div class="card">
-            <div class="card-title">Форматы общения</div>
-            <div class="muted">Выберите, как вам комфортно общаться.</div>
-            <div id="commChips" class="chips" style="margin-top:10px"></div>
-          </div>
-
-          <div class="card">
-            <div class="card-title">Работа</div>
-            <div class="muted">Укажите вашу вакансию/роль (будет использоваться как фильтр/совпадение).</div>
-            <div class="row" style="margin-top:10px">
-              <label class="label">Должность</label>
-              <input id="inputJob" class="input" list="jobList" placeholder="например: Product Manager" />
-              <datalist id="jobList">
-                <option value="Software Engineer"></option>
-                <option value="Designer"></option>
-                <option value="Product Manager"></option>
-                <option value="Data Analyst"></option>
-                <option value="Marketing"></option>
-                <option value="Sales"></option>
-                <option value="Student"></option>
-                <option value="Entrepreneur"></option>
-              </datalist>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-title">Учёба</div>
-            <div class="muted">Где учитесь (вуз/курсы) или что изучаете.</div>
-            <div class="row" style="margin-top:10px">
-              <label class="label">Учёба</label>
-              <input id="inputEducation" class="input" placeholder="например: МГУ / курсы по дизайну" />
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-title">Ценности и цель</div>
-            <div class="muted">Можно выбрать несколько.</div>
-            <div id="valuesChips" class="chips" style="margin-top:10px"></div>
-            <div class="row-inline" style="margin-top:10px">
-              <button id="btnAdultToggle" class="btn ghost" type="button">Показать 18+</button>
-            </div>
-            <div id="valuesAdultWrap" class="hidden" style="margin-top:10px">
-              <div class="muted">18+ варианты (скрытый раздел).</div>
-              <div id="valuesAdultChips" class="chips" style="margin-top:10px"></div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-title">Здоровье (трекер)</div>
-            <div class="muted">Ежедневная отметка. Это не медицинская рекомендация.</div>
-            <div class="row" style="margin-top:10px">
-              <label class="label">Настроение (1-5)</label>
-              <input id="inputMood" class="input" inputmode="numeric" placeholder="3" />
-            </div>
-            <div class="row">
-              <label class="label">Энергия (1-5)</label>
-              <input id="inputEnergy" class="input" inputmode="numeric" placeholder="3" />
-            </div>
-            <div class="row">
-              <label class="label">Сон (часы)</label>
-              <input id="inputSleep" class="input" inputmode="decimal" placeholder="7" />
-            </div>
-            <div class="row">
-              <label class="label">Заметка</label>
-              <input id="inputHealthNote" class="input" placeholder="например: устал / отлично" />
-            </div>
-            <div class="row-inline">
-              <button id="btnSaveHealth" class="btn" type="button">Сохранить</button>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-title">Безопасность</div>
-            <div class="muted" id="encStatus">Шифрование: выключено</div>
-            <div class="row" style="margin-top:10px">
-              <label class="label">Пароль</label>
-              <input id="inputPassphrase" class="input" type="password" placeholder="не хранится в приложении" />
-            </div>
-            <div class="row-inline">
-              <button id="btnEnableEnc" class="btn" type="button">Включить</button>
-              <button id="btnUnlockEnc" class="btn ghost" type="button">Разблокировать</button>
-              <button id="btnDisableEnc" class="btn danger" type="button">Выключить</button>
-            </div>
-            <div class="muted">Шифрование AES-GCM; ключ получается из пароля (PBKDF2). Без пароля данные не восстановить.</div>
-          </div>
-
-          <div class="card">
-            <div class="card-title">Аккаунт</div>
-            <div class="muted" id="accountStatus">Вход не выполнен</div>
-            <div class="row" style="margin-top:10px">
-              <label class="label">Email</label>
-              <input id="accountEmail" class="input" inputmode="email" autocomplete="email" placeholder="name@example.com" />
-            </div>
-            <div class="row">
-              <label class="label">Пароль</label>
-              <input id="accountPassword" class="input" type="password" autocomplete="current-password" placeholder="минимум 6 символов" />
-            </div>
-            <div class="row-inline">
-              <button id="btnAccountRegister" class="btn" type="button">Регистрация</button>
-              <button id="btnAccountLogin" class="btn ghost" type="button">Войти</button>
-              <button id="btnAccountLogout" class="btn danger" type="button">Выход</button>
-            </div>
-            <div class="muted">Вход по email: аккаунт нужен, чтобы профиль и анкета сохранялись на сервере (Supabase) и были доступны с любого устройства.</div>
-          </div>
-
-          <div class="card">
-            <div class="card-title">Данные</div>
-            <div class="row-inline">
-              <button id="btnExport" class="btn" type="button">Экспорт JSON</button>
-              <label class="btn ghost" for="fileImport">Импорт JSON</label>
-              <input id="fileImport" type="file" accept="application/json" hidden />
-            </div>
-            <div class="row-inline">
-              <button id="btnClear" class="btn danger" type="button">Очистить всё</button>
-            </div>
-            <div class="muted">Важно: это демо. Для продакшна лучше IndexedDB + шифрование + сервер с явным согласием.</div>
-          </div>
-
-          <div class="card">
-            <div class="card-title">Анкета</div>
-            <div id="profilePhotosPreview" class="row-inline" style="margin:10px 0"></div>
-          </div>
-        </div>
-      </form>
-    </dialog>
-
     <dialog id="dlgQuestionnaire" class="dialog">
       <div class="dialog-card questionnaire-dialog">
         <div class="dialog-head">
@@ -217,7 +65,7 @@
         </div>
         <div class="row-inline qn-actions">
           <button class="btn ghost" id="btnQuestionnairePrev" type="button">← Назад</button>
-          <span class="muted qn-hint">Свайп влево/вправо — перелистать вопрос</span>
+          <span class="muted qn-hint">Свайп для навигации</span>
           <button class="btn" id="btnQuestionnaireSkip" type="button">Пропустить</button>
         </div>
       </div>
@@ -333,7 +181,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=46')
+      import('./app.js?v=52')
         .then(() => {
           window.__walkdateImportOk = true;
         })

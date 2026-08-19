@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=46';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=52';
 import {
   clearState,
   defaultState,
@@ -10,22 +10,32 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=46';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=46';
-import { StepCounter } from './steps.js?v=46';
-import { decryptJson, encryptJson } from './encryption.js?v=46';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=46';
-import { partnerFilterText } from './partner-filter-text.js?v=46';
+} from './storage.js?v=52';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=52';
+import { StepCounter } from './steps.js?v=52';
+import { decryptJson, encryptJson } from './encryption.js?v=52';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=52';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=52';
+import { partnerFilterText } from './partner-filter-text.js?v=52';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
+  supabaseEnsureMatch,
+  supabaseGetMyLikes,
+  supabaseGetMyMatches,
+  supabaseGetPlansToday,
+  supabaseListPublicProfiles,
   supabaseLoadProfile,
+  supabaseMarkMatchSeen,
   supabaseOnAuth,
+  supabaseSaveLike,
+  supabaseSaveLocation,
+  supabaseSavePlans,
   supabaseSaveProfile,
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=46';
+} from './supabase.js?v=52';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -319,6 +329,76 @@ const DATING_PROFILES = [
   }
 ];
 
+let liveProfiles = [];
+let liveProfilesLoaded = false;
+let lastPushedMatchIds = [];
+
+function toDatingProfile(p) {
+  return {
+    id: p.id,
+    likesYou: false,
+    name: p.name || 'Аноним',
+    age: p.age,
+    city: p.cityOverride || p.city || '',
+    stepCount: p.stepCount || 0,
+    meetingIntent: p.meetingIntent || [],
+    meetingPlaces: p.meetingPlaces || [],
+    photos: p.photos || [],
+    interests: p.interests || [],
+    communication: p.communication || [],
+    values: p.values || [],
+    zodiac: p.zodiac || '',
+    jobTitle: p.jobTitle || '',
+    education: p.education || '',
+    budget: p.budget || '',
+    about: p.about || p.description || '',
+    persona: p.persona || {},
+    factual: p.factual || {}
+  };
+}
+
+async function loadLiveProfiles() {
+  liveProfilesLoaded = true;
+  try {
+    if (!accountInfo?.id || !isSupabaseConfigured()) return;
+    const list = await supabaseListPublicProfiles({ excludeUserId: accountInfo.id });
+    liveProfiles = list.map(toDatingProfile);
+    await syncLikesFromSupabase();
+    renderAll();
+  } catch (err) {
+    console.warn('live profiles', err?.message);
+  }
+}
+
+async function syncLikesFromSupabase() {
+  try {
+    if (!accountInfo?.id || !isSupabaseConfigured()) return;
+    const { mine, likedMe } = await supabaseGetMyLikes(accountInfo.id);
+    state.dating.likes = { ...state.dating.likes, ...mine };
+    state.dating.likedMe = { ...(state.dating.likedMe || {}), ...likedMe };
+    await syncMatchesFromSupabase();
+    save();
+  } catch (err) {
+    console.warn('sync likes', err?.message);
+  }
+}
+
+async function syncMatchesFromSupabase() {
+  if (!accountInfo?.id || !isSupabaseConfigured()) return;
+  const rows = await supabaseGetMyMatches(accountInfo.id);
+  const fresh = rows.filter((r) => !r.otherUnmatched).map((r) => r.other);
+  const demo = (state.dating.matches || []).filter((id) => !fresh.includes(id));
+  state.dating.matches = [...fresh, ...demo];
+  const known = new Set(lastPushedMatchIds);
+  const newOnes = fresh.filter((id) => !known.has(id));
+  lastPushedMatchIds = fresh;
+  if (newOnes.length) {
+    toast('Есть новый матч!');
+    haptic('match');
+    renderAll();
+  }
+}
+
 const QUESTIONNAIRE = [
   {
     block: 'Блок 1: Конфликт и стратегия',
@@ -535,6 +615,13 @@ const QN_ZODIAC_MAP = {
   зодиак_рыбы: 'Рыбы'
 };
 
+const CITY_ANSWER_TO_KEY = {
+  a: 'Moscow',
+  b: 'Saint Petersburg',
+  c: 'Kazan',
+  d: 'Novosibirsk'
+};
+
 let qnIndex = 0;
 let qnAnimating = false;
 
@@ -591,6 +678,12 @@ function renderAccountBadge() {
         // ignore
       }
       accountInfo = null;
+      liveProfiles = [];
+      liveProfilesLoaded = false;
+      if (state.dating) {
+        state.dating.likedMe = {};
+        for (const id of Object.keys(state.dating.likes)) delete state.dating.likes[id];
+      }
       save();
       toast('Выход');
       haptic('light');
@@ -601,7 +694,8 @@ function renderAccountBadge() {
       <span class="muted">Вход не выполнен</span>
       <button class="btn" type="button" data-account-action="login">Войти / Регистрация</button>`;
     el.querySelector('[data-account-action="login"]')?.addEventListener('click', () => {
-      openSettingsDialog();
+      switchTab('stats');
+      document.getElementById('accountCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       const emailEl = document.getElementById('accountEmail');
       if (emailEl) emailEl.focus();
     });
@@ -613,7 +707,6 @@ function boot() {
   ensureTodaySteps();
   ensureTodayPlans();
   wireTabs();
-  wireSettings();
   wirePwa();
   wireSwipes();
   wireQuestionnaire();
@@ -632,6 +725,12 @@ function boot() {
 
   // Гео-трекинг и датчики отключены (UI убран); город выбирается вручную в настройках.
   save();
+
+  // Периодическая подгрузка новых сообщений в открытом реальном чате.
+  setInterval(() => {
+    const open = state?.messages?.openChat;
+    if (open && isRealChat(open)) loadRemoteChat(open);
+  }, 12_000);
 }
 
 async function safeLoadState() {
@@ -731,6 +830,7 @@ async function syncProfileAfterAuth() {
       if (payload.dating?.matches) state.dating.matches = payload.dating.matches;
     }
     await supabasePushProfile();
+    await syncLikesFromSupabase();
     renderAll();
   } catch (err) {
     console.warn('supabase pull', err?.message);
@@ -760,6 +860,13 @@ function ensureTodayPlans() {
 }
 
 function wireTabs() {
+  const main = document.querySelector('.main');
+  const fadeTab = () => {
+    if (!main) return;
+    main.classList.remove('tab-fading');
+    void main.offsetWidth;
+    main.classList.add('tab-fading');
+  };
   document.querySelectorAll('.tab').forEach((btn) => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.tab;
@@ -771,6 +878,7 @@ function wireTabs() {
         save();
       }
       haptic('tab');
+      fadeTab();
       renderAll();
     });
   });
@@ -825,101 +933,13 @@ function wireSwipes() {
   main.addEventListener('pointercancel', onUp, { passive: true });
 }
 
-function openSettingsDialog() {
-  syncSettingsUi();
-  $('#dlgSettings').showModal();
-  haptic('open');
-}
-
 function wireSettings() {
-  $('#btnSettings')?.addEventListener('click', openSettingsDialog);
-
-  $('#selectCity').addEventListener('change', (e) => {
-    state.profile.cityOverride = e.target.value || 'auto';
-    save();
-    renderAll();
-  });
-
-
-  $('#inputJob').addEventListener('change', (e) => {
-    state.profile.jobTitle = String(e.target.value || '').trim().slice(0, 60);
-    save();
-    renderAll();
-    pushPublicProfileNow().catch(() => {});
-  });
-
-  $('#inputEducation').addEventListener('change', (e) => {
-    state.profile.education = String(e.target.value || '').trim().slice(0, 80);
-    save();
-    renderAll();
-    pushPublicProfileNow().catch(() => {});
-  });
-
-  $('#btnSaveHealth').addEventListener('click', () => {
-    const mood = clampInt($('#inputMood').value, 1, 5, 3);
-    const energy = clampInt($('#inputEnergy').value, 1, 5, 3);
-    const sleepHours = clampFloat($('#inputSleep').value, 0, 24, 7);
-    const note = String($('#inputHealthNote').value || '').trim().slice(0, 120);
-
-    const day = todayKey();
-    const entry = { day, mood, energy, sleepHours, note };
-
-    state.health = state.health || { last: entry, history: [] };
-    state.health.last = entry;
-    const hist = Array.isArray(state.health.history) ? state.health.history : [];
-    const filtered = hist.filter((x) => x?.day !== day);
-    filtered.unshift(entry);
-    state.health.history = filtered.slice(0, 90);
-    save();
-    renderAll();
-    haptic('light');
-    toast('Здоровье сохранено');
-  });
-
-  $('#btnEnableEnc').addEventListener('click', async () => {
-    try {
-      const pass = String($('#inputPassphrase').value || '');
-      state = await enableEncryption(pass, state);
-      toast('Шифрование включено');
-      haptic('light');
-      $('#inputPassphrase').value = '';
-      renderAll();
-    } catch (err) {
-      toast(err?.message || 'Не удалось включить шифрование');
-    }
-  });
-
-  $('#btnUnlockEnc').addEventListener('click', async () => {
-    try {
-      const pass = String($('#inputPassphrase').value || '');
-      state = await unlockWithPassphrase(pass, state);
-      toast('Разблокировано');
-      haptic('light');
-      $('#inputPassphrase').value = '';
-      renderAll();
-    } catch (err) {
-      toast(err?.message || 'Не удалось разблокировать');
-    }
-  });
-
-  $('#btnDisableEnc').addEventListener('click', async () => {
-    if (!confirm('Выключить шифрование? Данные останутся, но будут храниться без шифрования.')) return;
-    try {
-      state = await disableEncryption(state);
-      toast('Шифрование выключено');
-      haptic('heavy');
-      renderAll();
-    } catch (err) {
-      toast(err?.message || 'Не удалось выключить шифрование');
-    }
-  });
-
-  $('#accountEmail').addEventListener('change', (e) => {
+  $('#accountEmail')?.addEventListener('change', (e) => {
     state.cloud.email = String(e.target.value || '').trim();
     save();
   });
 
-  $('#btnAccountRegister').addEventListener('click', async () => {
+  $('#btnAccountRegister')?.addEventListener('click', async () => {
     const email = String($('#accountEmail').value || state.cloud.email || '').trim();
     const password = String($('#accountPassword').value || '');
     if (!email || password.length < 6) return toast('Нужны email и пароль от 6 символов');
@@ -939,7 +959,7 @@ function wireSettings() {
     }
   });
 
-  $('#btnAccountLogin').addEventListener('click', async () => {
+  $('#btnAccountLogin')?.addEventListener('click', async () => {
     const email = String($('#accountEmail').value || state.cloud.email || '').trim();
     const password = String($('#accountPassword').value || '');
     if (!email || !password) return toast('Введите email и пароль');
@@ -957,7 +977,7 @@ function wireSettings() {
     }
   });
 
-  $('#btnAccountLogout').addEventListener('click', async () => {
+  $('#btnAccountLogout')?.addEventListener('click', async () => {
     try {
       await supabaseSignOut();
     } catch (err) {
@@ -965,151 +985,52 @@ function wireSettings() {
     }
     state.cloud.token = null;
     state.cloud.enabled = false;
+    accountInfo = null;
+    liveProfiles = [];
+    liveProfilesLoaded = false;
+    if (state.dating) {
+      state.dating.likedMe = {};
+      for (const id of Object.keys(state.dating.likes)) delete state.dating.likes[id];
+    }
     save();
     toast('Выход');
     haptic('light');
     renderAll();
   });
 
-  $('#btnExport').addEventListener('click', () => {
-    exportState(state).then((txt) => {
-      const blob = new Blob([txt], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `walkdate-export-${todayKey()}.json`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-      haptic('light');
-    });
-  });
-
-  $('#fileImport').addEventListener('change', async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const text = await file.text();
-      state = await importStateFromJson(text, state);
-      toast('Импортировано');
-      startGeoIfNeeded();
-      startStepsIfNeeded();
-      renderAll();
-      haptic('light');
-    } catch (err) {
-      toast(err?.message || 'Ошибка импорта');
-    } finally {
-      e.target.value = '';
-    }
-  });
-
-  $('#btnClear').addEventListener('click', () => {
-    if (!confirm('Точно очистить все данные на этом устройстве?')) return;
-    stopGeo();
-    stopSteps();
-    clearState().then(async () => {
-      state = await loadState();
-      renderAll();
-      haptic('heavy');
-      toast('Очищено');
-    });
-  });
-
-  const chips = $('#interestChips');
-  chips.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-interest]');
-    if (!el) return;
-    const id = el.dataset.interest;
-    const set = new Set(state.profile.interests);
-    if (set.has(id)) set.delete(id);
-    else set.add(id);
-    state.profile.interests = [...set];
+  $('#consentGeo')?.addEventListener('change', (e) => {
+    state.consent.geo = !!e.target.checked;
     save();
+    startGeoIfNeeded();
     renderAll();
-    pushPublicProfileNow().catch(() => {});
   });
 
-  const comm = $('#commChips');
-  comm.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-comm]');
-    if (!el) return;
-    const id = el.dataset.comm;
-    const set = new Set(state.profile.communication || []);
-    if (set.has(id)) set.delete(id);
-    else set.add(id);
-    state.profile.communication = [...set];
+  $('#consentSteps')?.addEventListener('change', (e) => {
+    state.consent.steps = !!e.target.checked;
     save();
+    startStepsIfNeeded();
     renderAll();
-    pushPublicProfileNow().catch(() => {});
   });
 
-  const values = $('#valuesChips');
-  values.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-val]');
-    if (!el) return;
-    const id = el.dataset.val;
-    const set = new Set(state.profile.values || []);
-    if (set.has(id)) set.delete(id);
-    else set.add(id);
-    state.profile.values = [...set];
+  $('#consentMapShare')?.addEventListener('change', (e) => {
+    state.geo = state.geo || {};
+    state.geo.mapShare = !!e.target.checked;
     save();
+    maybeShareLocation();
     renderAll();
-    pushPublicProfileNow().catch(() => {});
   });
 
-  const valuesAdult = $('#valuesAdultChips');
-  valuesAdult.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-val]');
-    if (!el) return;
-    const id = el.dataset.val;
-    const set = new Set(state.profile.values || []);
-    if (set.has(id)) set.delete(id);
-    else set.add(id);
-    state.profile.values = [...set];
+  $('#consentPlanShare')?.addEventListener('change', (e) => {
+    state.geo = state.geo || {};
+    state.geo.planShare = !!e.target.checked;
     save();
+    maybeSharePlans();
     renderAll();
-    pushPublicProfileNow().catch(() => {});
-  });
-
-  $('#btnAdultToggle').addEventListener('click', () => {
-    // Explicit separate button as requested.
-    state.profile.valuesAdultUnlocked = !state.profile.valuesAdultUnlocked;
-    save();
-    renderAll();
-    haptic('light');
   });
 }
 
 function syncSettingsUi() {
-  $('#selectCity').value = state.profile.cityOverride || 'auto';
-  $('#inputJob').value = state.profile.jobTitle || '';
-  $('#inputEducation').value = state.profile.education || '';
-
-  const h = state.health?.last || { mood: 3, energy: 3, sleepHours: 7, note: '' };
-  $('#inputMood').value = String(h.mood ?? '');
-  $('#inputEnergy').value = String(h.energy ?? '');
-  $('#inputSleep').value = String(h.sleepHours ?? '');
-  $('#inputHealthNote').value = String(h.note ?? '');
-
-  const preview = $('#profilePhotosPreview');
-  if (preview) {
-    const photos = state.profile?.photos || [];
-    preview.innerHTML = photos.length
-      ? photos
-          .slice(0, 3)
-          .map(
-            (src) =>
-              `<img alt="profile photo" src="${src}" style="width:64px;height:64px;object-fit:cover;border-radius:16px;border:1px solid rgba(255,255,255,0.12)" />`
-          )
-          .join('')
-      : '';
-  }
-
-  $('#encStatus').textContent = state.encryption?.enabled
-    ? state.__locked
-      ? 'Шифрование: включено (заблокировано)'
-      : 'Шифрование: включено'
-    : 'Шифрование: выключено';
-
-  $('#accountEmail').value = state.cloud?.email || '';
+  $('#accountEmail') && ($('#accountEmail').value = state.cloud?.email || '');
   supabaseCurrentUser().then((u) => {
     const el = document.getElementById('accountStatus');
     if (el) {
@@ -1120,29 +1041,6 @@ function syncSettingsUi() {
           : 'Бэкенд не настроен — вставьте ключи Supabase в supabase-config.js';
     }
   });
-
-  $('#interestChips').innerHTML = INTERESTS.map((x) => {
-    const active = state.profile.interests.includes(x.id);
-    return `<div class="chip ${active ? 'active' : ''}" data-interest="${x.id}">${x.label}</div>`;
-  }).join('');
-
-  $('#commChips').innerHTML = COMM_FORMATS.map((x) => {
-    const active = (state.profile.communication || []).includes(x.id);
-    return `<div class="chip ${active ? 'active' : ''}" data-comm="${x.id}">${x.label}</div>`;
-  }).join('');
-
-  $('#valuesChips').innerHTML = VALUES.map((x) => {
-    const active = (state.profile.values || []).includes(x.id);
-    return `<div class="chip ${active ? 'active' : ''}" data-val="${x.id}">${x.label}</div>`;
-  }).join('');
-
-  const unlocked = !!state.profile.valuesAdultUnlocked;
-  $('#valuesAdultWrap').classList.toggle('hidden', !unlocked);
-  $('#btnAdultToggle').textContent = unlocked ? 'Скрыть 18+' : 'Показать 18+';
-  $('#valuesAdultChips').innerHTML = VALUES_ADULT.map((x) => {
-    const active = (state.profile.values || []).includes(x.id);
-    return `<div class="chip ${active ? 'active' : ''}" data-val="${x.id}">${x.label}</div>`;
-  }).join('');
 }
 
 function wirePwa() {
@@ -1309,13 +1207,13 @@ function matchesStepBucket(stepCount, bucket) {
 }
 
 function renderAll() {
-  syncSettingsUi();
   renderHome();
   renderEvents();
   renderDating();
   renderStats();
   renderCircle();
   renderAccountBadge();
+  syncSettingsUi();
 }
 
 function maybeStartOnboarding() {
@@ -1463,6 +1361,13 @@ function setQuestionnaireAnswer(questionId, optionId, { silent } = {}) {
   if (questionId === 'q258' && !state.profile.zodiac) {
     const opt = q ? questionOptions(q).find((o) => o.id === optionId) : null;
     if (opt && QN_ZODIAC_MAP[opt.value]) state.profile.zodiac = QN_ZODIAC_MAP[opt.value];
+  }
+
+  // Город из анкеты становится городом пользователя (используется фильтром дальности).
+  if (questionId === 'q274') {
+    const cityKey = CITY_ANSWER_TO_KEY[stored];
+    state.profile.cityOverride = cityKey || 'auto';
+    if (!cityKey && !silent) toast('Город: определяется по геолокации');
   }
 
   save();
@@ -2082,8 +1987,14 @@ function renderHomeFeedHtml() {
           <div class="profile-field">
             <label class="label">Формат компании</label>
             <label class="plan-company">
-              <input id="homePlanCompany" type="checkbox" />
+              <input id="homePlanCompany" type="checkbox" ${state.plans?.companyPref ? 'checked' : ''} />
               <span>Иду с компанией / не против компании</span>
+            </label>
+          </div>
+          <div class="profile-field">
+            <label class="plan-company">
+              <input id="homePlanShare" type="checkbox" ${state.geo?.planShare ? 'checked' : ''} />
+              <span>Публиковать планы сегодня</span>
             </label>
           </div>
           <div class="row-inline">
@@ -2091,7 +2002,7 @@ function renderHomeFeedHtml() {
             <button class="btn ghost" type="button" data-action="clearPlans">Очистить</button>
           </div>
         </div>
-        <div class="muted" style="margin-top:10px">Чтобы другие увидели ваши планы, включите “Публиковать планы сегодня” в Настройках.</div>
+        <div class="muted" style="margin-top:10px">${state.geo?.planShare ? 'Ваши планы видны другим людям.' : 'Включите «Публиковать планы сегодня», чтобы другие увидели ваши планы.'}</div>
       </div>
 
       <div class="card">
@@ -2108,7 +2019,8 @@ function renderHomeFeedHtml() {
 
 function profileLikesYou(id) {
   const p = DATING_PROFILES.find((x) => x.id === id);
-  return !!(p && p.likesYou);
+  if (p) return !!p.likesYou;
+  return !!(state.dating.likedMe && state.dating.likedMe[id]);
 }
 
 // Матч засчитывается только когда оба человека поставили друг другу лайк.
@@ -2142,7 +2054,7 @@ function ensureMessageThread(profileId) {
   const existing = state.messages.threads[profileId];
   if (existing) return existing;
 
-  const profile = DATING_PROFILES.find((x) => x.id === profileId);
+  const profile = DATING_PROFILES.find((x) => x.id === profileId) || liveProfiles.find((x) => x.id === profileId);
   const name = profile?.name || 'Профиль';
   const threads = {
     p1: [
@@ -2177,9 +2089,13 @@ function formatMessageTime(ts) {
 }
 
 function renderChatScreen(profileId) {
-  const profile = DATING_PROFILES.find((x) => x.id === profileId) || DATING_PROFILES[0];
+  const profile =
+    DATING_PROFILES.find((x) => x.id === profileId) ||
+    liveProfiles.find((x) => x.id === profileId) ||
+    DATING_PROFILES[0];
   const thread = ensureMessageThread(profileId);
   const messages = thread?.messages || [];
+  const secured = isRealChat(profileId);
   return `
     <div class="card chat-screen">
       <div class="chat-screen-head">
@@ -2191,6 +2107,7 @@ function renderChatScreen(profileId) {
             <div class="chat-thread-meta">${cityLabel(profile.city)} • ${escapeHtml(profile.jobTitle || '')}</div>
           </div>
         </div>
+        ${secured ? '<div class="pill" title="AES-GCM 256, ключ пары через PBKDF2">🔒 зашифровано</div>' : ''}
       </div>
       <div class="chat-thread-body">
         ${messages
@@ -2285,9 +2202,20 @@ function wireHomeContentHandlers(rootSelector) {
     addPlan({ title: title.slice(0, 80), scheduledAt: scheduledAt || null, companyOk });
     const titleInput = root.querySelector('#homePlanTitle');
     if (titleInput) titleInput.value = '';
-    const companyInput = root.querySelector('#homePlanCompany');
-    if (companyInput) companyInput.checked = false;
     haptic('light');
+    renderAll();
+  });
+  root.querySelector('#homePlanCompany')?.addEventListener('change', (e) => {
+    state.plans = state.plans || {};
+    state.plans.companyPref = !!e.target.checked;
+    save();
+    maybeSharePlans();
+  });
+  root.querySelector('#homePlanShare')?.addEventListener('change', (e) => {
+    state.geo = state.geo || {};
+    state.geo.planShare = !!e.target.checked;
+    save();
+    maybeSharePlans();
     renderAll();
   });
   root.querySelector('[data-action="clearPlans"]')?.addEventListener('click', () => {
@@ -2316,8 +2244,10 @@ function wireHomeContentHandlers(rootSelector) {
       t.unread = false;
       state.dating.seenMatches = state.dating.seenMatches || {};
       state.dating.seenMatches[chatId] = true;
+      if (accountInfo?.id) supabaseMarkMatchSeen(accountInfo.id, chatId).catch(() => {});
       save();
       renderAll();
+      loadRemoteChat(chatId);
     });
   });
   root.querySelectorAll('[data-chat-back]').forEach((b) => {
@@ -2336,8 +2266,10 @@ function wireHomeContentHandlers(rootSelector) {
       state.dating.seenMatches[matchId] = true;
       state.messages = state.messages || { activeThreadId: null, threads: {} };
       state.messages.openChat = matchId;
+      if (accountInfo?.id) supabaseMarkMatchSeen(accountInfo.id, matchId).catch(() => {});
       save();
       renderAll();
+      loadRemoteChat(matchId);
     });
   });
   root.querySelector('[data-action="sendChat"]')?.addEventListener('click', () => {
@@ -2352,7 +2284,47 @@ function wireHomeContentHandlers(rootSelector) {
     input.value = '';
     save();
     renderAll();
+    if (isRealChat(activeId)) {
+      pushEncryptedMessage(activeId, text.slice(0, 300)).catch((err) => {
+        console.warn('encrypted send', err?.message);
+      });
+    }
   });
+}
+
+function isRealChat(id) {
+  if (!accountInfo?.id || !isSupabaseConfigured()) return false;
+  return !DATING_PROFILES.some((p) => p.id === id);
+}
+
+async function pushEncryptedMessage(otherId, text) {
+  const key = await derivePairKey(accountInfo.id, otherId);
+  const cipher = await encryptChatText(key, text);
+  await supabaseSaveMessage(accountInfo.id, otherId, cipher);
+}
+
+async function loadRemoteChat(chatId) {
+  if (!isRealChat(chatId)) return;
+  try {
+    const key = await derivePairKey(accountInfo.id, chatId);
+    const rows = await supabaseGetMessages(accountInfo.id, chatId);
+    const messages = [];
+    for (const row of rows) {
+      try {
+        const text = await decryptChatText(key, { iv: row.iv, ct: row.ct });
+        messages.push({ from: row.from_user === accountInfo.id ? 'me' : 'them', text, ts: new Date(row.created_at).getTime() });
+      } catch {
+        // skip undecryptable
+      }
+    }
+    messages.sort((a, b) => a.ts - b.ts);
+    const thread = ensureMessageThread(chatId);
+    thread.messages = messages;
+    save();
+    renderAll();
+  } catch (err) {
+    console.warn('load remote chat', err?.message);
+  }
 }
 
 function renderHome() {
@@ -2782,6 +2754,10 @@ function matchesTreeFilters(p, treeFilter = {}) {
     if (!Array.isArray(opts) || !opts.length) continue;
     const q = ALL_QUESTIONS.find((x) => x.id === qid);
     if (!q || q.numeric || q.search) continue;
+    if (qid === 'q274') {
+      if (!opts.some((optId) => p.city === CITY_ANSWER_TO_KEY[optId])) return false;
+      continue;
+    }
     const matches = opts.some((optId) => {
       const opt = questionOptions(q).find((o) => o.id === optId);
       if (!opt) return false;
@@ -2791,6 +2767,79 @@ function matchesTreeFilters(p, treeFilter = {}) {
     if (!matches) return false;
   }
   return true;
+}
+
+// Категории дерева решений, где несовпадение значений критично для матча.
+const TREE_CRITICAL_CATEGORIES = ['family', 'habits', 'relationship', 'extra'];
+// Минимальная доля совпавших веток дерева для матча.
+const TREE_MATCH_THRESHOLD = 0.4;
+
+function buildUserTree(profile = state.profile) {
+  const answers = getQuestionnaireAnswers(profile);
+  const factual = {};
+  const persona = {};
+  for (const q of ALL_QUESTIONS) {
+    const answerId = answers[q.id];
+    if (!answerId) continue;
+    const num = numericAnswerValue(answerId);
+    const searched = searchAnswerValue(answerId);
+    let traitsList;
+    if (num != null) {
+      const bucket = numericBucket(q, num);
+      traitsList = bucket ? [{ [q.category]: bucket }] : [];
+    } else if (searched != null) {
+      const cat = (q.searchMap || {})[searched] || '';
+      traitsList = cat ? [{ [q.category]: cat }] : [];
+    } else {
+      traitsList = multiAnswerList(answerId)
+        .map((oid) => {
+          const opt = questionOptions(q).find((x) => x.id === oid);
+          return opt ? getOptionTraits(q, opt) : null;
+        })
+        .filter(Boolean);
+    }
+    for (const traits of traitsList) {
+      for (const [dim, val] of Object.entries(traits)) {
+        if (q.category) factual[dim] = val;
+        else persona[dim] = val;
+      }
+    }
+  }
+  return { factual, persona };
+}
+
+// Совместимость по дереву решений: сравнивает ветки пользователя и кандидата.
+// known — ветки, где известны значения обоих; match — совпавшие; conflicts — критичные расхождения.
+// Настройки читаются из state.dating.filters: treeEnabled, treeThreshold (%), treeConflicts.
+function treeMatchCompatibility(userProfile = state.profile, candidate = {}) {
+  const filters = state.dating?.filters || {};
+  const enabled = filters.treeEnabled !== false;
+  const conflictsEnabled = filters.treeConflicts !== false;
+  const threshold = Number.isFinite(Number(filters.treeThreshold)) ? Number(filters.treeThreshold) / 100 : TREE_MATCH_THRESHOLD;
+  const me = buildUserTree(userProfile);
+  const them = {
+    factual: candidate.factual || {},
+    persona: candidate.persona || {}
+  };
+  const known = [];
+  const match = [];
+  const conflicts = [];
+  for (const [dim, myVal] of Object.entries(me.factual)) {
+    const theirVal = them.factual[dim];
+    if (!theirVal) continue;
+    known.push(dim);
+    if (myVal === theirVal) match.push(dim);
+    else if (conflictsEnabled && TREE_CRITICAL_CATEGORIES.includes(dim)) conflicts.push({ dim, mine: myVal, theirs: theirVal });
+  }
+  for (const [dim, myVal] of Object.entries(me.persona)) {
+    const theirVal = them.persona[dim];
+    if (!theirVal) continue;
+    known.push(dim);
+    if (myVal === theirVal) match.push(dim);
+  }
+  const pct = known.length ? match.length / known.length : null;
+  const compatible = !enabled || !known.length ? true : pct >= threshold && conflicts.length === 0;
+  return { known, match, conflicts, pct, compatible, enabled, conflictsEnabled, threshold };
 }
 
 function renderDating() {
@@ -2807,8 +2856,18 @@ function renderDating() {
   const selectedPlaces = new Set(filters.meetingPlaces || []);
   const radiusKm = Number.isFinite(Number(filters.distanceKm)) ? Number(filters.distanceKm) : 500;
   const stepsBucket = String(filters.stepsBucket || '');
+  const geoActive = !!(state.consent?.geo && state.lastKnown);
+  const distanceMatters = filters.distanceMatters !== false;
+  const canMeasure = geoActive || !!cityKey;
+  const treeEnabled = filters.treeEnabled !== false;
+  const treeConflicts = filters.treeConflicts !== false;
+  const treeThresholdPct = Number.isFinite(Number(filters.treeThreshold)) ? Number(filters.treeThreshold) : Math.round(TREE_MATCH_THRESHOLD * 100);
 
-  const candidates = DATING_PROFILES.filter((p) => {
+  if (!liveProfilesLoaded && accountInfo?.id && isSupabaseConfigured()) {
+    loadLiveProfiles();
+  }
+
+  const candidates = [...DATING_PROFILES, ...liveProfiles].filter((p) => {
     if (!matchesTreeFilters(p, filters.tree)) return false;
 
     if (selectedIntents.size) {
@@ -2823,7 +2882,7 @@ function renderDating() {
 
     if (stepsBucket && !matchesStepBucket(Number(p.stepCount || 0), stepsBucket)) return false;
 
-    if (cityKey && radiusKm > 0) {
+    if (distanceMatters && canMeasure && cityKey && radiusKm > 0) {
       const km = cityDistanceKm(cityKey, p.city);
       if (km != null && km > radiusKm) return false;
     }
@@ -2869,9 +2928,18 @@ function renderDating() {
             </div>
           </div>
           <div class="filter-group">
-            <div class="label">Дальность: ${radiusKm} км</div>
-            <input class="range" type="range" min="0" max="3000" step="25" value="${radiusKm}" data-filter-range="distanceKm" />
-            <div class="muted">От текущего города: ${cityKey ? cityLabel(cityKey) : 'город не определён'}</div>
+            <div class="label ${!distanceMatters || !canMeasure ? 'muted' : ''}">Дальность: ${radiusKm} км</div>
+            <div class="chip-row">
+              <button class="chip ${distanceMatters ? 'active' : ''}" type="button" data-filter-distance-toggle>Учитывать дальность</button>
+            </div>
+            <input class="range" type="range" min="0" max="3000" step="25" value="${radiusKm}" data-filter-range="distanceKm" ${!distanceMatters || !canMeasure ? 'disabled' : ''} />
+            <div class="muted">${
+              !canMeasure
+                ? 'Включите геолокацию или укажите город в анкете, чтобы использовать фильтр по дальности.'
+                : distanceMatters
+                  ? `От: ${cityKey ? cityLabel(cityKey) : 'вашего города'} • ${geoActive ? 'геолокация активна' : 'город из анкеты'}`
+                  : 'Дальность не учитывается — показываем анкеты в любом городе.'
+            }</div>
           </div>
           <div class="filter-group">
             <div class="label">Мое потенциальное место встречи</div>
@@ -2882,6 +2950,18 @@ function renderDating() {
               }).join('')}
             </div>
           </div>
+          <div class="filter-group">
+            <div class="label">Матчинг по дереву решений</div>
+            <div class="chip-row">
+              <button class="chip ${treeEnabled ? 'active' : ''}" type="button" data-tree-toggle-match>Учитывать дерево при матче</button>
+            </div>
+            <div class="label ${!treeEnabled ? 'muted' : ''}">Порог совпадений: ${treeThresholdPct}%</div>
+            <input class="range" type="range" min="0" max="100" step="5" value="${treeThresholdPct}" data-tree-threshold ${!treeEnabled ? 'disabled' : ''} />
+            <div class="chip-row">
+              <button class="chip ${treeConflicts ? 'active' : ''}" type="button" data-tree-conflicts-toggle>Блокировать критические конфликты</button>
+            </div>
+            <div class="muted">Критичные расхождения: семья/дети, привычки, цель отношений, религия — матч не засчитывается.</div>
+          </div>
           ${renderTreeFilters(filters)}
           </div>
         </div>
@@ -2889,9 +2969,9 @@ function renderDating() {
 
       <div class="card">
         <div class="card-title">Анкета</div>
-        ${visible.length ? `<div class="tinder-wrap" id="tinderWrap"></div>` : `<div class="muted">Новых анкет нет. Сбросьте лайки или поменяйте интересы.</div>`}
+        ${visible.length ? `<div class="tinder-wrap" id="tinderWrap"></div>` : `<div class="muted">Новых анкет нет.</div>`}
         ${visible.length ? `<div class="tinder-actions"><button class="tbtn nope" type="button" data-tinder="nope">✕</button><button class="tbtn like" type="button" data-tinder="like">❤</button></div>` : ``}
-        ${userPortrait.answered < 7 ? `<div class="qn-cta"><span>Подбор станет точнее после анкеты</span><button class="btn" type="button" data-action="openQuestionnaire">Пройти анкету</button></div>` : ''}
+        ${userPortrait.answered < 7 ? `<div class="qn-cta" style="text-align:center;justify-content:center"><span>Подбор станет точнее после анкеты</span><button class="btn" type="button" data-action="openQuestionnaire">Пройти анкету</button></div>` : ''}
       </div>
     </div>
   `;
@@ -2996,6 +3076,47 @@ function renderDating() {
     el.addEventListener('change', () => renderAll());
   });
 
+  $('#view-dating').querySelectorAll('[data-filter-distance-toggle]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.dating.filters = state.dating.filters || {};
+      state.dating.filters.distanceMatters = !(state.dating.filters.distanceMatters !== false);
+      save();
+      renderAll();
+      haptic('light');
+    });
+  });
+
+  $('#view-dating').querySelectorAll('[data-tree-toggle-match]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.dating.filters = state.dating.filters || {};
+      state.dating.filters.treeEnabled = state.dating.filters.treeEnabled === false;
+      save();
+      renderAll();
+      haptic('light');
+    });
+  });
+
+  $('#view-dating').querySelectorAll('[data-tree-conflicts-toggle]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.dating.filters = state.dating.filters || {};
+      state.dating.filters.treeConflicts = state.dating.filters.treeConflicts === false;
+      save();
+      renderAll();
+      haptic('light');
+    });
+  });
+
+  $('#view-dating').querySelectorAll('[data-tree-threshold]').forEach((el) => {
+    el.addEventListener('input', () => {
+      state.dating.filters = state.dating.filters || {};
+      state.dating.filters.treeThreshold = Number(el.value || 0);
+      const label = el.closest('.filter-group')?.querySelector('.label');
+      if (label) label.textContent = `Порог совпадений: ${Number(el.value || 0)}%`;
+      save();
+    });
+    el.addEventListener('change', () => renderAll());
+  });
+
   if (visible.length) {
     mountTinder(visible);
     $('#view-dating').querySelector('[data-tinder="like"]')?.addEventListener('click', () => tinder?.swipe('right'));
@@ -3011,11 +3132,14 @@ function renderDating() {
       if (!matchId) return;
       state.dating.seenMatches = state.dating.seenMatches || {};
       state.dating.seenMatches[matchId] = true;
+      if (accountInfo?.id) supabaseMarkMatchSeen(accountInfo.id, matchId).catch(() => {});
       save();
       renderAll();
+      loadRemoteChat(matchId);
     });
   });
 }
+
 
 function renderStats() {
   const name = state.profile?.name || '';
@@ -3085,9 +3209,47 @@ function renderStats() {
         </div>
         <div class="row-inline" style="margin-top:14px">
           <button class="btn" type="button" data-action="saveProfileMini">Сохранить анкету</button>
-          <button class="btn ghost" type="button" id="btnSettings">Настройки</button>
         </div>
+      </div>
+
+      <div class="card" id="accountCard">
+        <div class="card-title">Аккаунт</div>
         <div class="account-badge" id="accountBadge"></div>
+        <div class="muted" id="accountStatus" style="margin-top:6px">Вход не выполнен</div>
+        <div class="row" style="margin-top:10px">
+          <label class="label">Email</label>
+          <input id="accountEmail" class="input" inputmode="email" autocomplete="email" placeholder="name@example.com" value="${escapeHtml(state.cloud?.email || '')}" />
+        </div>
+        <div class="row">
+          <label class="label">Пароль</label>
+          <input id="accountPassword" class="input" type="password" autocomplete="current-password" placeholder="минимум 6 символов" />
+        </div>
+        <div class="row-inline">
+          <button id="btnAccountRegister" class="btn" type="button">Регистрация</button>
+          <button id="btnAccountLogin" class="btn ghost" type="button">Войти</button>
+          <button id="btnAccountLogout" class="btn danger" type="button">Выход</button>
+        </div>
+        <div class="muted">Вход по email: аккаунт нужен, чтобы профиль и анкета сохранялись на сервере (Supabase) и были доступны с любого устройства.</div>
+        <div class="card-title" style="margin-top:16px">Согласия</div>
+        <div class="consent-list">
+          <label class="plan-company">
+            <input id="consentGeo" type="checkbox" ${state.consent?.geo ? 'checked' : ''} />
+            <span>Геолокация: город, расстояние до людей и карта</span>
+          </label>
+          <label class="plan-company">
+            <input id="consentSteps" type="checkbox" ${state.consent?.steps ? 'checked' : ''} />
+            <span>Шагомер: статистика активности</span>
+          </label>
+          <label class="plan-company">
+            <input id="consentMapShare" type="checkbox" ${state.geo?.mapShare ? 'checked' : ''} />
+            <span>Показывать меня на карте «люди рядом»</span>
+          </label>
+          <label class="plan-company">
+            <input id="consentPlanShare" type="checkbox" ${state.geo?.planShare ? 'checked' : ''} />
+            <span>Публиковать мои планы на сегодня</span>
+          </label>
+        </div>
+        <div class="muted">Согласия хранятся на этом устройстве и могут быть изменены в любой момент. Разрешения и паузу можно снять здесь.</div>
       </div>
 
       <div class="card">
@@ -3095,7 +3257,6 @@ function renderStats() {
         ${renderQuestionnaireSummary(state.profile)}
         <div class="row-inline" style="margin-top:10px">
           <button class="btn" type="button" data-action="openQuestionnaire">${portrait.answered ? 'Продолжить анкету' : 'Пройти анкету'}</button>
-          <span class="pill">${portrait.answered || 0}/${portrait.total || ALL_QUESTIONS.length}</span>
         </div>
         <button class="accordion-head" type="button" data-tree-toggle aria-expanded="${state.ui?.treeOpen ? 'true' : 'false'}">
           <span class="accordion-title">Дерево решений — категории</span>
@@ -3120,14 +3281,14 @@ function renderStats() {
     </div>
   `;
 
+  wireSettings();
+
   const descInput = $('#view-stats').querySelector('#profileDescription');
   const counter = $('#view-stats').querySelector('#descCounter');
   descInput?.addEventListener('input', () => {
     const len = String(descInput.value || '').length;
     if (counter) counter.textContent = `${len}/2000`;
   });
-
-  $('#view-stats').querySelector('#btnSettings')?.addEventListener('click', openSettingsDialog);
 
   $('#view-stats').querySelector('#profilePhotoInput')?.addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
@@ -3597,16 +3758,17 @@ function renderProfileCard(p) {
 }
 
 function renderMatchCard(id, { seen } = {}) {
-  const p = DATING_PROFILES.find((x) => x.id === id);
+  const p = DATING_PROFILES.find((x) => x.id === id) || liveProfiles.find((x) => x.id === id);
   if (!p) return '';
   const photo = p.photos?.[0] || './assets/profile/avatar-square.jpg';
+  const meta = p.city ? cityLabel(p.city) : '—';
   return `
     <div class="match-card ${seen ? 'seen' : 'new'}" data-match-id="${p.id}" role="button" tabindex="0" aria-label="Матч ${escapeHtml(p.name)}">
       <div class="match-photo-wrap">
         <img class="match-photo" alt="${escapeHtml(p.name)}" src="${photo}" />
       </div>
       <div class="match-name">${escapeHtml(p.name)}</div>
-      <div class="match-meta">${cityLabel(p.city)}</div>
+      <div class="match-meta">${meta}</div>
     </div>
   `;
 }
@@ -3630,21 +3792,53 @@ function renderGeoItem(p) {
 
 function onLike(id) {
   state.dating.likes[id] = 'like';
+  const candidate = DATING_PROFILES.find((x) => x.id === id) || liveProfiles.find((x) => x.id === id);
+  const tree = treeMatchCompatibility(state.profile, candidate || {});
+  const treeOk = tree.compatible;
   const mutual = profileLikesYou(id);
   state.dating.matches = (state.dating.matches || []).filter((x) => x !== id);
-  if (mutual) state.dating.matches.unshift(id);
+  if (mutual && treeOk) state.dating.matches.unshift(id);
 
-  if (mutual) {
+  if (mutual && treeOk) {
+    if (accountInfo?.id) supabaseEnsureMatch(accountInfo.id, id).catch(() => {});
     state.messages = state.messages || { activeThreadId: null, threads: {} };
     state.messages.activeThreadId = id;
     state.messages.openChat = id;
     state.ui = state.ui || {};
     state.ui.homePanel = 'messages';
     haptic('match');
-    toast('Есть матч!');
+    toast('Есть матч! Дерево решений подтвердило совместимость.');
     save();
     switchTab('home');
     return;
+  }
+
+  if (mutual && !treeOk && tree.known.length) {
+    toast('Взаимный лайк, но дерево решений не подтверждает совместимость');
+    haptic('skip');
+    save();
+    renderAll();
+    return;
+  }
+
+  if (accountInfo?.id) {
+    supabaseSaveLike(accountInfo.id, id, 'like')
+      .then(() => supabaseEnsureMatch(accountInfo.id, id))
+      .then((row) => {
+        if (!row) return;
+        state.dating.matches = (state.dating.matches || []).filter((x) => x !== id);
+        state.dating.matches.unshift(id);
+        state.messages = state.messages || { activeThreadId: null, threads: {} };
+        state.messages.activeThreadId = id;
+        state.messages.openChat = id;
+        state.ui = state.ui || {};
+        state.ui.homePanel = 'messages';
+        haptic('match');
+        toast('Есть матч!');
+        save();
+        switchTab('home');
+      })
+      .catch(() => {});
   }
   haptic('like');
   toast('Лайк отправлен');
@@ -3654,6 +3848,7 @@ function onLike(id) {
 
 function onSkip(id) {
   state.dating.likes[id] = 'skip';
+  if (accountInfo?.id) supabaseSaveLike(accountInfo.id, id, 'skip').catch(() => {});
   haptic('skip');
   save();
   renderAll();
@@ -3862,9 +4057,41 @@ async function refreshRemoteEvents(cityKey) {
 
 async function fetchNearby() {
   if (!state.lastKnown) throw new Error('Нет геопозиции');
-  if (!state.cloud?.enabled || !state.cloud?.token) throw new Error('Нужен логин (синк)');
   const cityKey = currentCityKey();
   if (!cityKey) throw new Error('Город не определён');
+  if (isSupabaseConfigured()) {
+    const [locs, profs] = await Promise.all([
+      supabaseGetLocations(),
+      supabaseListPublicProfiles({ excludeUserId: accountInfo?.id })
+    ]);
+    const byUser = {};
+    for (const l of locs) {
+      if (!byUser[l.user_id]) byUser[l.user_id] = [];
+      byUser[l.user_id].push(l);
+    }
+    const users = [];
+    for (const p of profs) {
+      const l = (byUser[p.id] || [])[0];
+      if (!l) continue;
+      users.push({
+        name: p.name || 'Пользователь рядом',
+        communication: p.communication || [],
+        interests: p.interests || [],
+        values: p.values || [],
+        zodiac: p.zodiac || '',
+        jobTitle: p.jobTitle || '',
+        education: p.education || '',
+        lat: l.lat,
+        lon: l.lon,
+        distKm: haversineKm(
+          { lat: state.lastKnown.lat, lon: state.lastKnown.lon },
+          { lat: l.lat, lon: l.lon }
+        )
+      });
+    }
+    return users;
+  }
+  if (!state.cloud?.enabled || !state.cloud?.token) throw new Error('Нужен логин (синк)');
   const users = await apiGetNearby(state.cloud.serverUrl, state.cloud.token, {
     lat: state.lastKnown.lat,
     lon: state.lastKnown.lon,
@@ -3940,6 +4167,9 @@ async function fetchPlansToday() {
   const day = todayKey();
   const cityKey = currentCityKey();
   if (!cityKey) throw new Error('Город не определён');
+  if (isSupabaseConfigured()) {
+    return supabaseGetPlansToday(day, { city: cityKey });
+  }
   if (!state.cloud?.enabled || !state.cloud?.token) throw new Error('Нужен логин (синк)');
   const list = await apiGetPlans(state.cloud.serverUrl, state.cloud.token, { cityKey });
   // Only today's plans.
@@ -3949,7 +4179,9 @@ async function fetchPlansToday() {
 function maybeShareLocation() {
   if (!state.lastKnown) return;
   if (!state.geo?.mapShare) return;
-  if (!state.cloud?.enabled || !state.cloud?.token) return;
+  const hasCloud = state.cloud?.enabled && state.cloud?.token;
+  const hasSupabase = !!(accountInfo?.id && isSupabaseConfigured());
+  if (!hasCloud && !hasSupabase) return;
   const cityKey = currentCityKey();
   if (!cityKey) return;
 
@@ -3958,6 +4190,16 @@ function maybeShareLocation() {
   if (now - lastLocSentAt < 25_000) return;
   lastLocSentAt = now;
 
+  if (hasSupabase) {
+    supabaseSaveLocation(accountInfo.id, {
+      lat: state.lastKnown.lat,
+      lon: state.lastKnown.lon,
+      acc: state.lastKnown.acc || null,
+      cityKey
+    }).catch(() => {});
+  }
+
+  if (!hasCloud) return;
   const serverUrl = state.cloud.serverUrl;
   const token = state.cloud.token;
 
@@ -3983,11 +4225,15 @@ function maybeShareLocation() {
 
 function maybeSharePlans() {
   if (!state.geo?.planShare) return;
-  if (!state.cloud?.enabled || !state.cloud?.token) return;
   if (!state.plans?.day) ensureTodayPlans();
   const day = state.plans.day;
   const plans = Array.isArray(state.plans.items) ? state.plans.items : [];
-  apiPostPlans(state.cloud.serverUrl, state.cloud.token, day, plans).catch(() => {});
+  if (accountInfo?.id && isSupabaseConfigured()) {
+    supabaseSavePlans(accountInfo.id, day, plans).catch(() => {});
+  }
+  if (state.cloud?.enabled && state.cloud?.token) {
+    apiPostPlans(state.cloud.serverUrl, state.cloud.token, day, plans).catch(() => {});
+  }
 }
 
 function addPlan(partial) {
@@ -3997,7 +4243,7 @@ function addPlan(partial) {
     createdAt: new Date().toISOString(),
     title: String(partial?.title || '').trim().slice(0, 80) || 'План',
     scheduledAt: partial?.scheduledAt || null,
-    companyOk: !!partial?.companyOk,
+    companyOk: partial?.companyOk != null ? !!partial.companyOk : !!state.plans?.companyPref,
     kind: partial?.kind || 'custom',
     eventId: partial?.eventId || null,
     cityKey: partial?.cityKey || currentCityKey(),
@@ -4322,7 +4568,7 @@ function mountTinder(profiles) {
 }
 
 function renderTinderInner(p) {
-  const tags = p.interests.map((t) => `<span class="pill">${interestLabel(t)}</span>`).join(' ');
+  const tags = (p.interests || []).map((t) => `<span class="pill">${interestLabel(t)}</span>`).join(' ');
   const comm = (p.communication || []).map((t) => `<span class="pill">${commLabel(t)}</span>`).join(' ');
   const vals = (p.values || []).map((t) => `<span class="pill">${valueLabel(t)}</span>`).join(' ');
   const zodiac = p.zodiac ? `<span class="pill">${escapeHtml(p.zodiac)}</span>` : '';
@@ -4334,6 +4580,12 @@ function renderTinderInner(p) {
   const shared = Array.isArray(compat.shared) && compat.shared.length ? compat.shared.slice(0, 3).map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ') : '';
   const diff = Array.isArray(compat.differences) && compat.differences.length ? compat.differences.slice(0, 2).map((x) => `<span class="pill muted-pill">${escapeHtml(x)}</span>`).join(' ') : '';
   const neutral = Array.isArray(compat.neutral) && compat.neutral.length ? compat.neutral.slice(0, 2).map((x) => `<span class="pill muted-pill">${escapeHtml(x)}</span>`).join(' ') : '';
+  const tree = treeMatchCompatibility(state.profile, p);
+  const treeBadge = !tree.enabled
+    ? '<span class="pill muted-pill">дерево: отключено в фильтрах</span>'
+    : tree.known.length === 0
+      ? '<span class="pill muted-pill">дерево: нет данных</span>'
+      : `<span class="pill status-pill ${tree.compatible ? 'good' : 'bad'}">дерево: ${Math.round(tree.pct * 100)}% совпадений${tree.conflicts.length ? ` • ${tree.conflicts.length} конфликт` : ''}</span>`;
   return `
     <div class="tinder-stamp like">LIKE</div>
     <div class="tinder-stamp nope">NOPE</div>
@@ -4349,6 +4601,7 @@ function renderTinderInner(p) {
       <div class="tinder-badges">${zodiac} ${job} ${edu}</div>
       <div class="tinder-badges"><span class="pill status-pill ${circle.tone === 'good' ? 'good' : circle.tone === 'bad' ? 'bad' : circle.tone === 'warn' ? 'warn' : 'muted'}">${circle.label}</span></div>
       ${circleHighlights.values.length ? `<div class="tinder-badges">${circleHighlights.values.slice(0, 2).map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ')}</div>` : ''}
+      <div class="tinder-badges">${treeBadge}</div>
       ${shared ? `<div class="tinder-badges">${shared}</div>` : ''}
       ${diff ? `<div class="tinder-badges">${diff}</div>` : ''}
       ${neutral ? `<div class="tinder-badges">${neutral}</div>` : ''}

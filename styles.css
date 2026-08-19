@@ -25,9 +25,9 @@ html, body {
   height: 100%;
   margin: 0;
   overflow-x: clip;
-  background: radial-gradient(1200px 700px at 15% 10%, rgba(167, 139, 250, 0.10), transparent 55%),
-    radial-gradient(900px 600px at 90% 10%, rgba(34, 211, 238, 0.08), transparent 50%),
-    radial-gradient(700px 500px at 60% 90%, rgba(251, 113, 133, 0.07), transparent 55%),
+  background: radial-gradient(1200px 700px at 15% 10%, rgba(167, 139, 250, 0.06), transparent 55%),
+    radial-gradient(900px 600px at 90% 10%, rgba(34, 211, 238, 0.045), transparent 50%),
+    radial-gradient(700px 500px at 60% 90%, rgba(251, 113, 133, 0.04), transparent 55%),
     var(--bg);
   color: var(--text);
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
@@ -142,6 +142,15 @@ a { color: inherit; }
 
 .view { display: block; }
 .hidden { display: none; }
+
+.main.tab-fading .view:not(.hidden) {
+  animation: viewFadeIn 0.28s ease;
+}
+
+@keyframes viewFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
 
 .muted { color: var(--muted); line-height: 1.35; }
 
@@ -917,6 +926,10 @@ a { color: inherit; }
   accent-color: var(--brand2);
 }
 
+.range:disabled {
+  opacity: 0.35;
+}
+
 .range::-webkit-slider-runnable-track {
   height: 8px;
   border-radius: 999px;
@@ -979,6 +992,17 @@ a { color: inherit; }
   width: 18px;
   height: 18px;
   accent-color: var(--brand2);
+}
+
+.consent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0 14px;
+}
+
+.consent-list .plan-company {
+  font-weight: 550;
 }
 
 .wishlist-places {
