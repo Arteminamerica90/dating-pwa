@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=58';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=59';
 import {
   clearState,
   defaultState,
@@ -10,13 +10,13 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=58';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=58';
-import { StepCounter } from './steps.js?v=58';
-import { decryptJson, encryptJson } from './encryption.js?v=58';
-import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=58';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=58';
-import { partnerFilterText } from './partner-filter-text.js?v=58';
+} from './storage.js?v=59';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=59';
+import { StepCounter } from './steps.js?v=59';
+import { decryptJson, encryptJson } from './encryption.js?v=59';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=59';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=59';
+import { partnerFilterText } from './partner-filter-text.js?v=59';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -38,7 +38,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=58';
+} from './supabase.js?v=59';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -2853,7 +2853,7 @@ function renderDating() {
   const myGender = String(state.profile?.gender || '');
   const myName = normText(state.profile?.name || '');
   const candidatePool = liveMode && liveProfiles.length ? liveProfiles : DATING_PROFILES;
-  const candidates = [...candidatePool].filter((p) => {
+  const baseMatch = (p) => {
     if (myGender) {
       const g = String(p.gender || '');
       if (g === myGender) return false;
@@ -2874,30 +2874,33 @@ function renderDating() {
 
     if (stepsBucket && !matchesStepBucket(Number(p.stepCount || 0), stepsBucket)) return false;
 
-    if (distanceMatters && canMeasure && cityKey && radiusKm > 0) {
-      const km = cityDistanceKm(cityKey, p.city);
-      if (km != null && km > radiusKm) return false;
-    }
-
     return true;
-  })
-    .map((p) => ({
-      ...p,
-      compatibility: buildPairCompatibility(state.profile, p),
-      score:
-        overlapCount(interests, new Set(p.interests)) +
-        overlapCount(comm, new Set(p.communication || [])) +
-        overlapCount(values, new Set(p.values || [])) +
-        (job && normText(p.jobTitle) === job ? 1 : 0) +
-        (zodiac && normText(p.zodiac) === zodiac ? 1 : 0) +
-        (edu && normText(p.education) === edu ? 1 : 0)
-    }))
-    .sort((a, b) => {
-      const ar = (a.compatibility?.support || 0) - (a.compatibility?.tension || 0);
-      const br = (b.compatibility?.support || 0) - (b.compatibility?.tension || 0);
-      if (br !== ar) return br - ar;
-      return b.score - a.score;
-    });
+  };
+  const inRadius = (p) => {
+    if (!(distanceMatters && canMeasure && cityKey && radiusKm > 0)) return true;
+    const km = cityDistanceKm(cityKey, p.city);
+    return km == null || km <= radiusKm;
+  };
+  const scored = (p) => ({
+    ...p,
+    compatibility: buildPairCompatibility(state.profile, p),
+    score:
+      overlapCount(interests, new Set(p.interests)) +
+      overlapCount(comm, new Set(p.communication || [])) +
+      overlapCount(values, new Set(p.values || [])) +
+      (job && normText(p.jobTitle) === job ? 1 : 0) +
+      (zodiac && normText(p.zodiac) === zodiac ? 1 : 0) +
+      (edu && normText(p.education) === edu ? 1 : 0)
+  });
+  const sorter = (a, b) => {
+    const ar = (a.compatibility?.support || 0) - (a.compatibility?.tension || 0);
+    const br = (b.compatibility?.support || 0) - (b.compatibility?.tension || 0);
+    if (br !== ar) return br - ar;
+    return b.score - a.score;
+  };
+  const withinRadius = candidatePool.filter((p) => baseMatch(p) && inRadius(p));
+  const pool = (withinRadius.length >= 2 || !canMeasure ? withinRadius : candidatePool.filter((p) => baseMatch(p))).map(scored).sort(sorter);
+  const candidates = pool;
 
   const visible = candidates.filter((p) => !state.dating.likes[p.id]).slice(0, 6);
   const matches = getMutualMatches();
@@ -2959,18 +2962,6 @@ function renderDating() {
           ${renderTreeFilters(filters)}
           </div>
         </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Мои пары</div>
-        ${
-          matches.length
-            ? `<div class="matches-strip">${matches.map((id) => renderMatchCard(id, { seen: !!seenMatches[id] })).join('')}</div>
-               <div class="row-inline" style="margin-top:10px">
-                 <button class="btn ghost" type="button" data-open-match-chat>Открыть переписку</button>
-               </div>`
-            : `<div class="muted">Пока нет пар. Матч появляется, когда вы оба поставите друг другу лайк.</div>`
-        }
       </div>
 
       <div class="card">
@@ -3138,11 +3129,6 @@ function renderDating() {
       if (!matchId) return;
       openMatchChat(matchId);
     });
-  });
-
-  $('#view-dating').querySelector('[data-open-match-chat]')?.addEventListener('click', () => {
-    const first = getMutualMatches()[0];
-    if (first) openMatchChat(first);
   });
 }
 
@@ -3821,15 +3807,10 @@ function onLike(id) {
 
   if (mutual && treeOk) {
     if (accountInfo?.id) supabaseEnsureMatch(accountInfo.id, id).catch(() => {});
-    state.messages = state.messages || { activeThreadId: null, threads: {} };
-    state.messages.activeThreadId = id;
-    state.messages.openChat = id;
-    state.ui = state.ui || {};
-    state.ui.homePanel = 'messages';
     haptic('match');
-    toast('Есть матч! Дерево решений подтвердило совместимость.');
+    toast('Есть матч! Дерево решений подтвердило совместимость. Переписка — в табе «Сообщение».');
     save();
-    switchTab('home');
+    renderAll();
     return;
   }
 
@@ -3848,15 +3829,10 @@ function onLike(id) {
         if (!row) return;
         state.dating.matches = (state.dating.matches || []).filter((x) => x !== id);
         state.dating.matches.unshift(id);
-        state.messages = state.messages || { activeThreadId: null, threads: {} };
-        state.messages.activeThreadId = id;
-        state.messages.openChat = id;
-        state.ui = state.ui || {};
-        state.ui.homePanel = 'messages';
         haptic('match');
-        toast('Есть матч!');
+        toast('Есть матч! Переписка — в табе «Сообщение».');
         save();
-        switchTab('home');
+        renderAll();
       })
       .catch(() => {});
   }
