@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=52';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=53';
 import {
   clearState,
   defaultState,
@@ -10,13 +10,13 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=52';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=52';
-import { StepCounter } from './steps.js?v=52';
-import { decryptJson, encryptJson } from './encryption.js?v=52';
-import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=52';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=52';
-import { partnerFilterText } from './partner-filter-text.js?v=52';
+} from './storage.js?v=53';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=53';
+import { StepCounter } from './steps.js?v=53';
+import { decryptJson, encryptJson } from './encryption.js?v=53';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=53';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=53';
+import { partnerFilterText } from './partner-filter-text.js?v=53';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -35,7 +35,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=52';
+} from './supabase.js?v=53';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -669,36 +669,10 @@ function renderAccountBadge() {
   }
   if (accountInfo?.email) {
     el.innerHTML = `
-      <span class="account-badge-info">Вход: <b>${escapeHtml(accountInfo.email)}</b></span>
-      <button class="btn danger" type="button" data-account-action="logout">Выйти</button>`;
-    el.querySelector('[data-account-action="logout"]')?.addEventListener('click', async () => {
-      try {
-        await supabaseSignOut();
-      } catch {
-        // ignore
-      }
-      accountInfo = null;
-      liveProfiles = [];
-      liveProfilesLoaded = false;
-      if (state.dating) {
-        state.dating.likedMe = {};
-        for (const id of Object.keys(state.dating.likes)) delete state.dating.likes[id];
-      }
-      save();
-      toast('Выход');
-      haptic('light');
-      renderAll();
-    });
+      <span class="account-badge-info">Вход: <b>${escapeHtml(accountInfo.email)}</b></span>`;
   } else {
     el.innerHTML = `
-      <span class="muted">Вход не выполнен</span>
-      <button class="btn" type="button" data-account-action="login">Войти / Регистрация</button>`;
-    el.querySelector('[data-account-action="login"]')?.addEventListener('click', () => {
-      switchTab('stats');
-      document.getElementById('accountCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      const emailEl = document.getElementById('accountEmail');
-      if (emailEl) emailEl.focus();
-    });
+      <span class="muted">Вход не выполнен</span>`;
   }
 }
 
@@ -1031,16 +1005,6 @@ function wireSettings() {
 
 function syncSettingsUi() {
   $('#accountEmail') && ($('#accountEmail').value = state.cloud?.email || '');
-  supabaseCurrentUser().then((u) => {
-    const el = document.getElementById('accountStatus');
-    if (el) {
-      el.textContent = u?.email
-        ? `Вход выполнен: ${u.email}`
-        : isSupabaseConfigured()
-          ? 'Вход не выполнен'
-          : 'Бэкенд не настроен — вставьте ключи Supabase в supabase-config.js';
-    }
-  });
 }
 
 function wirePwa() {
@@ -3215,7 +3179,6 @@ function renderStats() {
       <div class="card" id="accountCard">
         <div class="card-title">Аккаунт</div>
         <div class="account-badge" id="accountBadge"></div>
-        <div class="muted" id="accountStatus" style="margin-top:6px">Вход не выполнен</div>
         <div class="row" style="margin-top:10px">
           <label class="label">Email</label>
           <input id="accountEmail" class="input" inputmode="email" autocomplete="email" placeholder="name@example.com" value="${escapeHtml(state.cloud?.email || '')}" />
