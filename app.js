@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=53';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=54';
 import {
   clearState,
   defaultState,
@@ -10,13 +10,13 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=53';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=53';
-import { StepCounter } from './steps.js?v=53';
-import { decryptJson, encryptJson } from './encryption.js?v=53';
-import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=53';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=53';
-import { partnerFilterText } from './partner-filter-text.js?v=53';
+} from './storage.js?v=54';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=54';
+import { StepCounter } from './steps.js?v=54';
+import { decryptJson, encryptJson } from './encryption.js?v=54';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=54';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=54';
+import { partnerFilterText } from './partner-filter-text.js?v=54';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -35,7 +35,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=53';
+} from './supabase.js?v=54';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -3190,7 +3190,7 @@ function renderStats() {
         <div class="row-inline">
           <button id="btnAccountRegister" class="btn" type="button">Регистрация</button>
           <button id="btnAccountLogin" class="btn ghost" type="button">Войти</button>
-          <button id="btnAccountLogout" class="btn danger" type="button">Выход</button>
+          <button id="btnAccountLogout" class="btn danger ${accountInfo ? '' : 'disabled'}" type="button" ${accountInfo ? '' : 'disabled'}>Выход</button>
         </div>
         <div class="muted">Вход по email: аккаунт нужен, чтобы профиль и анкета сохранялись на сервере (Supabase) и были доступны с любого устройства.</div>
         <div class="card-title" style="margin-top:16px">Согласия</div>
