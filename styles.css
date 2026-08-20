@@ -550,6 +550,21 @@ a { color: inherit; }
 .btn:hover { background: rgba(15, 23, 42, 0.10); }
 .btn.ghost { background: transparent; }
 .btn.danger { border-color: rgba(251, 113, 133, 0.6); color: #be123c; }
+.btn.ok { background: var(--ok); border-color: var(--ok); color: #fff; }
+.btn.ok:hover { background: var(--ok); opacity: 0.9; }
+
+.consent-doc {
+  padding: 4px 0;
+}
+.consent-doc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--brand);
+  font-weight: 700;
+  text-decoration: none;
+}
+.consent-doc-link:visited { color: var(--brand); }
 
 .input, .select {
   width: 100%;

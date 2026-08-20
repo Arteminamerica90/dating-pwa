@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=68';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=69';
 import {
   clearState,
   defaultState,
@@ -10,13 +10,13 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=68';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=68';
-import { StepCounter } from './steps.js?v=68';
-import { decryptJson, encryptJson } from './encryption.js?v=68';
-import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=68';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=68';
-import { partnerFilterText } from './partner-filter-text.js?v=68';
+} from './storage.js?v=69';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=69';
+import { StepCounter } from './steps.js?v=69';
+import { decryptJson, encryptJson } from './encryption.js?v=69';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=69';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=69';
+import { partnerFilterText } from './partner-filter-text.js?v=69';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -41,7 +41,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=68';
+} from './supabase.js?v=69';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -687,8 +687,26 @@ function renderAccountBadge() {
   }
 }
 
+function syncLegalConsentFromStorage() {
+  try {
+    if (localStorage.getItem('xystar_legal_consent_v1') === '1') {
+      if (!(state.consent?.agreement && state.consent?.personalData && state.consent?.newsletters && state.consent?.cookies)) {
+        state.consent.agreement = true;
+        state.consent.personalData = true;
+        state.consent.newsletters = true;
+        state.consent.cookies = true;
+        save();
+        renderAll();
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
 function boot() {
   installGlobalErrorOverlay();
+  syncLegalConsentFromStorage();
   ensureTodaySteps();
   ensureTodayPlans();
   wireTabs();
@@ -1053,28 +1071,30 @@ function wireSettings() {
     }
   });
 
-  $('#consentAgreement')?.addEventListener('change', (e) => {
-    state.consent.agreement = !!e.target.checked;
+  $('#btnAcceptAll')?.addEventListener('click', () => {
+    const on = !(state.consent?.agreement && state.consent?.personalData && state.consent?.newsletters && state.consent?.cookies);
+    state.consent.agreement = on;
+    state.consent.personalData = on;
+    state.consent.newsletters = on;
+    state.consent.cookies = on;
     save();
     renderAll();
+    toast(on ? 'Согласие принято' : 'Согласие отозвано');
+    haptic('light');
   });
 
-  $('#consentPersonalData')?.addEventListener('change', (e) => {
-    state.consent.personalData = !!e.target.checked;
-    save();
-    renderAll();
-  });
-
-  $('#consentNewsletters')?.addEventListener('change', (e) => {
-    state.consent.newsletters = !!e.target.checked;
-    save();
-    renderAll();
-  });
-
-  $('#consentCookies')?.addEventListener('change', (e) => {
-    state.consent.cookies = !!e.target.checked;
-    save();
-    renderAll();
+  window.addEventListener('message', (event) => {
+    if (event.origin !== location.origin) return;
+    if (event.data && event.data.type === 'xystar-legal-consent') {
+      state.consent.agreement = true;
+      state.consent.personalData = true;
+      state.consent.newsletters = true;
+      state.consent.cookies = true;
+      save();
+      renderAll();
+      toast('Согласие принято');
+      haptic('light');
+    }
   });
 
   $('#consentGeo')?.addEventListener('change', (e) => {
@@ -3294,6 +3314,7 @@ function renderStats() {
   const photos = state.profile?.photos || [];
   const stepsOn = !!state.consent?.steps;
   const stepsRunning = !!stepCounter?.running;
+  const allLegalConsentsAccepted = !!(state.consent?.agreement && state.consent?.personalData && state.consent?.newsletters && state.consent?.cookies);
   const portrait = buildQuestionnairePortrait(state.profile?.questionnaireAnswers || {});
   const catsInfo = portrait.categories || {};
   const catsProgress = {
@@ -3392,24 +3413,24 @@ function renderStats() {
           <div class="muted" id="accountHint">Вход по email: профиль и анкета сохраняются на сервере (Supabase) и доступны с любого устройства. Не можете войти по своему паролю? Нажмите «Забыли пароль?» — на почту придёт ссылка для смены пароля.</div>`}
       </div>
         <div class="card-title" style="margin-top:16px">Согласия</div>
-        <div class="muted">Как в TwinBy: отдельные согласия для обработки данных, рассылок и cookies. Оператор — xystar.ru · провайдеры: Supabase (auth, база данных, хранилище), jsDelivr CDN (загрузка кода SDK).</div>
+        <div class="muted">Как в TwinBy: полные тексты документов вынесены по ссылкам. Оператор — xystar.ru · провайдеры: Supabase (auth, база данных, хранилище), jsDelivr CDN (загрузка кода SDK).</div>
         <div class="consent-list">
-          <label class="plan-company">
-            <input id="consentAgreement" type="checkbox" ${state.consent?.agreement ? 'checked' : ''} />
-            <span>Я принимаю Пользовательское соглашение xystar.ru</span>
-          </label>
-          <label class="plan-company">
-            <input id="consentPersonalData" type="checkbox" ${state.consent?.personalData ? 'checked' : ''} />
-            <span>Согласие на обработку персональных данных (имя, фото, анкета, геолокация при включении, сообщения) в соответствии с Политикой конфиденциальности xystar.ru</span>
-          </label>
-          <label class="plan-company">
-            <input id="consentNewsletters" type="checkbox" ${state.consent?.newsletters ? 'checked' : ''} />
-            <span>Согласие на получение новостей и рекламных рассылок по email от xystar.ru (провайдер рассылки — Supabase Auth)</span>
-          </label>
-          <label class="plan-company">
-            <input id="consentCookies" type="checkbox" ${state.consent?.cookies ? 'checked' : ''} />
-            <span>Согласие на использование cookies и вспомогательных сервисов (CDN jsDelivr для загрузки SDK, аналитика Supabase)</span>
-          </label>
+          <div class="consent-doc">
+            <a class="consent-doc-link" href="./legal.html#offer" target="_blank" rel="noopener">📄 Публичная оферта</a>
+          </div>
+          <div class="consent-doc">
+            <a class="consent-doc-link" href="./legal.html#agreement" target="_blank" rel="noopener">📄 Пользовательское соглашение</a>
+          </div>
+          <div class="consent-doc">
+            <a class="consent-doc-link" href="./legal.html#privacy" target="_blank" rel="noopener">📄 Обработка персональных данных</a>
+          </div>
+          <div class="row-inline" style="margin-top:8px">
+            <button id="btnAcceptAll" class="btn ${allLegalConsentsAccepted ? 'ok' : ''}" type="button">${allLegalConsentsAccepted ? 'Согласие принято ✓' : 'Я согласен со всеми пунктами'}</button>
+            <span class="muted" id="legalConsentHint">${allLegalConsentsAccepted ? 'Ваше согласие сохранено. Его можно отозвать, нажав кнопку ещё раз.' : 'Ознакомьтесь с документами по ссылкам и подтвердите согласие.'}</span>
+          </div>
+        </div>
+        <div class="card-title" style="margin-top:12px;font-size:15px">Функциональные переключатели</div>
+        <div class="consent-list">
           <label class="plan-company">
             <input id="consentGeo" type="checkbox" ${state.consent?.geo ? 'checked' : ''} />
             <span>Геолокация: город, расстояние до людей и карта</span>
@@ -3427,7 +3448,7 @@ function renderStats() {
             <span>Публиковать мои планы на сегодня</span>
           </label>
         </div>
-        <div class="muted">Каждое согласие можно отозвать в любой момент, сняв отметку. При отзыве согласия на обработку данных профиль перестанет загружаться на сервер.</div>
+        <div class="muted">Каждое согласие можно отозвать в любой момент. При отзыве согласия на обработку данных профиль перестанет загружаться на сервер.</div>
       </div>
 
       <div class="card">
