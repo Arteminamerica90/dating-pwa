@@ -42,7 +42,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=70';
+} from './supabase.js?v=71';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1058,12 +1058,11 @@ function wireSettings() {
     });
   });
 
-  $('#btnAccountLogout')?.addEventListener('click', async () => {
-    try {
-      await supabaseSignOut();
-    } catch (err) {
-      toast(err?.message || 'Ошибка выхода');
-    }
+  $('#btnAccountLogout')?.addEventListener('click', (e) => {
+    haptic('light');
+    const btn = $('#btnAccountLogout');
+    if (btn) { btn.disabled = true; const old = btn.textContent; btn.textContent = 'Выход…'; }
+    // Local logout first — instant response, never blocked by network.
     state.cloud.token = null;
     state.cloud.enabled = false;
     accountInfo = null;
@@ -1075,8 +1074,10 @@ function wireSettings() {
     }
     save();
     toast('Выход');
-    haptic('light');
     renderAll();
+    // Remote sign-out in background — must never block the UI.
+    supabaseSignOut().catch(() => {});
+    if (btn) setTimeout(() => { btn.disabled = false; btn.textContent = old; }, 400);
   });
 
   $('#btnChangePassword')?.addEventListener('click', () => {

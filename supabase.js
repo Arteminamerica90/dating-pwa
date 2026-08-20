@@ -2,9 +2,23 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL } from './supabase-config.js?v=46';
 
 let clientPromise = null;
 
+function withTimeout(promise, ms, label) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error((label || 'Запрос') + ': превышено время ожидания')), ms);
+    })
+  ]).finally(() => clearTimeout(timer));
+}
+
 function createSupabaseClient() {
-  return import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/+esm').then(({ createClient }) =>
-    createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  return withTimeout(
+    import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/+esm').then(({ createClient }) =>
+      createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    ),
+    12000,
+    'Загрузка клиента'
   );
 }
 
