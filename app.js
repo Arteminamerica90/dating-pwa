@@ -42,7 +42,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=74';
+} from './supabase.js?v=75';
 
 const $ = (sel) => document.querySelector(sel);
 

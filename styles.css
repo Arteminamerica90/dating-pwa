@@ -1698,3 +1698,75 @@ button.disabled, button[disabled] { opacity: 0.4; pointer-events: none; cursor: 
 .bk-offer-price { font-weight: 700; }
 .bk-success { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 .bk-error { margin-top: 12px; color: #e11d48; font-size: 13px; }
+
+/* ===== Центрирование текстов и полей ===== */
+.card,
+.card-title,
+.muted,
+.label,
+.pill,
+.btn,
+.pill .verdict {
+  text-align: center;
+}
+
+.profile-field,
+.auth-form,
+.bk-form {
+  align-items: center;
+}
+
+.input,
+.select,
+textarea.input {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.row,
+.row-inline,
+.consent-inline,
+.account-badge,
+.photo-hero-actions,
+.chat-thread-user,
+.chat-composer {
+  justify-content: center;
+}
+
+.row-inline {
+  justify-content: center;
+}
+
+.consent-doc {
+  text-align: center;
+}
+
+.questionnaire-grid {
+  justify-items: center;
+}
+
+.questionnaire-chip {
+  justify-items: center;
+}
+
+/* Исключения: не ломаем чат-пузыри, табы, карточки подбора и ленты событий */
+.chat-bubble-text,
+.chat-bubble {
+  text-align: initial;
+}
+.chat-thread-body {
+  align-items: stretch;
+}
+.tab,
+.tab-lbl {
+  text-align: center;
+}
+.event-tile,
+.plan-tile,
+.friend-row,
+.tinder-card,
+.photo-hero,
+.avatar,
+.chip {
+  text-align: initial;
+}
