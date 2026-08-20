@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=60';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=61';
 import {
   clearState,
   defaultState,
@@ -10,13 +10,13 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=60';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=60';
-import { StepCounter } from './steps.js?v=60';
-import { decryptJson, encryptJson } from './encryption.js?v=60';
-import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=60';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=60';
-import { partnerFilterText } from './partner-filter-text.js?v=60';
+} from './storage.js?v=61';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=61';
+import { StepCounter } from './steps.js?v=61';
+import { decryptJson, encryptJson } from './encryption.js?v=61';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=61';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=61';
+import { partnerFilterText } from './partner-filter-text.js?v=61';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -38,7 +38,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=60';
+} from './supabase.js?v=61';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -934,7 +934,7 @@ function wireSettings() {
   });
 
   $('#btnAccountRegister')?.addEventListener('click', async () => {
-    const email = String($('#accountEmail').value || state.cloud.email || '').trim();
+    const email = String($('#accountEmail').value || state.cloud.email || '').trim().toLowerCase();
     const password = String($('#accountPassword').value || '');
     if (!email || password.length < 6) return toast('Нужны email и пароль от 6 символов');
     try {
@@ -954,7 +954,7 @@ function wireSettings() {
   });
 
   $('#btnAccountLogin')?.addEventListener('click', async () => {
-    const email = String($('#accountEmail').value || state.cloud.email || '').trim();
+    const email = String($('#accountEmail').value || state.cloud.email || '').trim().toLowerCase();
     const password = String($('#accountPassword').value || '');
     if (!email || !password) return toast('Введите email и пароль');
     try {
@@ -967,7 +967,12 @@ function wireSettings() {
       haptic('light');
       renderAll();
     } catch (err) {
-      toast(err?.message || 'Ошибка входа');
+      const msg = String(err?.message || '');
+      if (/invalid/i.test(msg)) {
+        toast('Неверный email или пароль. Если аккаунта нет — нажмите «Регистрация».');
+      } else {
+        toast(msg || 'Ошибка входа');
+      }
     }
   });
 
