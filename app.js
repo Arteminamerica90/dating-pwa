@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=61';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=62';
 import {
   clearState,
   defaultState,
@@ -10,13 +10,13 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=61';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=61';
-import { StepCounter } from './steps.js?v=61';
-import { decryptJson, encryptJson } from './encryption.js?v=61';
-import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=61';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=61';
-import { partnerFilterText } from './partner-filter-text.js?v=61';
+} from './storage.js?v=62';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=62';
+import { StepCounter } from './steps.js?v=62';
+import { decryptJson, encryptJson } from './encryption.js?v=62';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=62';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=62';
+import { partnerFilterText } from './partner-filter-text.js?v=62';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -38,7 +38,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=61';
+} from './supabase.js?v=62';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -818,7 +818,10 @@ async function syncProfileAfterAuth() {
       }
       if (payload.plans) state.plans = payload.plans;
       if (payload.dating?.likes) state.dating.likes = { ...state.dating.likes, ...payload.dating.likes };
-      if (payload.dating?.matches) state.dating.matches = payload.dating.matches;
+      if (payload.dating?.matches) {
+        const remoteMatches = payload.dating.matches;
+        state.dating.matches = [...new Set([...remoteMatches, ...(state.dating.matches || [])])];
+      }
     }
     await supabasePushProfile();
     await syncLikesFromSupabase();
@@ -2034,7 +2037,10 @@ function getMutualMatches() {
 }
 
 function getMessageThreadIds() {
-  return getMutualMatches();
+  const ids = new Set(getMutualMatches());
+  const threads = state.messages?.threads ? Object.keys(state.messages.threads) : [];
+  for (const id of threads) if (id) ids.add(id);
+  return [...ids];
 }
 
 function ensureMessageThread(profileId) {
