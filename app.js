@@ -42,7 +42,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=72';
+} from './supabase.js?v=73';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -3400,24 +3400,6 @@ function renderStats() {
           <textarea id="profileDescription" class="input" maxlength="2000" placeholder="Расскажите о себе (до 2000 символов)">${escapeHtml(description)}</textarea>
         </div>
         <div class="muted" id="descCounter">${description.length}/2000</div>
-        <div class="consent-inline" style="font-size:10px">
-          <div class="muted">Ознакомьтесь с документами по ссылкам и подтвердите согласие.</div>
-          <div class="consent-list">
-            <div class="consent-doc">
-              <a class="consent-doc-link" href="./legal.html#offer" target="_blank" rel="noopener">📄 Публичная оферта</a>
-            </div>
-            <div class="consent-doc">
-              <a class="consent-doc-link" href="./legal.html#agreement" target="_blank" rel="noopener">📄 Пользовательское соглашение</a>
-            </div>
-            <div class="consent-doc">
-              <a class="consent-doc-link" href="./legal.html#privacy" target="_blank" rel="noopener">📄 Обработка персональных данных</a>
-            </div>
-            <div class="row-inline" style="margin-top:4px">
-              <button id="btnAcceptAll" class="btn ${allLegalConsentsAccepted ? 'ok' : ''}" type="button">${allLegalConsentsAccepted ? 'Согласие принято ✓' : 'Я согласен со всеми пунктами'}</button>
-            </div>
-          </div>
-          <div class="muted">Продолжая пользоваться данным приложением вы даёте согласие с правилами пользования сервиса.</div>
-        </div>
         <div class="profile-field">
           <label class="label">Интересы</label>
           <input id="profileInterestsText" class="input" value="${escapeHtml(interestsText)}" placeholder="Например: кофе, прогулки, кино" />
@@ -3512,6 +3494,28 @@ function renderStats() {
           </label>
         </div>
         <div class="muted">Каждое согласие можно отозвать в любой момент. При отзыве согласия на обработку данных профиль перестанет загружаться на сервер.</div>
+      </div>
+
+      <div class="card" id="legalConsentCard">
+        <div class="card-title">Согласия</div>
+        <div class="consent-inline" style="font-size:12px">
+          <div class="muted">Ознакомьтесь с документами по ссылкам и подтвердите согласие.</div>
+          <div class="consent-list">
+            <div class="consent-doc">
+              <a class="consent-doc-link" href="./legal.html#offer" target="_blank" rel="noopener">📄 Публичная оферта</a>
+            </div>
+            <div class="consent-doc">
+              <a class="consent-doc-link" href="./legal.html#agreement" target="_blank" rel="noopener">📄 Пользовательское соглашение</a>
+            </div>
+            <div class="consent-doc">
+              <a class="consent-doc-link" href="./legal.html#privacy" target="_blank" rel="noopener">📄 Обработка персональных данных</a>
+            </div>
+          </div>
+          <div class="row-inline" style="margin-top:8px">
+            <button id="btnAcceptAll" class="btn ${allLegalConsentsAccepted ? 'ok' : ''}" type="button">${allLegalConsentsAccepted ? 'Согласие принято ✓' : 'Я согласен со всеми пунктами'}</button>
+          </div>
+          <div class="muted" style="margin-top:6px">Продолжая пользоваться данным приложением вы даёте согласие с правилами пользования сервиса.</div>
+        </div>
       </div>
     </div>
   `;
