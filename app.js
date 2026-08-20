@@ -42,7 +42,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=73';
+} from './supabase.js?v=74';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1603,11 +1603,11 @@ function renderQuestionnaireSummary(profile = state.profile) {
   const labels = portrait.labels || [];
   const snippet = labels.length
     ? labels.slice(0, 4).map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ')
-    : `<span class="pill">Портрет ещё строится</span>`;
+    : '';
   const confidence = portrait.answered >= 7 ? 'Портрет уже достаточно выражен' : 'Портрет будет точнее после нескольких ответов';
   return `
     <div class="muted">Ответы строят портрет и помогают подбирать пару — без баллов.</div>
-    <div class="row-inline" style="margin-top:10px">${snippet}</div>
+    ${snippet ? `<div class="row-inline" style="margin-top:10px">${snippet}</div>` : ''}
     <div class="muted" style="margin-top:10px">${confidence}</div>
   `;
 }
