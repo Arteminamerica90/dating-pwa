@@ -44,7 +44,11 @@ export function defaultState() {
     consent: {
       asked: false,
       geo: false,
-      steps: false
+      steps: false,
+      agreement: false,
+      personalData: false,
+      newsletters: false,
+      cookies: false
     },
     steps: {
       day: todayKey(),
@@ -205,7 +209,7 @@ export async function saveState(state, { noEncrypt } = {}) {
         photos: st.profile?.photos || [],
         onboarded: !!st.profile?.onboarded
       },
-      consent: st.consent || { asked: true, geo: false, steps: false },
+      consent: st.consent || { asked: true, geo: false, steps: false, agreement: false, personalData: false, newsletters: false, cookies: false },
       ui: st.ui || { homePanel: 'feed', activeChatId: null, eventsView: 'places' },
       circle: st.circle || { friends: [], recommendations: [] },
       encryption: { enabled: true },

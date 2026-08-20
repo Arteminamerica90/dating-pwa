@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=66';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=67';
 import {
   clearState,
   defaultState,
@@ -10,13 +10,13 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=66';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=66';
-import { StepCounter } from './steps.js?v=66';
-import { decryptJson, encryptJson } from './encryption.js?v=66';
-import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=66';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=66';
-import { partnerFilterText } from './partner-filter-text.js?v=66';
+} from './storage.js?v=67';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=67';
+import { StepCounter } from './steps.js?v=67';
+import { decryptJson, encryptJson } from './encryption.js?v=67';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=67';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=67';
+import { partnerFilterText } from './partner-filter-text.js?v=67';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -40,7 +40,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=66';
+} from './supabase.js?v=67';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -790,6 +790,7 @@ async function supabasePushProfile() {
   try {
     const user = await supabaseCurrentUser();
     if (!user) return;
+    if (!state.consent?.personalData) return;
     const payload = {
       profile: state.profile,
       plans: state.plans,
@@ -1021,6 +1022,30 @@ function wireSettings() {
     save();
     toast('Выход');
     haptic('light');
+    renderAll();
+  });
+
+  $('#consentAgreement')?.addEventListener('change', (e) => {
+    state.consent.agreement = !!e.target.checked;
+    save();
+    renderAll();
+  });
+
+  $('#consentPersonalData')?.addEventListener('change', (e) => {
+    state.consent.personalData = !!e.target.checked;
+    save();
+    renderAll();
+  });
+
+  $('#consentNewsletters')?.addEventListener('change', (e) => {
+    state.consent.newsletters = !!e.target.checked;
+    save();
+    renderAll();
+  });
+
+  $('#consentCookies')?.addEventListener('change', (e) => {
+    state.consent.cookies = !!e.target.checked;
+    save();
     renderAll();
   });
 
@@ -2137,14 +2162,26 @@ function formatMessageTime(ts) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function renderChatScreen(profileId) {
-  const profile =
+function resolveChatProfile(profileId) {
+  return (
     DATING_PROFILES.find((x) => x.id === profileId) ||
-    liveProfiles.find((x) => x.id === profileId) ||
-    DATING_PROFILES[0];
+    liveProfiles.find((x) => x.id === profileId) || {
+      id: profileId,
+      name: 'Профиль',
+      age: '',
+      city: '',
+      jobTitle: '',
+      photos: []
+    }
+  );
+}
+
+function renderChatScreen(profileId) {
+  const profile = resolveChatProfile(profileId);
   const thread = ensureMessageThread(profileId);
   const messages = thread?.messages || [];
   const secured = isRealChat(profileId);
+  const mutual = getMutualMatches().includes(profileId);
   return `
     <div class="card chat-screen">
       <div class="chat-screen-head">
@@ -2153,7 +2190,7 @@ function renderChatScreen(profileId) {
           <img class="chat-thread-avatar" src="${profile.photos?.[0] || './assets/profile/avatar-square.jpg'}" alt="${escapeHtml(profile.name)}" />
           <div>
             <div class="chat-thread-name">${escapeHtml(profile.name)}, ${profile.age}</div>
-            <div class="chat-thread-meta">${cityLabel(profile.city)} • ${escapeHtml(profile.jobTitle || '')}</div>
+            <div class="chat-thread-meta">${cityLabel(profile.city)} • ${escapeHtml(profile.jobTitle || '')}${mutual ? ' • Общий метч с «' + escapeHtml(profile.name) + '»' : ''}</div>
           </div>
         </div>
         ${secured ? '<div class="pill" title="AES-GCM 256, ключ пары через PBKDF2">🔒 зашифровано</div>' : ''}
@@ -2201,12 +2238,12 @@ function renderHomeMessagesHtml() {
   const list = threadIds.length
     ? threadIds
         .map((id) => {
-          const profile = DATING_PROFILES.find((x) => x.id === id) || liveProfiles.find((x) => x.id === id);
-          if (!profile) return '';
+          const profile = resolveChatProfile(id);
           const t = ensureMessageThread(id);
           const lastMsg = t.messages?.[t.messages.length - 1];
           const unread = !!t.unread;
           const secured = isRealChat(id);
+          const mutual = matches.includes(id);
           return `
             <button class="chat-item" type="button" data-chat-id="${id}">
               <div class="chat-avatar-wrap ${unread ? 'unread' : ''}">
@@ -2217,7 +2254,8 @@ function renderHomeMessagesHtml() {
                   <div class="chat-name">${escapeHtml(profile.name)}, ${profile.age}${secured ? ' 🔒' : ''}</div>
                   <div class="chat-time">${lastMsg ? formatMessageTime(lastMsg.ts) : ''}</div>
                 </div>
-                <div class="chat-preview">${escapeHtml(lastMsg?.text || profile.about || 'Новое совпадение')}</div>
+                <div class="chat-preview">${lastMsg ? escapeHtml(lastMsg.text) : (mutual ? 'Общий метч с ' + escapeHtml(profile.name) : escapeHtml(profile.about || 'Новое совпадение'))}</div>
+                ${mutual ? `<div class="chat-mutual">Общий метч</div>` : ''}
               </div>
             </button>
           `;
@@ -3310,7 +3348,24 @@ function renderStats() {
         </div>
         <div class="muted" id="accountHint">Вход по email: аккаунт нужен, чтобы профиль и анкета сохранялись на сервере (Supabase) и были доступны с любого устройства.</div>
         <div class="card-title" style="margin-top:16px">Согласия</div>
+        <div class="muted">Как в TwinBy: отдельные согласия для обработки данных, рассылок и cookies. Оператор — xystar.ru · провайдеры: Supabase (auth, база данных, хранилище), jsDelivr CDN (загрузка кода SDK).</div>
         <div class="consent-list">
+          <label class="plan-company">
+            <input id="consentAgreement" type="checkbox" ${state.consent?.agreement ? 'checked' : ''} />
+            <span>Я принимаю Пользовательское соглашение xystar.ru</span>
+          </label>
+          <label class="plan-company">
+            <input id="consentPersonalData" type="checkbox" ${state.consent?.personalData ? 'checked' : ''} />
+            <span>Согласие на обработку персональных данных (имя, фото, анкета, геолокация при включении, сообщения) в соответствии с Политикой конфиденциальности xystar.ru</span>
+          </label>
+          <label class="plan-company">
+            <input id="consentNewsletters" type="checkbox" ${state.consent?.newsletters ? 'checked' : ''} />
+            <span>Согласие на получение новостей и рекламных рассылок по email от xystar.ru (провайдер рассылки — Supabase Auth)</span>
+          </label>
+          <label class="plan-company">
+            <input id="consentCookies" type="checkbox" ${state.consent?.cookies ? 'checked' : ''} />
+            <span>Согласие на использование cookies и вспомогательных сервисов (CDN jsDelivr для загрузки SDK, аналитика Supabase)</span>
+          </label>
           <label class="plan-company">
             <input id="consentGeo" type="checkbox" ${state.consent?.geo ? 'checked' : ''} />
             <span>Геолокация: город, расстояние до людей и карта</span>
@@ -3328,7 +3383,7 @@ function renderStats() {
             <span>Публиковать мои планы на сегодня</span>
           </label>
         </div>
-        <div class="muted">Согласия хранятся на этом устройстве и могут быть изменены в любой момент. Разрешения и паузу можно снять здесь.</div>
+        <div class="muted">Каждое согласие можно отозвать в любой момент, сняв отметку. При отзыве согласия на обработку данных профиль перестанет загружаться на сервер.</div>
       </div>
 
       <div class="card">

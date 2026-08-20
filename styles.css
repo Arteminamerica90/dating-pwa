@@ -408,6 +408,15 @@ a { color: inherit; }
   -webkit-box-orient: vertical;
 }
 
+.chat-mutual {
+  color: var(--accent, #8b5cf6);
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .messages-thread-card {
   display: flex;
   flex-direction: column;
