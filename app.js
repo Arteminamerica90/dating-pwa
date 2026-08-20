@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=65';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=66';
 import {
   clearState,
   defaultState,
@@ -10,13 +10,13 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=65';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=65';
-import { StepCounter } from './steps.js?v=65';
-import { decryptJson, encryptJson } from './encryption.js?v=65';
-import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=65';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=65';
-import { partnerFilterText } from './partner-filter-text.js?v=65';
+} from './storage.js?v=66';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=66';
+import { StepCounter } from './steps.js?v=66';
+import { decryptJson, encryptJson } from './encryption.js?v=66';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=66';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=66';
+import { partnerFilterText } from './partner-filter-text.js?v=66';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -40,7 +40,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=65';
+} from './supabase.js?v=66';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1292,8 +1292,8 @@ async function addProfilePhotoFromUrl(url) {
 }
 
 async function addProfilePhotoFromFile(file) {
-  const dataUrl = await readImageAsDataUrl(file, 1024);
   syncProfileFormFields();
+  const dataUrl = await readImageAsDataUrl(file, 1024);
   state.profile.photos = [dataUrl, ...(state.profile.photos || [])].slice(0, 3);
   save();
   pushPublicProfileNow().catch(() => {});
@@ -3243,7 +3243,7 @@ function renderStats() {
       <div class="card profile-editor">
         <div class="card-title">Анкета</div>
         <div class="photo-hero">
-          <button class="photo-hero-main ${photos[0] ? '' : 'empty'}" type="button" data-action="pickPhoto">
+          <button class="photo-hero-main ${photos[0] ? '' : 'empty'}" type="button" data-action="pickPhoto" ${photos.length >= 3 ? 'disabled' : ''}>
             ${photos[0] ? `<img alt="profile photo" src="${photos[0]}" />` : `<div class="photo-empty">Фото профиля</div>`}
           </button>
           <div class="photo-hero-actions">
@@ -3383,6 +3383,7 @@ function renderStats() {
 
   $('#view-stats').querySelectorAll('[data-action="pickPhoto"]').forEach((btn) => {
     btn.addEventListener('click', () => {
+      if (btn.disabled) return;
       $('#view-stats').querySelector('#profilePhotoInput')?.click();
     });
   });
