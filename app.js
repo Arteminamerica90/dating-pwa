@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=67';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=68';
 import {
   clearState,
   defaultState,
@@ -10,13 +10,13 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=67';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=67';
-import { StepCounter } from './steps.js?v=67';
-import { decryptJson, encryptJson } from './encryption.js?v=67';
-import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=67';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=67';
-import { partnerFilterText } from './partner-filter-text.js?v=67';
+} from './storage.js?v=68';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=68';
+import { StepCounter } from './steps.js?v=68';
+import { decryptJson, encryptJson } from './encryption.js?v=68';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=68';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=68';
+import { partnerFilterText } from './partner-filter-text.js?v=68';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -30,6 +30,7 @@ import {
   supabaseLoadProfile,
   supabaseMarkMatchSeen,
   supabaseOnAuth,
+  supabaseChangePassword,
   supabaseResetPassword,
   supabaseResendConfirmation,
   supabaseSaveLike,
@@ -40,7 +41,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=67';
+} from './supabase.js?v=68';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -950,6 +951,7 @@ function wireSettings() {
       state.cloud.email = email;
       state.cloud.enabled = true;
       save();
+      accountInfo = reg.user;
       await syncProfileAfterAuth();
       toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
       haptic('light');
@@ -964,7 +966,8 @@ function wireSettings() {
     const password = String($('#accountPassword').value || '');
     if (!email || !password) return toast('Введите email и пароль');
     try {
-      await supabaseSignIn(email, password);
+      const user = await supabaseSignIn(email, password);
+      accountInfo = user;
       state.cloud.email = email;
       state.cloud.enabled = true;
       save();
@@ -1023,6 +1026,31 @@ function wireSettings() {
     toast('Выход');
     haptic('light');
     renderAll();
+  });
+
+  $('#btnChangePassword')?.addEventListener('click', () => {
+    $('#changePasswordBox').hidden = false;
+  });
+
+  $('#btnChangePasswordCancel')?.addEventListener('click', () => {
+    $('#changePasswordBox').hidden = true;
+    const inp = $('#newPassword');
+    if (inp) inp.value = '';
+  });
+
+  $('#btnChangePasswordSave')?.addEventListener('click', async () => {
+    const password = String($('#newPassword')?.value || '');
+    if (password.length < 6) return toast('Пароль должен быть минимум 6 символов');
+    try {
+      await supabaseChangePassword(password);
+      const inp = $('#newPassword');
+      if (inp) inp.value = '';
+      $('#changePasswordBox').hidden = true;
+      toast('Пароль изменён');
+      haptic('light');
+    } catch (err) {
+      toast(err?.message || 'Не удалось сменить пароль');
+    }
   });
 
   $('#consentAgreement')?.addEventListener('change', (e) => {
@@ -3329,24 +3357,40 @@ function renderStats() {
       <div class="card" id="accountCard">
         <div class="card-title">Аккаунт</div>
         <div class="account-badge" id="accountBadge"></div>
-        <div class="row" style="margin-top:10px">
-          <label class="label">Email</label>
-          <input id="accountEmail" class="input" inputmode="email" autocomplete="email" placeholder="name@example.com" value="${escapeHtml(state.cloud?.email || '')}" />
-        </div>
-        <div class="row">
-          <label class="label">Пароль</label>
-          <input id="accountPassword" class="input" type="password" autocomplete="current-password" placeholder="минимум 6 символов" />
-        </div>
-        <div class="row-inline">
-          <button id="btnAccountRegister" class="btn" type="button">Регистрация</button>
-          <button id="btnAccountLogin" class="btn ghost" type="button">Войти</button>
-          <button id="btnAccountLogout" class="btn danger ${accountInfo ? '' : 'disabled'}" type="button" ${accountInfo ? '' : 'disabled'}>Выход</button>
-        </div>
-        <div class="row-inline" style="margin-top:8px">
-          <button id="btnForgotPassword" class="btn ghost" type="button">Забыли пароль?</button>
-          <button id="btnResendConfirm" class="btn ghost" type="button">Повторить письмо</button>
-        </div>
-        <div class="muted" id="accountHint">Вход по email: аккаунт нужен, чтобы профиль и анкета сохранялись на сервере (Supabase) и были доступны с любого устройства.</div>
+        ${accountInfo
+          ? `
+          <div class="row-inline" style="margin-top:10px" id="accountSignedIn">
+            <button id="btnChangePassword" class="btn" type="button">Сменить пароль</button>
+            <button id="btnAccountLogout" class="btn danger" type="button">Выход</button>
+          </div>
+          <div class="row" id="changePasswordBox" hidden>
+            <label class="label">Новый пароль</label>
+            <input id="newPassword" class="input" type="password" autocomplete="new-password" placeholder="минимум 6 символов" />
+            <div class="row-inline" style="margin-top:8px">
+              <button id="btnChangePasswordSave" class="btn" type="button">Сохранить пароль</button>
+              <button id="btnChangePasswordCancel" class="btn ghost" type="button">Отмена</button>
+            </div>
+          </div>
+          <div class="muted" style="margin-top:8px">Вы вошли как ${escapeHtml(accountInfo.email || '')}. Профиль и анкета сохраняются на сервере (Supabase).</div>`
+          : `
+          <div class="row" style="margin-top:10px" id="accountSignedOut">
+            <label class="label">Email</label>
+            <input id="accountEmail" class="input" inputmode="email" autocomplete="email" placeholder="name@example.com" value="${escapeHtml(state.cloud?.email || '')}" />
+          </div>
+          <div class="row">
+            <label class="label">Пароль</label>
+            <input id="accountPassword" class="input" type="password" autocomplete="current-password" placeholder="минимум 6 символов" />
+          </div>
+          <div class="row-inline">
+            <button id="btnAccountRegister" class="btn" type="button">Регистрация</button>
+            <button id="btnAccountLogin" class="btn ghost" type="button">Войти</button>
+          </div>
+          <div class="row-inline" style="margin-top:8px">
+            <button id="btnForgotPassword" class="btn ghost" type="button">Забыли пароль?</button>
+            <button id="btnResendConfirm" class="btn ghost" type="button">Повторить письмо</button>
+          </div>
+          <div class="muted" id="accountHint">Вход по email: профиль и анкета сохраняются на сервере (Supabase) и доступны с любого устройства. Не можете войти по своему паролю? Нажмите «Забыли пароль?» — на почту придёт ссылка для смены пароля.</div>`}
+      </div>
         <div class="card-title" style="margin-top:16px">Согласия</div>
         <div class="muted">Как в TwinBy: отдельные согласия для обработки данных, рассылок и cookies. Оператор — xystar.ru · провайдеры: Supabase (auth, база данных, хранилище), jsDelivr CDN (загрузка кода SDK).</div>
         <div class="consent-list">
