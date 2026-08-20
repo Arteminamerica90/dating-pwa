@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=63';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=64';
 import {
   clearState,
   defaultState,
@@ -10,13 +10,13 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=63';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=63';
-import { StepCounter } from './steps.js?v=63';
-import { decryptJson, encryptJson } from './encryption.js?v=63';
-import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=63';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=63';
-import { partnerFilterText } from './partner-filter-text.js?v=63';
+} from './storage.js?v=64';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=64';
+import { StepCounter } from './steps.js?v=64';
+import { decryptJson, encryptJson } from './encryption.js?v=64';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=64';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=64';
+import { partnerFilterText } from './partner-filter-text.js?v=64';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -30,6 +30,8 @@ import {
   supabaseLoadProfile,
   supabaseMarkMatchSeen,
   supabaseOnAuth,
+  supabaseResetPassword,
+  supabaseResendConfirmation,
   supabaseSaveLike,
   supabaseSaveLocation,
   supabaseSaveMessage,
@@ -38,7 +40,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=63';
+} from './supabase.js?v=64';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -972,10 +974,32 @@ function wireSettings() {
     } catch (err) {
       const msg = String(err?.message || '');
       if (/invalid/i.test(msg)) {
-        toast('Неверный email или пароль. Если аккаунта нет — нажмите «Регистрация».');
+        toast('Неверный email или пароль. Если аккаунт создавался ранее — нажмите «Регистрация»: оно отправит письмо подтверждения.');
       } else {
         toast(msg || 'Ошибка входа');
       }
+    }
+  });
+
+  $('#btnForgotPassword')?.addEventListener('click', async () => {
+    const email = String($('#accountEmail').value || '').trim().toLowerCase();
+    if (!email) return toast('Введите email в поле выше');
+    try {
+      await supabaseResetPassword(email);
+      toast('Письмо для сброса пароля отправлено на ' + email);
+    } catch (err) {
+      toast(err?.message || 'Не удалось отправить письмо');
+    }
+  });
+
+  $('#btnResendConfirm')?.addEventListener('click', async () => {
+    const email = String($('#accountEmail').value || '').trim().toLowerCase();
+    if (!email) return toast('Введите email в поле выше');
+    try {
+      await supabaseResendConfirmation(email);
+      toast('Письмо подтверждения отправлено. Проверьте почту.');
+    } catch (err) {
+      toast(err?.message || 'Не удалось отправить письмо');
     }
   });
 
@@ -2875,7 +2899,7 @@ function renderDating() {
   const liveMode = !!accountInfo?.id && isSupabaseConfigured();
   const myGender = String(state.profile?.gender || '');
   const myName = normText(state.profile?.name || '');
-  const candidatePool = liveMode && liveProfiles.length ? liveProfiles : DATING_PROFILES;
+  const candidatePool = liveProfiles.length ? liveProfiles : [];
   const baseMatch = (p) => {
     if (myGender) {
       const g = String(p.gender || '');
@@ -3258,7 +3282,11 @@ function renderStats() {
           <button id="btnAccountLogin" class="btn ghost" type="button">Войти</button>
           <button id="btnAccountLogout" class="btn danger ${accountInfo ? '' : 'disabled'}" type="button" ${accountInfo ? '' : 'disabled'}>Выход</button>
         </div>
-        <div class="muted">Вход по email: аккаунт нужен, чтобы профиль и анкета сохранялись на сервере (Supabase) и были доступны с любого устройства.</div>
+        <div class="row-inline" style="margin-top:8px">
+          <button id="btnForgotPassword" class="btn ghost" type="button">Забыли пароль?</button>
+          <button id="btnResendConfirm" class="btn ghost" type="button">Повторить письмо</button>
+        </div>
+        <div class="muted" id="accountHint">Вход по email: аккаунт нужен, чтобы профиль и анкета сохранялись на сервере (Supabase) и были доступны с любого устройства.</div>
         <div class="card-title" style="margin-top:16px">Согласия</div>
         <div class="consent-list">
           <label class="plan-company">

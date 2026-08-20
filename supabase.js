@@ -46,6 +46,24 @@ export async function supabaseSignOut() {
   if (error) throw new Error(error.message);
 }
 
+export async function supabaseResetPassword(email) {
+  const supabase = await getSupabase();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: location.origin + location.pathname
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function supabaseResendConfirmation(email) {
+  const supabase = await getSupabase();
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email,
+    options: { emailRedirectTo: location.origin + location.pathname }
+  });
+  if (error) throw new Error(error.message);
+}
+
 export async function supabaseCurrentUser() {
   if (!isSupabaseConfigured()) return null;
   const supabase = await getSupabase();
