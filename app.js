@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=59';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=60';
 import {
   clearState,
   defaultState,
@@ -10,13 +10,13 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=59';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=59';
-import { StepCounter } from './steps.js?v=59';
-import { decryptJson, encryptJson } from './encryption.js?v=59';
-import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=59';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=59';
-import { partnerFilterText } from './partner-filter-text.js?v=59';
+} from './storage.js?v=60';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=60';
+import { StepCounter } from './steps.js?v=60';
+import { decryptJson, encryptJson } from './encryption.js?v=60';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=60';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=60';
+import { partnerFilterText } from './partner-filter-text.js?v=60';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -38,7 +38,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=59';
+} from './supabase.js?v=60';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -806,7 +806,16 @@ async function syncProfileAfterAuth() {
     if (!user) return;
     const payload = await supabaseLoadProfile(user.id);
     if (payload) {
-      if (payload.profile) state.profile = { ...state.profile, ...payload.profile };
+      if (payload.profile) {
+        const remote = { ...payload.profile };
+        const localAnswers = Object.keys(state.profile.questionnaireAnswers || {}).length;
+        const remoteAnswers = Object.keys(remote.questionnaireAnswers || {}).length;
+        if (localAnswers > remoteAnswers) {
+          delete remote.questionnaireAnswers;
+          delete remote.portrait;
+        }
+        state.profile = { ...state.profile, ...remote };
+      }
       if (payload.plans) state.plans = payload.plans;
       if (payload.dating?.likes) state.dating.likes = { ...state.dating.likes, ...payload.dating.likes };
       if (payload.dating?.matches) state.dating.matches = payload.dating.matches;
@@ -820,7 +829,10 @@ async function syncProfileAfterAuth() {
 }
 
 function save() {
-  saveState(state).catch(() => {});
+  saveState(state).catch((err) => {
+    console.error('save failed', err);
+    toast('Ошибка сохранения. Данные могут не сохраниться.');
+  });
   scheduleCloudSync();
 }
 

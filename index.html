@@ -14,9 +14,6 @@
   </head>
   <body>
     <div id="app" class="app">
-      <header class="topbar">
-        </header>
-
       <nav class="tabs" aria-label="Разделы">
         <button class="tab" data-tab="home" type="button" aria-label="Сообщения">
           <span class="tab-ico" aria-hidden="true">💬</span>
@@ -176,7 +173,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=59')
+      import('./app.js?v=60')
         .then(() => {
           window.__walkdateImportOk = true;
         })
