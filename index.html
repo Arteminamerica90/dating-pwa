@@ -24,11 +24,11 @@
         <button class="tab" data-tab="dating" type="button" aria-label="Знакомства">
           <span class="tab-ico" aria-hidden="true">💞</span>
         </button>
-        <button class="tab active" data-tab="stats" type="button" aria-label="Профиль">
-          <span class="tab-ico" aria-hidden="true">👤</span>
-        </button>
         <button class="tab" data-tab="circle" type="button" aria-label="Круг знакомств">
           <span class="tab-ico" aria-hidden="true">🌐</span>
+        </button>
+        <button class="tab active" data-tab="stats" type="button" aria-label="Профиль">
+          <span class="tab-ico" aria-hidden="true">👤</span>
         </button>
       </nav>
 
@@ -173,7 +173,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=71')
+      import('./app.js?v=72')
         .then(() => {
           window.__walkdateImportOk = true;
         })

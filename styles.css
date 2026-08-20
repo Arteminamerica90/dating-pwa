@@ -1606,7 +1606,6 @@ a { color: inherit; }
   padding: 10px 12px;
   border-radius: 12px;
   background: rgba(15, 23, 42, 0.04);
-  border: 1px solid rgba(15, 23, 42, 0.08);
   font-size: 13px;
   line-height: 1.35;
 }

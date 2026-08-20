@@ -42,7 +42,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=71';
+} from './supabase.js?v=72';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -681,7 +681,7 @@ function renderAccountBadge() {
   }
   if (accountInfo?.email) {
     el.innerHTML = `
-      <span class="account-badge-info">Вход: <b>${escapeHtml(accountInfo.email)}</b></span>`;
+      <span class="account-badge-info"><b>${escapeHtml(accountInfo.email)}</b></span>`;
   } else {
     el.innerHTML = `
       <span class="muted">Вход не выполнен</span>`;
@@ -3400,6 +3400,24 @@ function renderStats() {
           <textarea id="profileDescription" class="input" maxlength="2000" placeholder="Расскажите о себе (до 2000 символов)">${escapeHtml(description)}</textarea>
         </div>
         <div class="muted" id="descCounter">${description.length}/2000</div>
+        <div class="consent-inline" style="font-size:10px">
+          <div class="muted">Ознакомьтесь с документами по ссылкам и подтвердите согласие.</div>
+          <div class="consent-list">
+            <div class="consent-doc">
+              <a class="consent-doc-link" href="./legal.html#offer" target="_blank" rel="noopener">📄 Публичная оферта</a>
+            </div>
+            <div class="consent-doc">
+              <a class="consent-doc-link" href="./legal.html#agreement" target="_blank" rel="noopener">📄 Пользовательское соглашение</a>
+            </div>
+            <div class="consent-doc">
+              <a class="consent-doc-link" href="./legal.html#privacy" target="_blank" rel="noopener">📄 Обработка персональных данных</a>
+            </div>
+            <div class="row-inline" style="margin-top:4px">
+              <button id="btnAcceptAll" class="btn ${allLegalConsentsAccepted ? 'ok' : ''}" type="button">${allLegalConsentsAccepted ? 'Согласие принято ✓' : 'Я согласен со всеми пунктами'}</button>
+            </div>
+          </div>
+          <div class="muted">Продолжая пользоваться данным приложением вы даёте согласие с правилами пользования сервиса.</div>
+        </div>
         <div class="profile-field">
           <label class="label">Интересы</label>
           <input id="profileInterestsText" class="input" value="${escapeHtml(interestsText)}" placeholder="Например: кофе, прогулки, кино" />
@@ -3407,83 +3425,6 @@ function renderStats() {
         <div class="row-inline" style="margin-top:14px">
           <button class="btn" type="button" data-action="saveProfileMini">Сохранить анкету</button>
         </div>
-      </div>
-
-      <div class="card" id="accountCard">
-        <div class="card-title">Аккаунт</div>
-        <div class="account-badge" id="accountBadge"></div>
-        ${accountInfo
-          ? `
-          <div class="row-inline" style="margin-top:10px" id="accountSignedIn">
-            <button id="btnChangePassword" class="btn" type="button">Сменить пароль</button>
-            <button id="btnAccountLogout" class="btn danger" type="button">Выход</button>
-          </div>
-          <div class="row" id="changePasswordBox" hidden>
-            <label class="label">Новый пароль</label>
-            <input id="newPassword" class="input" type="password" autocomplete="new-password" placeholder="минимум 6 символов" />
-            <div class="row-inline" style="margin-top:8px">
-              <button id="btnChangePasswordSave" class="btn" type="button">Сохранить пароль</button>
-              <button id="btnChangePasswordCancel" class="btn ghost" type="button">Отмена</button>
-            </div>
-          </div>
-          <div class="muted" style="margin-top:8px">Вы вошли как ${escapeHtml(accountInfo.email || '')}. Профиль и анкета сохраняются на сервере (Supabase).</div>`
-          : `
-          <form class="auth-form" id="authForm" autocomplete="on">
-            <div class="row" style="margin-top:10px">
-              <label class="label" for="accountEmail">Email</label>
-              <input id="accountEmail" name="email" class="input" type="email" inputmode="email" autocomplete="email" required placeholder="name@example.com" value="${escapeHtml(state.cloud?.email || '')}" />
-            </div>
-            <div class="row">
-              <label class="label" for="accountPassword">Пароль</label>
-              <input id="accountPassword" name="password" class="input" type="password" autocomplete="current-password" placeholder="минимум 6 символов" />
-            </div>
-            <div class="row-inline">
-              <button id="btnAccountRegister" class="btn" type="submit" formnovalidate>Регистрация</button>
-              <button id="btnAccountLogin" class="btn ghost" type="submit" formnovalidate>Войти</button>
-            </div>
-            <div class="row-inline" style="margin-top:8px">
-              <button id="btnForgotPassword" class="btn ghost" type="button">Забыли пароль?</button>
-              <button id="btnResendConfirm" class="btn ghost" type="button">Повторить письмо</button>
-            </div>
-          </form>
-          <div class="muted" id="accountHint">Вход по email: профиль и анкета сохраняются на сервере (Supabase) и доступны с любого устройства. Не можете войти по своему паролю? Нажмите «Забыли пароль?» — на почту придёт ссылка для смены пароля.</div>`}
-        <div class="card-title" style="margin-top:16px">Согласия</div>
-        <div class="muted">Как в TwinBy: полные тексты документов вынесены по ссылкам. Оператор — xystar.ru · провайдеры: Supabase (auth, база данных, хранилище), jsDelivr CDN (загрузка кода SDK).</div>
-        <div class="consent-list">
-          <div class="consent-doc">
-            <a class="consent-doc-link" href="./legal.html#offer" target="_blank" rel="noopener">📄 Публичная оферта</a>
-          </div>
-          <div class="consent-doc">
-            <a class="consent-doc-link" href="./legal.html#agreement" target="_blank" rel="noopener">📄 Пользовательское соглашение</a>
-          </div>
-          <div class="consent-doc">
-            <a class="consent-doc-link" href="./legal.html#privacy" target="_blank" rel="noopener">📄 Обработка персональных данных</a>
-          </div>
-          <div class="row-inline" style="margin-top:8px">
-            <button id="btnAcceptAll" class="btn ${allLegalConsentsAccepted ? 'ok' : ''}" type="button">${allLegalConsentsAccepted ? 'Согласие принято ✓' : 'Я согласен со всеми пунктами'}</button>
-            <span class="muted" id="legalConsentHint">${allLegalConsentsAccepted ? 'Ваше согласие сохранено. Его можно отозвать, нажав кнопку ещё раз.' : 'Ознакомьтесь с документами по ссылкам и подтвердите согласие.'}</span>
-          </div>
-        </div>
-        <div class="card-title" style="margin-top:12px;font-size:15px">Функциональные переключатели</div>
-        <div class="consent-list">
-          <label class="plan-company">
-            <input id="consentGeo" type="checkbox" ${state.consent?.geo ? 'checked' : ''} />
-            <span>Геолокация: город, расстояние до людей и карта</span>
-          </label>
-          <label class="plan-company">
-            <input id="consentSteps" type="checkbox" ${state.consent?.steps ? 'checked' : ''} />
-            <span>Шагомер: статистика активности</span>
-          </label>
-          <label class="plan-company">
-            <input id="consentMapShare" type="checkbox" ${state.geo?.mapShare ? 'checked' : ''} />
-            <span>Показывать меня на карте «люди рядом»</span>
-          </label>
-          <label class="plan-company">
-            <input id="consentPlanShare" type="checkbox" ${state.geo?.planShare ? 'checked' : ''} />
-            <span>Публиковать мои планы на сегодня</span>
-          </label>
-        </div>
-        <div class="muted">Каждое согласие можно отозвать в любой момент. При отзыве согласия на обработку данных профиль перестанет загружаться на сервер.</div>
       </div>
 
       <div class="card">
@@ -3512,6 +3453,66 @@ function renderStats() {
       </div>
 
       ${renderHomeFeedHtml()}
+
+      <div class="card" id="accountCard">
+        <div class="card-title">Аккаунт</div>
+        <div class="account-badge" id="accountBadge"></div>
+        ${accountInfo
+          ? `
+          <div class="row-inline" style="margin-top:10px" id="accountSignedIn">
+            <button id="btnChangePassword" class="btn" type="button">Сменить пароль</button>
+            <button id="btnAccountLogout" class="btn danger" type="button">Выход</button>
+          </div>
+          <div class="row" id="changePasswordBox" hidden>
+            <label class="label">Новый пароль</label>
+            <input id="newPassword" class="input" type="password" autocomplete="new-password" placeholder="минимум 6 символов" />
+            <div class="row-inline" style="margin-top:8px">
+              <button id="btnChangePasswordSave" class="btn" type="button">Сохранить пароль</button>
+              <button id="btnChangePasswordCancel" class="btn ghost" type="button">Отмена</button>
+            </div>
+          </div>
+          <div class="muted" style="margin-top:8px">Профиль и анкета сохраняются на сервере (Supabase).</div>`
+          : `
+          <form class="auth-form" id="authForm" autocomplete="on">
+            <div class="row" style="margin-top:10px">
+              <label class="label" for="accountEmail">Email</label>
+              <input id="accountEmail" name="email" class="input" type="email" inputmode="email" autocomplete="email" required placeholder="name@example.com" value="${escapeHtml(state.cloud?.email || '')}" />
+            </div>
+            <div class="row">
+              <label class="label" for="accountPassword">Пароль</label>
+              <input id="accountPassword" name="password" class="input" type="password" autocomplete="current-password" placeholder="минимум 6 символов" />
+            </div>
+            <div class="row-inline">
+              <button id="btnAccountRegister" class="btn" type="submit" formnovalidate>Регистрация</button>
+              <button id="btnAccountLogin" class="btn ghost" type="submit" formnovalidate>Войти</button>
+            </div>
+            <div class="row-inline" style="margin-top:8px">
+              <button id="btnForgotPassword" class="btn ghost" type="button">Забыли пароль?</button>
+              <button id="btnResendConfirm" class="btn ghost" type="button">Повторить письмо</button>
+            </div>
+          </form>
+          <div class="muted" id="accountHint">Вход по email: профиль и анкета сохраняются на сервере (Supabase) и доступны с любого устройства. Не можете войти по своему паролю? Нажмите «Забыли пароль?» — на почту придёт ссылка для смены пароля.</div>`}
+        <div class="card-title" style="margin-top:12px;font-size:15px">Функциональные переключатели</div>
+        <div class="consent-list">
+          <label class="plan-company">
+            <input id="consentGeo" type="checkbox" ${state.consent?.geo ? 'checked' : ''} />
+            <span>Геолокация: город, расстояние до людей и карта</span>
+          </label>
+          <label class="plan-company">
+            <input id="consentSteps" type="checkbox" ${state.consent?.steps ? 'checked' : ''} />
+            <span>Шагомер: статистика активности</span>
+          </label>
+          <label class="plan-company">
+            <input id="consentMapShare" type="checkbox" ${state.geo?.mapShare ? 'checked' : ''} />
+            <span>Показывать меня на карте «люди рядом»</span>
+          </label>
+          <label class="plan-company">
+            <input id="consentPlanShare" type="checkbox" ${state.geo?.planShare ? 'checked' : ''} />
+            <span>Публиковать мои планы на сегодня</span>
+          </label>
+        </div>
+        <div class="muted">Каждое согласие можно отозвать в любой момент. При отзыве согласия на обработку данных профиль перестанет загружаться на сервер.</div>
+      </div>
     </div>
   `;
 
