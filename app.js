@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=69';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=70';
 import {
   clearState,
   defaultState,
@@ -10,13 +10,13 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=69';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=69';
-import { StepCounter } from './steps.js?v=69';
-import { decryptJson, encryptJson } from './encryption.js?v=69';
-import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=69';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=69';
-import { partnerFilterText } from './partner-filter-text.js?v=69';
+} from './storage.js?v=70';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=70';
+import { StepCounter } from './steps.js?v=70';
+import { decryptJson, encryptJson } from './encryption.js?v=70';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=70';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=70';
+import { partnerFilterText } from './partner-filter-text.js?v=70';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -40,8 +40,9 @@ import {
   supabaseSaveProfile,
   supabaseSignIn,
   supabaseSignOut,
-  supabaseSignUp
-} from './supabase.js?v=69';
+  supabaseSignUp,
+  warmupSupabase
+} from './supabase.js?v=70';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -707,6 +708,7 @@ function syncLegalConsentFromStorage() {
 function boot() {
   installGlobalErrorOverlay();
   syncLegalConsentFromStorage();
+  warmupSupabase();
   ensureTodaySteps();
   ensureTodayPlans();
   wireTabs();
@@ -953,76 +955,107 @@ function wireSwipes() {
 }
 
 function wireSettings() {
+  $('#authForm')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+  });
+
   $('#accountEmail')?.addEventListener('change', (e) => {
     state.cloud.email = String(e.target.value || '').trim();
     save();
   });
 
-  $('#btnAccountRegister')?.addEventListener('click', async () => {
-    const email = String($('#accountEmail').value || state.cloud.email || '').trim().toLowerCase();
-    const password = String($('#accountPassword').value || '');
-    if (!email || password.length < 6) return toast('Нужны email и пароль от 6 символов');
+  async function runWithButton(btn, label, fn) {
+    if (!btn || btn.dataset.busy) return;
+    btn.dataset.busy = '1';
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Одну секунду…';
     try {
-      const reg = await supabaseSignUp(email, password, {
-        emailRedirectTo: location.origin + location.pathname
-      });
-      state.cloud.email = email;
-      state.cloud.enabled = true;
-      save();
-      accountInfo = reg.user;
-      await syncProfileAfterAuth();
-      toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
-      haptic('light');
-      renderAll();
-    } catch (err) {
-      toast(err?.message || 'Ошибка регистрации');
+      await fn();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+      delete btn.dataset.busy;
     }
-  });
+  }
 
-  $('#btnAccountLogin')?.addEventListener('click', async () => {
-    const email = String($('#accountEmail').value || state.cloud.email || '').trim().toLowerCase();
-    const password = String($('#accountPassword').value || '');
-    if (!email || !password) return toast('Введите email и пароль');
-    try {
-      const user = await supabaseSignIn(email, password);
-      accountInfo = user;
-      state.cloud.email = email;
-      state.cloud.enabled = true;
-      save();
-      await syncProfileAfterAuth();
-      toast('Вход выполнен');
-      haptic('light');
-      renderAll();
-    } catch (err) {
-      const msg = String(err?.message || '');
-      if (/invalid/i.test(msg)) {
-        toast('Неверный email или пароль. Если аккаунт создавался ранее — нажмите «Регистрация»: оно отправит письмо подтверждения.');
-      } else {
-        toast(msg || 'Ошибка входа');
+  $('#btnAccountRegister')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    runWithButton($('#btnAccountRegister'), 'Регистрация', async () => {
+      const email = String($('#accountEmail').value || state.cloud.email || '').trim().toLowerCase();
+      const password = String($('#accountPassword').value || '');
+      if (!email || password.length < 6) return toast('Нужны email и пароль от 6 символов');
+      try {
+        const reg = await supabaseSignUp(email, password, {
+          emailRedirectTo: location.origin + location.pathname
+        });
+        state.cloud.email = email;
+        state.cloud.enabled = true;
+        save();
+        accountInfo = reg.user;
+        renderAll();
+        toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
+        haptic('light');
+        syncProfileAfterAuth().catch(() => {});
+      } catch (err) {
+        toast(err?.message || 'Ошибка регистрации');
       }
-    }
+    });
   });
 
-  $('#btnForgotPassword')?.addEventListener('click', async () => {
-    const email = String($('#accountEmail').value || '').trim().toLowerCase();
-    if (!email) return toast('Введите email в поле выше');
-    try {
-      await supabaseResetPassword(email);
-      toast('Письмо для сброса пароля отправлено на ' + email);
-    } catch (err) {
-      toast(err?.message || 'Не удалось отправить письмо');
-    }
+  $('#btnAccountLogin')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    runWithButton($('#btnAccountLogin'), 'Войти', async () => {
+      const email = String($('#accountEmail').value || state.cloud.email || '').trim().toLowerCase();
+      const password = String($('#accountPassword').value || '');
+      if (!email || !password) return toast('Введите email и пароль');
+      try {
+        const user = await supabaseSignIn(email, password);
+        accountInfo = user;
+        state.cloud.email = email;
+        state.cloud.enabled = true;
+        save();
+        renderAll();
+        toast('Вход выполнен');
+        haptic('light');
+        syncProfileAfterAuth().catch(() => {});
+      } catch (err) {
+        const msg = String(err?.message || '');
+        if (/invalid/i.test(msg)) {
+          toast('Неверный email или пароль. Если аккаунт создавался ранее — нажмите «Регистрация»: оно отправит письмо подтверждения.');
+        } else {
+          toast(msg || 'Ошибка входа');
+        }
+      }
+    });
   });
 
-  $('#btnResendConfirm')?.addEventListener('click', async () => {
-    const email = String($('#accountEmail').value || '').trim().toLowerCase();
-    if (!email) return toast('Введите email в поле выше');
-    try {
-      await supabaseResendConfirmation(email);
-      toast('Письмо подтверждения отправлено. Проверьте почту.');
-    } catch (err) {
-      toast(err?.message || 'Не удалось отправить письмо');
-    }
+  $('#btnForgotPassword')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    runWithButton($('#btnForgotPassword'), 'Забыли пароль?', async () => {
+      const email = String($('#accountEmail').value || '').trim().toLowerCase();
+      if (!email) return toast('Введите email в поле выше');
+      try {
+        await supabaseResetPassword(email);
+        toast('Письмо для сброса пароля отправлено на ' + email);
+      } catch (err) {
+        toast(err?.message || 'Не удалось отправить письмо');
+      }
+    });
+  });
+
+  $('#btnResendConfirm')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    runWithButton($('#btnResendConfirm'), 'Повторить письмо', async () => {
+      const email = String($('#accountEmail').value || '').trim().toLowerCase();
+      if (!email) return toast('Введите email в поле выше');
+      try {
+        await supabaseResendConfirmation(email);
+        toast('Письмо подтверждения отправлено. Проверьте почту.');
+      } catch (err) {
+        toast(err?.message || 'Не удалось отправить письмо');
+      }
+    });
   });
 
   $('#btnAccountLogout')?.addEventListener('click', async () => {
@@ -3394,24 +3427,25 @@ function renderStats() {
           </div>
           <div class="muted" style="margin-top:8px">Вы вошли как ${escapeHtml(accountInfo.email || '')}. Профиль и анкета сохраняются на сервере (Supabase).</div>`
           : `
-          <div class="row" style="margin-top:10px" id="accountSignedOut">
-            <label class="label">Email</label>
-            <input id="accountEmail" class="input" inputmode="email" autocomplete="email" placeholder="name@example.com" value="${escapeHtml(state.cloud?.email || '')}" />
-          </div>
-          <div class="row">
-            <label class="label">Пароль</label>
-            <input id="accountPassword" class="input" type="password" autocomplete="current-password" placeholder="минимум 6 символов" />
-          </div>
-          <div class="row-inline">
-            <button id="btnAccountRegister" class="btn" type="button">Регистрация</button>
-            <button id="btnAccountLogin" class="btn ghost" type="button">Войти</button>
-          </div>
-          <div class="row-inline" style="margin-top:8px">
-            <button id="btnForgotPassword" class="btn ghost" type="button">Забыли пароль?</button>
-            <button id="btnResendConfirm" class="btn ghost" type="button">Повторить письмо</button>
-          </div>
+          <form class="auth-form" id="authForm" autocomplete="on">
+            <div class="row" style="margin-top:10px">
+              <label class="label" for="accountEmail">Email</label>
+              <input id="accountEmail" name="email" class="input" type="email" inputmode="email" autocomplete="email" required placeholder="name@example.com" value="${escapeHtml(state.cloud?.email || '')}" />
+            </div>
+            <div class="row">
+              <label class="label" for="accountPassword">Пароль</label>
+              <input id="accountPassword" name="password" class="input" type="password" autocomplete="current-password" placeholder="минимум 6 символов" />
+            </div>
+            <div class="row-inline">
+              <button id="btnAccountRegister" class="btn" type="submit" formnovalidate>Регистрация</button>
+              <button id="btnAccountLogin" class="btn ghost" type="submit" formnovalidate>Войти</button>
+            </div>
+            <div class="row-inline" style="margin-top:8px">
+              <button id="btnForgotPassword" class="btn ghost" type="button">Забыли пароль?</button>
+              <button id="btnResendConfirm" class="btn ghost" type="button">Повторить письмо</button>
+            </div>
+          </form>
           <div class="muted" id="accountHint">Вход по email: профиль и анкета сохраняются на сервере (Supabase) и доступны с любого устройства. Не можете войти по своему паролю? Нажмите «Забыли пароль?» — на почту придёт ссылка для смены пароля.</div>`}
-      </div>
         <div class="card-title" style="margin-top:16px">Согласия</div>
         <div class="muted">Как в TwinBy: полные тексты документов вынесены по ссылкам. Оператор — xystar.ru · провайдеры: Supabase (auth, база данных, хранилище), jsDelivr CDN (загрузка кода SDK).</div>
         <div class="consent-list">

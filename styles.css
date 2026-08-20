@@ -566,6 +566,12 @@ a { color: inherit; }
 }
 .consent-doc-link:visited { color: var(--brand); }
 
+.auth-form { display: flex; flex-direction: column; gap: 6px; }
+.auth-form .row { margin-top: 4px; }
+.auth-form .row-inline { flex-wrap: wrap; }
+.auth-form .btn { flex: 1 1 130px; min-width: 0; }
+.auth-form .btn:disabled { opacity: 0.6; cursor: default; }
+
 .input, .select {
   width: 100%;
   max-width: 260px;

@@ -17,6 +17,16 @@ export function getSupabase() {
   return clientPromise;
 }
 
+export function warmupSupabase() {
+  // Загружаем SDK заранее, чтобы первый клик «Войти»/«Регистрация»
+  // не ждал сетевую загрузку модуля с CDN.
+  try {
+    getSupabase().catch(() => {});
+  } catch {
+    // ignore
+  }
+}
+
 export async function supabaseSignUp(email, password, options) {
   if (!isSupabaseConfigured()) throw new Error('Supabase не настроен');
   const supabase = await getSupabase();
