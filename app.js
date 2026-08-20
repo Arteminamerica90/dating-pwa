@@ -1,4 +1,4 @@
-import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=64';
+import { EVENTS, INTERESTS, cityLabel, interestLabel, VENUES, venueById } from './events.js?v=65';
 import {
   clearState,
   defaultState,
@@ -10,13 +10,13 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=64';
-import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=64';
-import { StepCounter } from './steps.js?v=64';
-import { decryptJson, encryptJson } from './encryption.js?v=64';
-import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=64';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=64';
-import { partnerFilterText } from './partner-filter-text.js?v=64';
+} from './storage.js?v=65';
+import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=65';
+import { StepCounter } from './steps.js?v=65';
+import { decryptJson, encryptJson } from './encryption.js?v=65';
+import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=65';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=65';
+import { partnerFilterText } from './partner-filter-text.js?v=65';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -40,7 +40,7 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp
-} from './supabase.js?v=64';
+} from './supabase.js?v=65';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1293,10 +1293,31 @@ async function addProfilePhotoFromUrl(url) {
 
 async function addProfilePhotoFromFile(file) {
   const dataUrl = await readImageAsDataUrl(file, 1024);
-  state.profile.photos = [dataUrl, ...(state.profile.photos || [])].slice(0, 6);
+  syncProfileFormFields();
+  state.profile.photos = [dataUrl, ...(state.profile.photos || [])].slice(0, 3);
   save();
   pushPublicProfileNow().catch(() => {});
   renderAll();
+  toast('Фото добавлено');
+}
+
+function syncProfileFormFields() {
+  const root = $('#view-stats');
+  if (!root) return;
+  const nextName = String(root.querySelector('#profileName')?.value || '').trim().slice(0, 40);
+  const nextGender = String(root.querySelector('#profileGender')?.value || '');
+  const nextDescription = String(root.querySelector('#profileDescription')?.value || '').slice(0, 2000);
+  const nextInterestsRaw = String(root.querySelector('#profileInterestsText')?.value || '');
+  const nextInterests = nextInterestsRaw
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .slice(0, 30);
+  if (nextName) state.profile.name = nextName;
+  if (nextGender) state.profile.gender = nextGender;
+  state.profile.description = nextDescription;
+  if (nextInterestsRaw.trim()) state.profile.interests = nextInterests;
+  state.profile.portrait = buildQuestionnairePortrait(state.profile.questionnaireAnswers || {});
 }
 
 function getQuestionnaireAnswers(profile = state.profile) {
@@ -3226,17 +3247,18 @@ function renderStats() {
             ${photos[0] ? `<img alt="profile photo" src="${photos[0]}" />` : `<div class="photo-empty">Фото профиля</div>`}
           </button>
           <div class="photo-hero-actions">
-            <button class="btn" type="button" data-action="pickPhoto">Загрузить фото</button>
+            <button class="btn" type="button" data-action="pickPhoto" ${photos.length >= 3 ? 'disabled' : ''}>Загрузить фото</button>
             <input id="profilePhotoInput" type="file" accept="image/*" hidden />
             <button class="btn ghost" type="button" data-action="clearPhotos">Удалить все</button>
           </div>
           <div id="profilePhotosPreview" class="photo-strip">
             ${photos.length
               ? photos
-                  .slice(0, 6)
+                  .slice(0, 3)
                   .map((src, idx) => `<button class="photo-thumb" type="button" data-photo-index="${idx}"><img alt="photo ${idx + 1}" src="${src}" /></button>`)
                   .join('')
               : ''}
+            ${photos.length < 3 ? '<div class="muted photo-hint">Можно загрузить до 3 фото</div>' : ''}
           </div>
         </div>
         <div class="profile-field">
@@ -3367,6 +3389,7 @@ function renderStats() {
 
   $('#view-stats').querySelector('[data-action="clearPhotos"]')?.addEventListener('click', () => {
     if (!confirm('Удалить все фото?')) return;
+    syncProfileFormFields();
     state.profile.photos = [];
     save();
     pushPublicProfileNow().catch(() => {});
