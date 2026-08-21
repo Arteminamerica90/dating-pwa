@@ -42,7 +42,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=75';
+} from './supabase.js?v=76';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -3382,24 +3382,23 @@ function renderStats() {
             ${photos.length < 3 ? '<div class="muted photo-hint">Можно загрузить до 3 фото</div>' : ''}
           </div>
         </div>
-        <div class="profile-field">
+        <div class="profile-field row-inline">
           <label class="label">Имя</label>
           <input id="profileName" class="input" maxlength="40" value="${escapeHtml(name)}" placeholder="Ваше имя" />
         </div>
-        <div class="profile-field">
+        <div class="profile-field row-inline">
           <label class="label">Вы кто</label>
           <select id="profileGender" class="select">
             <option value="" ${!gender ? 'selected' : ''}>Не указано</option>
             <option value="female" ${gender === 'female' ? 'selected' : ''}>Женщина</option>
             <option value="male" ${gender === 'male' ? 'selected' : ''}>Мужчина</option>
           </select>
-          <div class="muted">От этого зависят формулировки вопросов и варианты ответов в анкете.</div>
         </div>
+        <div class="muted">От этого зависят формулировки вопросов и варианты ответов в анкете.</div>
         <div class="profile-field">
           <label class="label">Описание</label>
           <textarea id="profileDescription" class="input" maxlength="2000" placeholder="Расскажите о себе (до 2000 символов)">${escapeHtml(description)}</textarea>
         </div>
-        <div class="muted" id="descCounter">${description.length}/2000</div>
         <div class="profile-field">
           <label class="label">Интересы</label>
           <input id="profileInterestsText" class="input" value="${escapeHtml(interestsText)}" placeholder="Например: кофе, прогулки, кино" />
@@ -3453,7 +3452,7 @@ function renderStats() {
               <button id="btnChangePasswordCancel" class="btn ghost" type="button">Отмена</button>
             </div>
           </div>
-          <div class="muted" style="margin-top:8px">Профиль и анкета сохраняются на сервере (Supabase).</div>`
+          <div class="muted" style="margin-top:8px"></div>`
           : `
           <form class="auth-form" id="authForm" autocomplete="on">
             <div class="row" style="margin-top:10px">
@@ -3474,47 +3473,57 @@ function renderStats() {
             </div>
           </form>
           <div class="muted" id="accountHint">Вход по email: профиль и анкета сохраняются на сервере (Supabase) и доступны с любого устройства. Не можете войти по своему паролю? Нажмите «Забыли пароль?» — на почту придёт ссылка для смены пароля.</div>`}
-        <div class="card-title" style="margin-top:12px;font-size:15px">Функциональные переключатели</div>
-        <div class="consent-list">
-          <label class="plan-company">
-            <input id="consentGeo" type="checkbox" ${state.consent?.geo ? 'checked' : ''} />
-            <span>Геолокация: город, расстояние до людей и карта</span>
-          </label>
-          <label class="plan-company">
-            <input id="consentSteps" type="checkbox" ${state.consent?.steps ? 'checked' : ''} />
-            <span>Шагомер: статистика активности</span>
-          </label>
-          <label class="plan-company">
-            <input id="consentMapShare" type="checkbox" ${state.geo?.mapShare ? 'checked' : ''} />
-            <span>Показывать меня на карте «люди рядом»</span>
-          </label>
-          <label class="plan-company">
-            <input id="consentPlanShare" type="checkbox" ${state.geo?.planShare ? 'checked' : ''} />
-            <span>Публиковать мои планы на сегодня</span>
-          </label>
+        <button class="accordion-head" type="button" data-toggle-func-settings aria-expanded="${state.ui?.funcSettingsOpen ? 'true' : 'false'}">
+          <span class="accordion-title">Функциональные переключатели</span>
+          <span class="chevron" aria-hidden="true"></span>
+        </button>
+        <div class="accordion-body" ${state.ui?.funcSettingsOpen ? '' : 'hidden'}>
+          <div class="consent-list">
+            <label class="plan-company">
+              <input id="consentGeo" type="checkbox" ${state.consent?.geo ? 'checked' : ''} />
+              <span>Геолокация: город, расстояние до людей и карта</span>
+            </label>
+            <label class="plan-company">
+              <input id="consentSteps" type="checkbox" ${state.consent?.steps ? 'checked' : ''} />
+              <span>Шагомер: статистика активности</span>
+            </label>
+            <label class="plan-company">
+              <input id="consentMapShare" type="checkbox" ${state.geo?.mapShare ? 'checked' : ''} />
+              <span>Показывать меня на карте «люди рядом»</span>
+            </label>
+            <label class="plan-company">
+              <input id="consentPlanShare" type="checkbox" ${state.geo?.planShare ? 'checked' : ''} />
+              <span>Публиковать мои планы на сегодня</span>
+            </label>
+          </div>
+          <div class="muted">Каждое согласие можно отозвать в любой момент. При отзыве согласия на обработку данных профиль перестанет загружаться на сервер.</div>
         </div>
-        <div class="muted">Каждое согласие можно отозвать в любой момент. При отзыве согласия на обработку данных профиль перестанет загружаться на сервер.</div>
       </div>
 
-      <div class="card" id="legalConsentCard">
-        <div class="card-title">Согласия</div>
-        <div class="consent-inline" style="font-size:12px">
-          <div class="muted">Ознакомьтесь с документами по ссылкам и подтвердите согласие.</div>
-          <div class="consent-list">
-            <div class="consent-doc">
-              <a class="consent-doc-link" href="./legal.html#offer" target="_blank" rel="noopener">📄 Публичная оферта</a>
+      <div class="card" id="legalConsentCard" ${allLegalConsentsAccepted && state.ui?.legalConsentExpanded !== true ? 'hidden' : ''}>
+        <button class="accordion-head" type="button" data-toggle-legal-consent aria-expanded="${state.ui?.legalConsentExpanded ? 'true' : 'false'}">
+          <span class="accordion-title">Согласия</span>
+          <span class="chevron" aria-hidden="true"></span>
+        </button>
+        <div class="accordion-body" ${state.ui?.legalConsentExpanded ? '' : 'hidden'}>
+          <div class="consent-inline" style="font-size:12px">
+            <div class="muted">Ознакомьтесь с документами по ссылкам и подтвердите согласие.</div>
+            <div class="consent-list">
+              <div class="consent-doc">
+                <a class="consent-doc-link" href="./legal.html#offer" target="_blank" rel="noopener">📄 Публичная оферта</a>
+              </div>
+              <div class="consent-doc">
+                <a class="consent-doc-link" href="./legal.html#agreement" target="_blank" rel="noopener">📄 Пользовательское соглашение</a>
+              </div>
+              <div class="consent-doc">
+                <a class="consent-doc-link" href="./legal.html#privacy" target="_blank" rel="noopener">📄 Обработка персональных данных</a>
+              </div>
             </div>
-            <div class="consent-doc">
-              <a class="consent-doc-link" href="./legal.html#agreement" target="_blank" rel="noopener">📄 Пользовательское соглашение</a>
+            <div class="row-inline" style="margin-top:8px">
+              <button id="btnAcceptAll" class="btn ${allLegalConsentsAccepted ? 'ok' : ''}" type="button">${allLegalConsentsAccepted ? 'Согласие принято ✓' : 'Я согласен со всеми пунктами'}</button>
             </div>
-            <div class="consent-doc">
-              <a class="consent-doc-link" href="./legal.html#privacy" target="_blank" rel="noopener">📄 Обработка персональных данных</a>
-            </div>
+            <div class="muted" style="margin-top:6px">Продолжая пользоваться данным приложением вы даёте согласие с правилами пользования сервиса.</div>
           </div>
-          <div class="row-inline" style="margin-top:8px">
-            <button id="btnAcceptAll" class="btn ${allLegalConsentsAccepted ? 'ok' : ''}" type="button">${allLegalConsentsAccepted ? 'Согласие принято ✓' : 'Я согласен со всеми пунктами'}</button>
-          </div>
-          <div class="muted" style="margin-top:6px">Продолжая пользоваться данным приложением вы даёте согласие с правилами пользования сервиса.</div>
         </div>
       </div>
     </div>
@@ -3522,12 +3531,7 @@ function renderStats() {
 
   wireSettings();
 
-  const descInput = $('#view-stats').querySelector('#profileDescription');
-  const counter = $('#view-stats').querySelector('#descCounter');
-  descInput?.addEventListener('input', () => {
-    const len = String(descInput.value || '').length;
-    if (counter) counter.textContent = `${len}/2000`;
-  });
+
 
   $('#view-stats').querySelector('#profilePhotoInput')?.addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
@@ -3632,6 +3636,22 @@ function renderStats() {
   });
 
   $('#view-stats').querySelector('[data-action="openQuestionnaire"]')?.addEventListener('click', openQuestionnaire);
+
+  $('#view-stats').querySelector('[data-toggle-legal-consent]')?.addEventListener('click', () => {
+    state.ui = state.ui || {};
+    state.ui.legalConsentExpanded = !state.ui.legalConsentExpanded;
+    const card = document.getElementById('legalConsentCard');
+    if (card) card.hidden = false;
+    save();
+    renderAll();
+  });
+
+  $('#view-stats').querySelector('[data-toggle-func-settings]')?.addEventListener('click', () => {
+    state.ui = state.ui || {};
+    state.ui.funcSettingsOpen = !state.ui.funcSettingsOpen;
+    save();
+    renderAll();
+  });
 
   $('#view-stats').querySelector('[data-tree-toggle]')?.addEventListener('click', () => {
     state.ui = state.ui || {};
