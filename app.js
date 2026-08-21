@@ -42,7 +42,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=76';
+} from './supabase.js?v=77';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -3472,7 +3472,7 @@ function renderStats() {
               <button id="btnResendConfirm" class="btn ghost" type="button">Повторить письмо</button>
             </div>
           </form>
-          <div class="muted" id="accountHint">Вход по email: профиль и анкета сохраняются на сервере (Supabase) и доступны с любого устройства. Не можете войти по своему паролю? Нажмите «Забыли пароль?» — на почту придёт ссылка для смены пароля.</div>`}
+          <div class="muted" id="accountHint">Не можете войти по своему паролю? Нажмите «Забыли пароль?» — на почту придёт ссылка для смены пароля.</div>`}
         <button class="accordion-head" type="button" data-toggle-func-settings aria-expanded="${state.ui?.funcSettingsOpen ? 'true' : 'false'}">
           <span class="accordion-title">Функциональные переключатели</span>
           <span class="chevron" aria-hidden="true"></span>
