@@ -38,11 +38,12 @@ import {
   supabaseSaveMessage,
   supabaseSavePlans,
   supabaseSaveProfile,
+  supabaseDeleteProfile,
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=83';
+} from './supabase.js?v=84';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -644,6 +645,16 @@ init().catch((err) => {
 async function init() {
   state = await safeLoadStateWithTimeout(1500);
   window.__walkdateStarted = true;
+
+  window.__deleteMyProfile = async () => {
+    if (!accountInfo?.id) return toast('Нет активной сессии');
+    try {
+      await supabaseDeleteProfile(accountInfo.id);
+      toast('Профиль удалён с сервера');
+    } catch (err) {
+      toast(err?.message || 'Ошибка удаления');
+    }
+  };
   boot();
   // Optional demo helper: if you open ?demoPhoto=1, it loads a sample profile photo from assets.
   // Useful to preview how photos look without uploading via file picker.
@@ -3324,6 +3335,24 @@ function renderStats() {
             ${photos.length < 3 ? '<div class="muted photo-hint">Можно загрузить до 3 фото</div>' : ''}
           </div>
         </div>
+
+      <div class="card">
+        <div class="card-title">Анкета совместимости</div>
+        ${renderQuestionnaireSummary(state.profile)}
+        <div class="row-inline" style="margin-top:10px">
+          <button class="btn" type="button" data-action="openQuestionnaire">${portrait.answered ? 'Продолжить анкету' : 'Пройти анкету'}</button>
+        </div>
+        <button class="accordion-head" type="button" data-tree-toggle aria-expanded="${state.ui?.treeOpen ? 'true' : 'false'}">
+          <span class="accordion-title">Вопросы</span>
+          <span class="pill">${catsProgress.done}/${CATEGORY_ORDER.length}</span>
+          <span class="chevron" aria-hidden="true"></span>
+        </button>
+        <div class="accordion-body" ${state.ui?.treeOpen ? '' : 'hidden'}>
+          ${renderQuestionnaireCategories(state.profile)}
+        </div>
+      </div>
+
+      <div class="profile-editor">
         <div class="profile-field row-inline">
           <label class="label">Имя</label>
           <input id="profileName" class="input" maxlength="40" value="${escapeHtml(name)}" placeholder="Ваше имя" />
@@ -3350,24 +3379,12 @@ function renderStats() {
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-title">Анкета совместимости</div>
-        ${renderQuestionnaireSummary(state.profile)}
-        <div class="row-inline" style="margin-top:10px">
-          <button class="btn" type="button" data-action="openQuestionnaire">${portrait.answered ? 'Продолжить анкету' : 'Пройти анкету'}</button>
-        </div>
-        <button class="accordion-head" type="button" data-tree-toggle aria-expanded="${state.ui?.treeOpen ? 'true' : 'false'}">
-          <span class="accordion-title">Дерево решений — категории</span>
-          <span class="pill">${catsProgress.done}/${CATEGORY_ORDER.length}</span>
+      <div class="card" id="accountCard" ${state.ui?.accountExpanded === false ? '' : ''}>
+        <button class="accordion-head" type="button" data-toggle-account aria-expanded="${state.ui?.accountExpanded !== false ? 'true' : 'false'}">
+          <span class="accordion-title">Аккаунт</span>
           <span class="chevron" aria-hidden="true"></span>
         </button>
-        <div class="accordion-body" ${state.ui?.treeOpen ? '' : 'hidden'}>
-          ${renderQuestionnaireCategories(state.profile)}
-        </div>
-      </div>
-
-      <div class="card" id="accountCard">
-        <div class="card-title">Аккаунт</div>
+        <div class="accordion-body" ${state.ui?.accountExpanded !== false ? '' : 'hidden'}>
         <div class="account-badge" id="accountBadge"></div>
         ${accountInfo
           ? `
@@ -3404,6 +3421,7 @@ function renderStats() {
             </div>
           </form>
           <div class="muted" id="accountHint">Не можете войти по своему паролю? Нажмите «Забыли пароль?» — на почту придёт ссылка для смены пароля.</div>`}
+        </div>
       </div>
 
       <div class="card" id="legalConsentCard" ${allLegalConsentsAccepted && state.ui?.legalConsentExpanded !== true ? 'hidden' : ''}>
@@ -3548,6 +3566,13 @@ function renderStats() {
     state.ui.legalConsentExpanded = !state.ui.legalConsentExpanded;
     const card = document.getElementById('legalConsentCard');
     if (card) card.hidden = false;
+    save();
+    renderAll();
+  });
+
+  $('#view-stats').querySelector('[data-toggle-account]')?.addEventListener('click', () => {
+    state.ui = state.ui || {};
+    state.ui.accountExpanded = state.ui.accountExpanded === false ? true : false;
     save();
     renderAll();
   });
@@ -3962,7 +3987,7 @@ function onLike(id) {
   if (mutual && treeOk) {
     if (accountInfo?.id) supabaseEnsureMatch(accountInfo.id, id).catch(() => {});
     haptic('match');
-    toast('Есть матч! Дерево решений подтвердило совместимость. Переписка — в табе «Сообщение».');
+    toast('Есть матч! Вопросы подтвердило совместимость. Переписка — в табе «Сообщение».');
     save();
     renderAll();
     return;

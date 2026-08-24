@@ -122,6 +122,12 @@ export async function supabaseSaveProfile(userId, payload) {
   if (error) throw new Error(error.message);
 }
 
+export async function supabaseDeleteProfile(userId) {
+  const supabase = await getSupabase();
+  const { error } = await supabase.from('profiles').delete().eq('id', userId);
+  if (error) throw new Error(error.message);
+}
+
 export async function supabaseListPublicProfiles({ excludeUserId, limit = 50 } = {}) {
   if (!isSupabaseConfigured()) return [];
   const supabase = await getSupabase();
