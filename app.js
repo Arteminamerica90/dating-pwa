@@ -42,7 +42,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=82';
+} from './supabase.js?v=83';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -816,6 +816,12 @@ async function supabasePushProfile() {
       profile: state.profile,
       plans: state.plans,
       dating: { likes: state.dating?.likes || {}, matches: state.dating?.matches || [] },
+      consent: {
+        agreement: !!state.consent?.agreement,
+        personalData: !!state.consent?.personalData,
+        newsletters: !!state.consent?.newsletters,
+        cookies: !!state.consent?.cookies
+      },
       updated_at: new Date().toISOString()
     };
     await supabaseSaveProfile(user.id, payload);
@@ -845,6 +851,12 @@ async function syncProfileAfterAuth() {
       if (payload.dating?.matches) {
         const remoteMatches = payload.dating.matches;
         state.dating.matches = [...new Set([...remoteMatches, ...(state.dating.matches || [])])];
+      }
+      if (payload.consent) {
+        state.consent.agreement = !!payload.consent.agreement;
+        state.consent.personalData = !!payload.consent.personalData;
+        state.consent.newsletters = !!payload.consent.newsletters;
+        state.consent.cookies = !!payload.consent.cookies;
       }
     }
     await supabasePushProfile();
@@ -3386,9 +3398,9 @@ function renderStats() {
               <button id="btnAccountRegister" class="btn" type="submit" formnovalidate>Регистрация</button>
               <button id="btnAccountLogin" class="btn ghost" type="submit" formnovalidate>Войти</button>
             </div>
-            <div class="row-inline" style="margin-top:8px">
-              <button id="btnForgotPassword" class="btn ghost" type="button">Забыли пароль?</button>
-              <button id="btnResendConfirm" class="btn ghost" type="button">Повторить письмо</button>
+            <div class="row-inline" style="margin-top:8px; justify-content:center; gap:12px">
+              <button id="btnForgotPassword" class="link-btn" type="button">Забыли пароль?</button>
+              <button id="btnResendConfirm" class="link-btn" type="button">Повторить письмо</button>
             </div>
           </form>
           <div class="muted" id="accountHint">Не можете войти по своему паролю? Нажмите «Забыли пароль?» — на почту придёт ссылка для смены пароля.</div>`}

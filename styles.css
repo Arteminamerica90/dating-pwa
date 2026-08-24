@@ -564,6 +564,18 @@ a { color: inherit; }
 .btn.ok { background: var(--ok); border-color: var(--ok); color: #fff; }
 .btn.ok:hover { background: var(--ok); opacity: 0.9; }
 
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--brand);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 4px 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.link-btn:hover { opacity: 0.7; }
+
 .consent-doc {
   padding: 4px 0;
 }
@@ -580,7 +592,8 @@ a { color: inherit; }
 .auth-form { display: flex; flex-direction: column; gap: 6px; align-items: center; }
 .auth-form .row { margin-top: 4px; }
 .auth-form .row-inline { flex-wrap: wrap; justify-content: center; }
-.auth-form .btn { width: 100%; max-width: 320px; min-width: 0; }
+.auth-form .input { max-width: 360px; }
+.auth-form .btn { width: 100%; max-width: 360px; min-width: 0; }
 .auth-form .btn:disabled { opacity: 0.6; cursor: default; }
 
 .input, .select {
