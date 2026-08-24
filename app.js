@@ -43,7 +43,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=88';
+} from './supabase.js?v=89';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1439,11 +1439,11 @@ function profileGender() {
 
 function questionOptions(q) {
   const g = profileGender();
-  return g === 'f' && Array.isArray(q.optionsF)
-    ? q.optionsF
-    : g === 'm' && Array.isArray(q.optionsM)
-      ? q.optionsM
-      : q.options || [];
+  if (g === 'f' && Array.isArray(q.optionsF)) return q.optionsF;
+  if (g === 'm' && Array.isArray(q.optionsM)) return q.optionsM;
+  if (Array.isArray(q.optionsM)) return q.optionsM;
+  if (Array.isArray(q.optionsF)) return q.optionsF;
+  return q.options || [];
 }
 
 function questionText(q) {
