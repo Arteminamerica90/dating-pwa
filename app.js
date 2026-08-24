@@ -42,7 +42,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=77';
+} from './supabase.js?v=78';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1334,7 +1334,7 @@ function renderAll() {
   renderEvents();
   renderDating();
   renderStats();
-  renderCircle();
+  // renderCircle(); // скрыто — вернём позже
   renderAccountBadge();
   syncSettingsUi();
 }
@@ -1778,10 +1778,6 @@ function setQuestionCard() {
     inner = `
       <div class="qn-opts-wrap">
         <div class="qn-opts" id="qnOptsStrip">${opts}</div>
-        <div class="qn-opts-nav">
-          <button class="btn ghost" type="button" data-qn-scroll="-1">‹ Назад</button>
-          <button class="btn ghost" type="button" data-qn-scroll="1">Вперёд ›</button>
-        </div>
       </div>
       ${q.multi ? `<button class="btn qn-multi-done" type="button" id="qnMultiDone" disabled>Готово →</button>` : ''}`;
   }
@@ -1790,14 +1786,14 @@ function setQuestionCard() {
     ${inner}
   `;
   $('#qnBlock').textContent = q.block || (q.category ? CATEGORY_LABELS[q.category] : '');
-  $('#qnCounter').textContent = `Вопрос ${qnIndex + 1} из ${ALL_QUESTIONS.length} • отвечено: ${Object.keys(answers).length}`;
+  const answers2 = getQuestionnaireAnswers();
+  const count2 = Object.keys(answers2).length;
+  $('#qnCounter').textContent = `Вопрос ${qnIndex + 1} из ${ALL_QUESTIONS.length} • отвечено: ${count2}`;
   $('#qnProgressBar').style.width = Math.round(((qnIndex + 1) / ALL_QUESTIONS.length) * 100) + '%';
-  $('#btnQuestionnairePrev').disabled = qnIndex === 0;
   const optsStrip = document.getElementById('qnOptsStrip');
   if (optsStrip) {
     const sel = optsStrip.querySelector('.qn-opt.selected');
-    if (sel) sel.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-    else optsStrip.scrollTo({ left: 0 });
+    if (sel) sel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
   if (q.numeric) {
     const input = document.getElementById('qnNumInput');
@@ -1882,59 +1878,10 @@ function qnGo(dir) {
 function wireQuestionnaire() {
   $('#btnQuestionnaireClose').addEventListener('click', closeQuestionnaire);
   $('#btnBookingClose')?.addEventListener('click', () => $('#dlgBooking')?.close());
-  $('#btnQuestionnairePrev').addEventListener('click', () => qnGo(-1));
-  $('#btnQuestionnaireSkip').addEventListener('click', () => qnGo(1));
   $('#dlgQuestionnaire').addEventListener('close', () => renderAll());
-
-  const card = $('#qnCard');
-  if (!card) return;
-
-  let startX = 0;
-  let startY = 0;
-  let tracking = false;
-  let pointerId = null;
-
-  const onDown = (e) => {
-    if (e.pointerType === 'mouse') return;
-    if (e.button != null && e.button !== 0) return;
-    if (e.target.closest('.qn-opts')) return;
-    startX = e.clientX;
-    startY = e.clientY;
-    tracking = true;
-    pointerId = e.pointerId;
-  };
-
-  const onMove = (e) => {
-    if (!tracking || e.pointerId !== pointerId) return;
-    const dy = e.clientY - startY;
-    const dx = e.clientX - startX;
-    if (Math.abs(dy) > 22 && Math.abs(dy) > Math.abs(dx)) tracking = false;
-  };
-
-  const onUp = (e) => {
-    if (!tracking || e.pointerId !== pointerId) return;
-    tracking = false;
-    if (e.type === 'pointercancel') return;
-    const dx = e.clientX - startX;
-    if (Math.abs(dx) < 60) return;
-    qnGo(dx < 0 ? 1 : -1);
-  };
-
-  card.addEventListener('pointerdown', onDown, { passive: true });
-  card.addEventListener('pointermove', onMove, { passive: true });
-  card.addEventListener('pointerup', onUp, { passive: true });
-  card.addEventListener('pointercancel', onUp, { passive: true });
+}
 
   card.addEventListener('click', (e) => {
-    const navBtn = e.target.closest('[data-qn-scroll]');
-    if (navBtn) {
-      const strip = document.getElementById('qnOptsStrip');
-      const dir = Number(navBtn.dataset.qnScroll);
-      if (strip && dir) {
-        strip.scrollBy({ left: (strip.clientWidth - 130) * dir, behavior: 'smooth' });
-      }
-      return;
-    }
     const btn = e.target.closest('[data-qn-opt]');
     if (btn) {
       const oid = btn.dataset.qnOpt;
@@ -1951,9 +1898,21 @@ function wireQuestionnaire() {
         if (doneBtn) doneBtn.disabled = !sel.size;
         return;
       }
-      setQuestionnaireAnswer(q.id, oid, { silent: true });
-      haptic('light');
-      qnGo(1);
+      const prev = getQuestionnaireAnswers()[q.id];
+      if (prev === oid) {
+        setQuestionnaireAnswer(q.id, null, { silent: true });
+        btn.classList.remove('selected');
+      } else {
+        setQuestionnaireAnswer(q.id, oid, { silent: true });
+        haptic('light');
+        card.querySelectorAll('[data-qn-opt]').forEach((b) => {
+          b.classList.toggle('selected', b.dataset.qnOpt === oid);
+        });
+      }
+      const answers = getQuestionnaireAnswers();
+      const count = Object.keys(answers).length;
+      $('#qnCounter').textContent = `Вопрос ${qnIndex + 1} из ${ALL_QUESTIONS.length} • отвечено: ${count}`;
+      $('#qnProgressBar').style.width = Math.round(((qnIndex + 1) / ALL_QUESTIONS.length) * 100) + '%';
       return;
     }
     const searchBtn = e.target.closest('[data-qn-search]');
@@ -1962,7 +1921,6 @@ function wireQuestionnaire() {
       if (!q) return;
       setQuestionnaireAnswer(q.id, `search:${searchBtn.dataset.qnSearch}`, { silent: true });
       haptic('light');
-      qnGo(1);
     }
   });
 }
@@ -3424,16 +3382,16 @@ function renderStats() {
         </div>
       </div>
 
-      <div class="card">
+      ${''/* <div class="card">
         <div class="card-title">Анонимные отзывы друзей</div>
         <div class="muted">Отзывы видны без имени автора. Для использования в подборе нужно минимум 3 отзыва от разных друзей.</div>
         <div class="row-inline" style="margin-top:10px">
           <span class="pill">${selfRecs.length} отзывов</span>
           <span class="pill">${selfRecs.length >= 3 ? 'Можно использовать в подборе' : 'Недостаточно данных'}</span>
         </div>
-      </div>
+      </div> */}
 
-      ${renderHomeFeedHtml()}
+      ${''/* renderHomeFeedHtml() */}
 
       <div class="card" id="accountCard">
         <div class="card-title">Аккаунт</div>

@@ -24,9 +24,6 @@
         <button class="tab" data-tab="dating" type="button" aria-label="Знакомства">
           <span class="tab-ico" aria-hidden="true">💞</span>
         </button>
-        <button class="tab" data-tab="circle" type="button" aria-label="Круг знакомств">
-          <span class="tab-ico" aria-hidden="true">🌐</span>
-        </button>
         <button class="tab active" data-tab="stats" type="button" aria-label="Профиль">
           <span class="tab-ico" aria-hidden="true">👤</span>
         </button>
@@ -37,28 +34,25 @@
         <section class="view hidden" id="view-events"></section>
         <section class="view hidden" id="view-dating"></section>
         <section class="view" id="view-stats"></section>
-        <section class="view hidden" id="view-circle"></section>
+        <!-- <section class="view hidden" id="view-circle"></section> -->
       </main>
     </div>
 
     <dialog id="dlgQuestionnaire" class="dialog">
       <div class="dialog-card questionnaire-dialog">
-        <div class="dialog-head">
+        <div class="dialog-head" style="justify-content:center">
           <div>
             <div class="dialog-title">Анкета совместимости</div>
             <div class="muted" id="qnBlock"></div>
           </div>
-          <button class="btn ghost" id="btnQuestionnaireClose" type="button">Закрыть</button>
         </div>
         <div class="qn-progress" aria-hidden="true"><div id="qnProgressBar" class="qn-progress-bar"></div></div>
         <div class="qn-counter muted" id="qnCounter"></div>
         <div class="qn-stage">
           <div id="qnCard" class="qn-card"></div>
         </div>
-        <div class="row-inline qn-actions">
-          <button class="btn ghost" id="btnQuestionnairePrev" type="button">← Назад</button>
-          <span class="muted qn-hint">Свайп для навигации</span>
-          <button class="btn" id="btnQuestionnaireSkip" type="button">Пропустить</button>
+        <div style="margin-top:12px;text-align:center">
+          <button class="btn" id="btnQuestionnaireClose" type="button">Закрыть</button>
         </div>
       </div>
     </dialog>
@@ -173,7 +167,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=77')
+      import('./app.js?v=78')
         .then(() => {
           window.__walkdateImportOk = true;
         })
