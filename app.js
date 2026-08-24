@@ -1130,8 +1130,6 @@ function wireSettings() {
       haptic('light');
     }
   });
-
-  });
 }
 
 function syncSettingsUi() {
