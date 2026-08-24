@@ -42,7 +42,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=78';
+} from './supabase.js?v=79';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1879,7 +1879,9 @@ function wireQuestionnaire() {
   $('#btnQuestionnaireClose').addEventListener('click', closeQuestionnaire);
   $('#btnBookingClose')?.addEventListener('click', () => $('#dlgBooking')?.close());
   $('#dlgQuestionnaire').addEventListener('close', () => renderAll());
-}
+
+  const card = $('#qnCard');
+  if (!card) return;
 
   card.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-qn-opt]');
@@ -3381,17 +3383,6 @@ function renderStats() {
           ${renderQuestionnaireCategories(state.profile)}
         </div>
       </div>
-
-      ${''/* <div class="card">
-        <div class="card-title">Анонимные отзывы друзей</div>
-        <div class="muted">Отзывы видны без имени автора. Для использования в подборе нужно минимум 3 отзыва от разных друзей.</div>
-        <div class="row-inline" style="margin-top:10px">
-          <span class="pill">${selfRecs.length} отзывов</span>
-          <span class="pill">${selfRecs.length >= 3 ? 'Можно использовать в подборе' : 'Недостаточно данных'}</span>
-        </div>
-      </div> */}
-
-      ${''/* renderHomeFeedHtml() */}
 
       <div class="card" id="accountCard">
         <div class="card-title">Аккаунт</div>
