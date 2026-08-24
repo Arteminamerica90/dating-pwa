@@ -42,7 +42,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=80';
+} from './supabase.js?v=81';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1131,34 +1131,6 @@ function wireSettings() {
     }
   });
 
-  $('#consentGeo')?.addEventListener('change', (e) => {
-    state.consent.geo = !!e.target.checked;
-    save();
-    startGeoIfNeeded();
-    renderAll();
-  });
-
-  $('#consentSteps')?.addEventListener('change', (e) => {
-    state.consent.steps = !!e.target.checked;
-    save();
-    startStepsIfNeeded();
-    renderAll();
-  });
-
-  $('#consentMapShare')?.addEventListener('change', (e) => {
-    state.geo = state.geo || {};
-    state.geo.mapShare = !!e.target.checked;
-    save();
-    maybeShareLocation();
-    renderAll();
-  });
-
-  $('#consentPlanShare')?.addEventListener('change', (e) => {
-    state.geo = state.geo || {};
-    state.geo.planShare = !!e.target.checked;
-    save();
-    maybeSharePlans();
-    renderAll();
   });
 }
 
@@ -3422,31 +3394,6 @@ function renderStats() {
             </div>
           </form>
           <div class="muted" id="accountHint">Не можете войти по своему паролю? Нажмите «Забыли пароль?» — на почту придёт ссылка для смены пароля.</div>`}
-        <button class="accordion-head" type="button" data-toggle-func-settings aria-expanded="${state.ui?.funcSettingsOpen ? 'true' : 'false'}">
-          <span class="accordion-title">Функциональные переключатели</span>
-          <span class="chevron" aria-hidden="true"></span>
-        </button>
-        <div class="accordion-body" ${state.ui?.funcSettingsOpen ? '' : 'hidden'}>
-          <div class="consent-list">
-            <label class="plan-company">
-              <input id="consentGeo" type="checkbox" ${state.consent?.geo ? 'checked' : ''} />
-              <span>Геолокация: город, расстояние до людей и карта</span>
-            </label>
-            <label class="plan-company">
-              <input id="consentSteps" type="checkbox" ${state.consent?.steps ? 'checked' : ''} />
-              <span>Шагомер: статистика активности</span>
-            </label>
-            <label class="plan-company">
-              <input id="consentMapShare" type="checkbox" ${state.geo?.mapShare ? 'checked' : ''} />
-              <span>Показывать меня на карте «люди рядом»</span>
-            </label>
-            <label class="plan-company">
-              <input id="consentPlanShare" type="checkbox" ${state.geo?.planShare ? 'checked' : ''} />
-              <span>Публиковать мои планы на сегодня</span>
-            </label>
-          </div>
-          <div class="muted">Каждое согласие можно отозвать в любой момент. При отзыве согласия на обработку данных профиль перестанет загружаться на сервер.</div>
-        </div>
       </div>
 
       <div class="card" id="legalConsentCard" ${allLegalConsentsAccepted && state.ui?.legalConsentExpanded !== true ? 'hidden' : ''}>
@@ -3591,13 +3538,6 @@ function renderStats() {
     state.ui.legalConsentExpanded = !state.ui.legalConsentExpanded;
     const card = document.getElementById('legalConsentCard');
     if (card) card.hidden = false;
-    save();
-    renderAll();
-  });
-
-  $('#view-stats').querySelector('[data-toggle-func-settings]')?.addEventListener('click', () => {
-    state.ui = state.ui || {};
-    state.ui.funcSettingsOpen = !state.ui.funcSettingsOpen;
     save();
     renderAll();
   });
