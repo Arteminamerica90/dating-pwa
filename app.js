@@ -43,7 +43,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=89';
+} from './supabase.js?v=90';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1333,9 +1333,66 @@ function renderAll() {
 }
 
 function maybeStartOnboarding() {
-  // Do not auto-open onboarding on app start.
-  // Keep it available from the "Полная анкета" button.
-  return;
+  const name = String(state.profile?.name || '').trim();
+  const gender = String(state.profile?.gender || '').trim();
+  if (name && name !== 'Вы' && gender) return;
+
+  const dlg = $('#dlgOnboarding');
+  if (!dlg) return;
+  dlg.showModal();
+
+  let chosenGender = gender === 'male' ? 'male' : gender === 'female' ? 'female' : '';
+
+  function showStep2() {
+    $('#onboardingStep1').hidden = true;
+    $('#onboardingStep2').hidden = false;
+    const inp = $('#obNameInput');
+    if (inp) {
+      inp.value = name !== 'Вы' ? name : '';
+      inp.addEventListener('input', () => {
+        $('#obNameSubmit').disabled = !inp.value.trim();
+      });
+      setTimeout(() => inp.focus(), 120);
+    }
+  }
+
+  $('#obGenderMale')?.addEventListener('click', () => {
+    chosenGender = 'male';
+    showStep2();
+  });
+
+  $('#obGenderFemale')?.addEventListener('click', () => {
+    chosenGender = 'female';
+    showStep2();
+  });
+
+  $('#obNameSubmit')?.addEventListener('click', () => {
+    const nameVal = String($('#obNameInput')?.value || '').trim();
+    if (!nameVal) return;
+
+    state.profile.name = nameVal;
+    state.profile.gender = chosenGender;
+    save();
+
+    $('#onboardingStep2').hidden = true;
+    $('#onboardingStep3').hidden = false;
+    $('#obGreeting').textContent = `Привет, ${nameVal}!`;
+
+    renderAll();
+    scheduleCloudSync();
+  });
+
+  $('#obRegister')?.addEventListener('click', () => {
+    dlg.close();
+    if (accountInfo?.email) return;
+    switchTab('stats');
+  });
+
+  $('#obSkip')?.addEventListener('click', () => {
+    dlg.close();
+  });
+
+  dlg.addEventListener('close', () => renderAll());
 }
 
 function isProfileIncomplete(st) {
@@ -3351,18 +3408,7 @@ function renderStats() {
       </div>
 
       <div class="profile-editor">
-        <div class="profile-field row-inline">
-          <label class="label">Имя</label>
-          <input id="profileName" class="input" maxlength="40" value="${escapeHtml(name)}" placeholder="Ваше имя" />
-        </div>
-        <div class="profile-field row-inline">
-          <label class="label">Вы кто</label>
-          <select id="profileGender" class="select">
-            <option value="" ${!gender ? 'selected' : ''}>Не указано</option>
-            <option value="female" ${gender === 'female' ? 'selected' : ''}>Женщина</option>
-            <option value="male" ${gender === 'male' ? 'selected' : ''}>Мужчина</option>
-          </select>
-        </div>
+        <div class="muted">Имя и пол: ${escapeHtml(name || 'Не указано')} • ${gender === 'male' ? 'Мужчина' : gender === 'female' ? 'Женщина' : 'Не указано'}</div>
         <div class="muted">От этого зависят формулировки вопросов и варианты ответов в анкете.</div>
         <div class="profile-field">
           <label class="label">Описание</label>
@@ -3520,8 +3566,6 @@ function renderStats() {
   });
 
   $('#view-stats').querySelector('[data-action="saveProfileMini"]')?.addEventListener('click', () => {
-    const nextName = String($('#view-stats').querySelector('#profileName')?.value || '').trim().slice(0, 40);
-    const nextGender = String($('#view-stats').querySelector('#profileGender')?.value || '');
     const nextDescription = String($('#view-stats').querySelector('#profileDescription')?.value || '').slice(0, 2000);
     const nextInterestsRaw = String($('#view-stats').querySelector('#profileInterestsText')?.value || '');
     const nextInterests = nextInterestsRaw
@@ -3529,8 +3573,6 @@ function renderStats() {
       .map((x) => x.trim())
       .filter(Boolean)
       .slice(0, 30);
-    state.profile.name = nextName || state.profile.name;
-    state.profile.gender = nextGender;
     state.profile.description = nextDescription;
     state.profile.interests = nextInterests;
     state.profile.portrait = buildQuestionnairePortrait(state.profile.questionnaireAnswers || {});
