@@ -51,7 +51,6 @@
         </div>
         <div style="margin-top:12px;display:flex;justify-content:center;gap:8px;flex-wrap:wrap">
           <button class="btn ghost" id="btnQuestionnaireBack" type="button">← Назад</button>
-          <button class="btn" id="btnQuestionnaireSkip" type="button">Пропустить</button>
           <button class="btn" id="btnQuestionnaireNext" type="button">Далее →</button>
           <button class="btn ghost" id="btnQuestionnaireClose" type="button">Закрыть</button>
         </div>
@@ -168,7 +167,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=87')
+      import('./app.js?v=88')
         .then(() => {
           window.__walkdateImportOk = true;
         })

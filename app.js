@@ -43,7 +43,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=87';
+} from './supabase.js?v=88';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1597,11 +1597,9 @@ function renderQuestionnaireSummary(profile = state.profile) {
   const snippet = labels.length
     ? labels.slice(0, 4).map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ')
     : '';
-  const confidence = portrait.answered >= 7 ? 'Портрет уже достаточно выражен' : 'Портрет будет точнее после нескольких ответов';
   return `
     <div class="muted">Ответы строят портрет и помогают подбирать пару.</div>
     ${snippet ? `<div class="row-inline" style="margin-top:10px">${snippet}</div>` : ''}
-    <div class="muted" style="margin-top:10px">${confidence}</div>
   `;
 }
 
@@ -1848,8 +1846,6 @@ function qnGo(dir) {
   if (next < 0 || next > max) return;
   qnAnimating = true;
   const card = $('#qnCard');
-  const skipBtn = $('#btnQuestionnaireSkip');
-  if (skipBtn) skipBtn.disabled = true;
   card.classList.add(dir > 0 ? 'slide-left' : 'slide-right');
   setTimeout(() => {
     qnIndex = next;
@@ -1861,7 +1857,6 @@ function qnGo(dir) {
         card.classList.remove('slide-right', 'slide-left');
       })
     );
-    if (skipBtn) skipBtn.disabled = false;
     setTimeout(() => {
       qnAnimating = false;
     }, 250);
@@ -1878,7 +1873,6 @@ function wireQuestionnaire() {
 
   $('#btnQuestionnaireBack')?.addEventListener('click', () => qnGo(-1));
   $('#btnQuestionnaireNext')?.addEventListener('click', () => qnGo(1));
-  $('#btnQuestionnaireSkip')?.addEventListener('click', () => qnGo(1));
 
   const card = $('#qnCard');
   if (!card) return;
@@ -3118,12 +3112,10 @@ function renderDating() {
         <div class="card-title">Анкета</div>
         ${visible.length ? `<div class="tinder-wrap" id="tinderWrap"></div>` : `<div class="muted">Новых анкет нет.</div>`}
         ${visible.length ? `<div class="tinder-actions"><button class="tbtn nope" type="button" data-tinder="nope">✕</button><button class="tbtn like" type="button" data-tinder="like">❤</button></div>` : ``}
-        ${userPortrait.answered < 7 ? `<div class="qn-cta" style="text-align:center;justify-content:center"><span>Подбор станет точнее после анкеты</span><button class="btn" type="button" data-action="openQuestionnaire">Пройти анкету</button></div>` : ''}
       </div>
     </div>
   `;
 
-  $('#view-dating').querySelector('[data-action="openQuestionnaire"]')?.addEventListener('click', openQuestionnaire);
 
   $('#view-dating').querySelectorAll('[data-open-tab]').forEach((b) => {
     b.addEventListener('click', () => switchTab(b.dataset.openTab));
@@ -3341,16 +3333,13 @@ function renderStats() {
                   .map((src, idx) => `<button class="photo-thumb" type="button" data-photo-index="${idx}"><img alt="photo ${idx + 1}" src="${src}" /></button>`)
                   .join('')
               : ''}
-            ${photos.length < 3 ? '<div class="muted photo-hint">Можно загрузить до 3 фото</div>' : ''}
+            ${photos.length < 3 ? '<div class="muted photo-hint" style="text-align:center;font-size:10px">Можно загрузить до 3 фото</div>' : ''}
           </div>
         </div>
 
       <div class="card">
         <div class="card-title">Анкета совместимости</div>
         ${renderQuestionnaireSummary(state.profile)}
-        <div class="row-inline" style="margin-top:10px">
-          <button class="btn" type="button" data-action="openQuestionnaire">${portrait.answered ? 'Продолжить анкету' : 'Пройти анкету'}</button>
-        </div>
         <button class="accordion-head" type="button" data-tree-toggle aria-expanded="${state.ui?.treeOpen ? 'true' : 'false'}">
           <span class="accordion-title">Вопросы</span>
           <span class="pill">${catsProgress.done}/${CATEGORY_ORDER.length}</span>
@@ -3567,8 +3556,6 @@ function renderStats() {
       haptic('light');
     });
   });
-
-  $('#view-stats').querySelector('[data-action="openQuestionnaire"]')?.addEventListener('click', openQuestionnaire);
 
   $('#view-stats').querySelector('[data-toggle-legal-consent]')?.addEventListener('click', () => {
     state.ui = state.ui || {};
