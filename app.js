@@ -43,7 +43,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=86';
+} from './supabase.js?v=87';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1599,7 +1599,7 @@ function renderQuestionnaireSummary(profile = state.profile) {
     : '';
   const confidence = portrait.answered >= 7 ? 'Портрет уже достаточно выражен' : 'Портрет будет точнее после нескольких ответов';
   return `
-    <div class="muted">Ответы строят портрет и помогают подбирать пару — без баллов.</div>
+    <div class="muted">Ответы строят портрет и помогают подбирать пару.</div>
     ${snippet ? `<div class="row-inline" style="margin-top:10px">${snippet}</div>` : ''}
     <div class="muted" style="margin-top:10px">${confidence}</div>
   `;
@@ -1825,7 +1825,7 @@ function setQuestionCard() {
 }
 
 function renderSearchResults(q, chosen, query) {
-  const list = Array.isArray(q.searchList) ? q.searchList : [];
+  const list = Array.isArray(q.searchList) ? q.searchList : (q.searchMap ? Object.keys(q.searchMap) : []);
   const needle = String(query || '').toLowerCase().trim();
   const items = needle
     ? list.filter((p) => String(p).toLowerCase().includes(needle))
@@ -1875,6 +1875,10 @@ function wireQuestionnaire() {
     renderAll();
     scheduleCloudSync();
   });
+
+  $('#btnQuestionnaireBack')?.addEventListener('click', () => qnGo(-1));
+  $('#btnQuestionnaireNext')?.addEventListener('click', () => qnGo(1));
+  $('#btnQuestionnaireSkip')?.addEventListener('click', () => qnGo(1));
 
   const card = $('#qnCard');
   if (!card) return;
