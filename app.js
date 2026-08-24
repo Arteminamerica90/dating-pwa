@@ -42,7 +42,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=79';
+} from './supabase.js?v=80';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1331,7 +1331,7 @@ function matchesStepBucket(stepCount, bucket) {
 
 function renderAll() {
   renderHome();
-  renderEvents();
+  // renderEvents(); // скрыто — вернём позже
   renderDating();
   renderStats();
   // renderCircle(); // скрыто — вернём позже
