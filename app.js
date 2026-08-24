@@ -43,7 +43,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=85';
+} from './supabase.js?v=86';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1849,7 +1849,7 @@ function qnGo(dir) {
   qnAnimating = true;
   const card = $('#qnCard');
   const skipBtn = $('#btnQuestionnaireSkip');
-  skipBtn.disabled = true;
+  if (skipBtn) skipBtn.disabled = true;
   card.classList.add(dir > 0 ? 'slide-left' : 'slide-right');
   setTimeout(() => {
     qnIndex = next;
@@ -1861,7 +1861,7 @@ function qnGo(dir) {
         card.classList.remove('slide-right', 'slide-left');
       })
     );
-    skipBtn.disabled = false;
+    if (skipBtn) skipBtn.disabled = false;
     setTimeout(() => {
       qnAnimating = false;
     }, 250);
