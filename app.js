@@ -43,7 +43,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=84';
+} from './supabase.js?v=85';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1871,7 +1871,10 @@ function qnGo(dir) {
 function wireQuestionnaire() {
   $('#btnQuestionnaireClose').addEventListener('click', closeQuestionnaire);
   $('#btnBookingClose')?.addEventListener('click', () => $('#dlgBooking')?.close());
-  $('#dlgQuestionnaire').addEventListener('close', () => renderAll());
+  $('#dlgQuestionnaire').addEventListener('close', () => {
+    renderAll();
+    scheduleCloudSync();
+  });
 
   const card = $('#qnCard');
   if (!card) return;
@@ -1903,6 +1906,7 @@ function wireQuestionnaire() {
         card.querySelectorAll('[data-qn-opt]').forEach((b) => {
           b.classList.toggle('selected', b.dataset.qnOpt === oid);
         });
+        setTimeout(() => qnGo(1), 300);
       }
       const answers = getQuestionnaireAnswers();
       const count = Object.keys(answers).length;
@@ -1916,6 +1920,7 @@ function wireQuestionnaire() {
       if (!q) return;
       setQuestionnaireAnswer(q.id, `search:${searchBtn.dataset.qnSearch}`, { silent: true });
       haptic('light');
+      setTimeout(() => qnGo(1), 300);
     }
   });
 }
