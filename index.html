@@ -2,6 +2,7 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="interactive-widget" content="resizes-content" />
     <meta name="theme-color" content="#f4f5fa" />
@@ -164,7 +165,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=81')
+      import('./app.js?v=82')
         .then(() => {
           window.__walkdateImportOk = true;
         })

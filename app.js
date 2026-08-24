@@ -42,7 +42,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=81';
+} from './supabase.js?v=82';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -907,7 +907,7 @@ function wireTabs() {
 
 function wireSwipes() {
   // Swipe left/right on main content switches tabs (native-feel).
-  const order = ['home', 'events', 'dating', 'stats', 'circle'];
+  const order = ['home', 'dating', 'stats'];
   const main = document.querySelector('.main');
   if (!main) return;
 
