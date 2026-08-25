@@ -43,7 +43,7 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=90';
+} from './supabase.js?v=91';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1385,7 +1385,7 @@ function maybeStartOnboarding() {
   $('#obRegister')?.addEventListener('click', () => {
     dlg.close();
     if (accountInfo?.email) return;
-    switchTab('stats');
+    openRegisterDialog();
   });
 
   $('#obSkip')?.addEventListener('click', () => {
@@ -1393,6 +1393,118 @@ function maybeStartOnboarding() {
   });
 
   dlg.addEventListener('close', () => renderAll());
+}
+
+function openRegisterDialog() {
+  const dlg = $('#dlgRegister');
+  if (!dlg) return;
+  dlg.showModal();
+
+  const form = $('#regForm');
+  const emailInput = $('#regEmail');
+  const passwordInput = $('#regPassword');
+  const submitBtn = $('#btnRegSubmit');
+
+  form?.addEventListener('submit', (e) => {
+    e.preventDefault();
+  });
+
+  submitBtn?.addEventListener('click', async () => {
+    const email = String(emailInput?.value || '').trim().toLowerCase();
+    const password = String(passwordInput?.value || '');
+    if (!email || password.length < 6) return toast('Нужны email и пароль от 6 символов');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Одну секунду…';
+    try {
+      const reg = await supabaseSignUp(email, password, {
+        emailRedirectTo: location.origin + location.pathname
+      });
+      state.cloud.email = email;
+      state.cloud.enabled = true;
+      save();
+      accountInfo = reg.user;
+      dlg.close();
+      toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
+      haptic('light');
+      renderAll();
+      syncProfileAfterAuth().catch(() => {});
+    } catch (err) {
+      toast(err?.message || 'Ошибка регистрации');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Зарегистрироваться';
+    }
+  });
+
+  $('#btnRegLogin')?.addEventListener('click', () => {
+    dlg.close();
+    openLoginDialog();
+  });
+
+  $('#btnRegClose')?.addEventListener('click', () => {
+    dlg.close();
+  });
+
+  setTimeout(() => emailInput?.focus(), 120);
+}
+
+function openLoginDialog() {
+  const dlg = $('#dlgRegister');
+  if (!dlg) return;
+  dlg.showModal();
+
+  const form = $('#regForm');
+  const emailInput = $('#regEmail');
+  const passwordInput = $('#regPassword');
+  const submitBtn = $('#btnRegSubmit');
+
+  const origText = submitBtn?.textContent;
+  if (submitBtn) submitBtn.textContent = 'Войти';
+
+  form?.addEventListener('submit', (e) => {
+    e.preventDefault();
+  });
+
+  submitBtn?.removeEventListener?.('click', submitBtn?._regHandler);
+
+  const loginHandler = async () => {
+    const email = String(emailInput?.value || '').trim().toLowerCase();
+    const password = String(passwordInput?.value || '');
+    if (!email || !password) return toast('Введите email и пароль');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Одну секунду…';
+    try {
+      const user = await supabaseSignIn(email, password);
+      accountInfo = user;
+      state.cloud.email = email;
+      state.cloud.enabled = true;
+      save();
+      dlg.close();
+      toast('Вход выполнен');
+      haptic('light');
+      renderAll();
+      syncProfileAfterAuth().catch(() => {});
+    } catch (err) {
+      const msg = String(err?.message || '');
+      if (/invalid/i.test(msg)) {
+        toast('Неверный email или пароль');
+      } else {
+        toast(msg || 'Ошибка входа');
+      }
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Войти';
+    }
+  };
+  submitBtn?.addEventListener('click', loginHandler);
+
+  $('#btnRegLogin')?.addEventListener('click', () => {
+    if (submitBtn) submitBtn.textContent = origText || 'Зарегистрироваться';
+  });
+
+  $('#btnRegClose')?.addEventListener('click', () => {
+    dlg.close();
+  });
 }
 
 function isProfileIncomplete(st) {

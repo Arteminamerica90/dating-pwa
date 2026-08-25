@@ -92,6 +92,33 @@
       </div>
     </dialog>
 
+    <dialog id="dlgRegister" class="dialog">
+      <div class="dialog-card questionnaire-dialog">
+        <div class="dialog-head" style="justify-content:center">
+          <div class="dialog-title">Регистрация</div>
+        </div>
+        <form class="auth-form" id="regForm" autocomplete="on">
+          <div class="row" style="margin-top:10px">
+            <label class="label" for="regEmail">Email</label>
+            <input id="regEmail" name="email" class="input" type="email" inputmode="email" autocomplete="email" required placeholder="name@example.com" style="width:100%;max-width:360px" />
+          </div>
+          <div class="row">
+            <label class="label" for="regPassword">Пароль</label>
+            <input id="regPassword" name="password" class="input" type="password" autocomplete="new-password" placeholder="минимум 6 символов" style="width:100%;max-width:360px" />
+          </div>
+          <div class="row-inline">
+            <button id="btnRegSubmit" class="btn" type="submit">Зарегистрироваться</button>
+          </div>
+          <div class="row-inline" style="margin-top:8px; justify-content:center; gap:12px">
+            <button id="btnRegLogin" class="link-btn" type="button">Уже есть аккаунт? Войти</button>
+          </div>
+        </form>
+        <div style="text-align:center;margin-top:12px">
+          <button class="btn ghost" id="btnRegClose" type="button">Пока нет</button>
+        </div>
+      </div>
+    </dialog>
+
     <dialog id="dlgBooking" class="dialog">
       <div class="dialog-card">
         <div class="dialog-head">
@@ -202,7 +229,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=90')
+      import('./app.js?v=91')
         .then(() => {
           window.__walkdateImportOk = true;
         })
