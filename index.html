@@ -119,6 +119,26 @@
       </div>
     </dialog>
 
+    <dialog id="dlgSubscription" class="dialog">
+      <div class="dialog-card questionnaire-dialog">
+        <div class="dialog-head" style="justify-content:space-between">
+          <div class="dialog-title">Подписка</div>
+          <button class="btn ghost" id="btnSubClose" type="button">Закрыть</button>
+        </div>
+        <div id="subCurrentPlan" style="margin:12px 0"></div>
+        <div id="subPlans" class="sub-plans"></div>
+        <div id="subPaywall" hidden>
+          <div style="background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);border-radius:12px;padding:16px;margin:12px 0">
+            <div style="font-weight:700;margin-bottom:8px">🔒 Эта функция доступна по подписке</div>
+            <div class="muted" id="subPaywallText"></div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div class="muted" style="text-align:center;font-size:12px">Оплата через ЮKassa • Безопасно • Отмена в любой момент</div>
+        </div>
+      </div>
+    </dialog>
+
     <dialog id="dlgBooking" class="dialog">
       <div class="dialog-card">
         <div class="dialog-head">
@@ -229,7 +249,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=91')
+      import('./app.js?v=92')
         .then(() => {
           window.__walkdateImportOk = true;
         })

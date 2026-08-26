@@ -917,6 +917,156 @@ function cleanText(value) {
   return String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+const YOOKASSA_SHOP_ID = process.env.YOOKASSA_SHOP_ID || '';
+const YOOKASSA_SECRET_KEY = process.env.YOOKASSA_SECRET_KEY || '';
+
+function yookassaAuth() {
+  return 'Basic ' + Buffer.from(`${YOOKASSA_SHOP_ID}:${YOOKASSA_SECRET_KEY}`).toString('base64');
+}
+
+const PLAN_PRICES = {
+  standard: 29900,
+  premium: 99900,
+  vip: 299900,
+  income_200k: 19900,
+  income_500k: 49900,
+  income_1m: 99900,
+  income_5m: 299900
+};
+
+async function handleYooKassaCreatePayment(req, res) {
+  const headers = corsHeaders();
+  try {
+    const body = await readBody(req);
+    const { planId, userId, email } = JSON.parse(body || '{}');
+    if (!planId || !PLAN_PRICES[planId]) return sendJson(res, 400, { error: 'invalid_plan' }, headers);
+    if (!YOOKASSA_SHOP_ID || !YOOKASSA_SECRET_KEY) return sendJson(res, 500, { error: 'yookassa_not_configured' }, headers);
+
+    const amount = PLAN_PRICES[planId];
+    const description = `WalkDate — ${planId}`;
+    const return_url = `${req.headers.referer || 'https://xystar.ru/'}?payment=success`;
+
+    const yookassaRes = await fetch('https://api.yookassa.ru/v3/payments', {
+      method: 'POST',
+      headers: {
+        'Authorization': yookassaAuth(),
+        'Content-Type': 'application/json',
+        'Idempotence-Key': `${userId || 'anon'}-${planId}-${Date.now()}`
+      },
+      body: JSON.stringify({
+        amount: { value: (amount / 100).toFixed(2), currency: 'RUB' },
+        capture: true,
+        confirmation: { type: 'redirect', return_url },
+        description,
+        metadata: { userId: userId || '', planId, email: email || '' },
+        receipt: email ? {
+          customer: { email },
+          items: [{
+            description,
+            quantity: '1.00',
+            amount: { value: (amount / 100).toFixed(2), currency: 'RUB' },
+            vat_code: 1,
+            payment_mode: 'full_payment',
+            payment_subject: 'service'
+          }]
+        } : undefined
+      })
+    });
+
+    const data = await yookassaRes.json();
+    if (!yookassaRes.ok) return sendJson(res, yookassaRes.status, { error: data?.error?.message || 'yookassa_error' }, headers);
+
+    return sendJson(res, 200, {
+      paymentId: data.id,
+      confirmationUrl: data.confirmation?.confirmation_url || null,
+      status: data.status
+    }, headers);
+  } catch (err) {
+    return sendJson(res, 500, { error: err?.message || 'internal' }, headers);
+  }
+}
+
+async function handleYooKassaWebhook(req, res) {
+  const headers = corsHeaders();
+  try {
+    const body = await readBody(req);
+    const event = JSON.parse(body || '{}');
+
+    if (event.type === 'payment.succeeded') {
+      const meta = event.object?.metadata || {};
+      const userId = meta.userId;
+      const planId = meta.planId;
+      if (userId && planId) {
+        const expiresAt = new Date();
+        expiresAt.setMonth(expiresAt.getMonth() + 1);
+        const supabaseUrl = process.env.SUPABASE_URL || 'https://mdabznllmqnhddgwontq.supabase.co';
+        const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || '';
+        await fetch(`${supabaseUrl}/rest/v1/subscriptions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            plan_id: planId,
+            payment_id: event.object.id,
+            status: 'active',
+            expires_at: expiresAt.toISOString(),
+            created_at: new Date().toISOString()
+          })
+        });
+      }
+    }
+
+    if (event.type === 'payment.canceled') {
+      const meta = event.object?.metadata || {};
+      if (meta.userId) {
+        const supabaseUrl = process.env.SUPABASE_URL || 'https://mdabznllmqnhddgwontq.supabase.co';
+        const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || '';
+        await fetch(`${supabaseUrl}/rest/v1/subscriptions?user_id=eq.${encodeURIComponent(meta.userId)}&payment_id=eq.${encodeURIComponent(event.object.id)}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`
+          },
+          body: JSON.stringify({ status: 'canceled' })
+        });
+      }
+    }
+
+    return sendJson(res, 200, { ok: true }, headers);
+  } catch (err) {
+    return sendJson(res, 200, { ok: true }, headers);
+  }
+}
+
+async function handleYooKassaStatus(req, res, url) {
+  const headers = corsHeaders();
+  const userId = url.searchParams.get('userId');
+  if (!userId) return sendJson(res, 400, { error: 'userId required' }, headers);
+  try {
+    const supabaseUrl = process.env.SUPABASE_URL || 'https://mdabznllmqnhddgwontq.supabase.co';
+    const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || '';
+    const resp = await fetch(
+      `${supabaseUrl}/rest/v1/subscriptions?user_id=eq.${encodeURIComponent(userId)}&status=eq.active&expires_at=gt.${new Date().toISOString()}&order=expires_at.desc&limit=1`,
+      { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
+    );
+    const rows = await resp.json();
+    const data = Array.isArray(rows) ? rows[0] : null;
+    return sendJson(res, 200, {
+      planId: data?.plan_id || 'free',
+      expiresAt: data?.expires_at || null,
+      addons: data?.addons || []
+    }, headers);
+  } catch (err) {
+    return sendJson(res, 200, { planId: 'free' }, headers);
+  }
+}
+
 function slugify(value) {
   return cleanText(value).toLowerCase().replace(/[^a-zа-я0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'event';
 }
@@ -978,5 +1128,8 @@ export default async function handler(req, res) {
   if (url.pathname === '/api/loc' && req.method === 'POST') return handleLoc(req, res);
   if (url.pathname === '/api/nearby' && req.method === 'GET') return handleNearby(req, res, url);
   if (url.pathname === '/api/plans') return handlePlans(req, res, url);
+  if (req.method === 'POST' && url.pathname === '/api/yookassa/create-payment') return handleYooKassaCreatePayment(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/yookassa/webhook') return handleYooKassaWebhook(req, res);
+  if (req.method === 'GET' && url.pathname === '/api/yookassa/status') return handleYooKassaStatus(req, res, url);
   return sendJson(res, 404, { error: 'not_found' }, corsHeaders());
 }

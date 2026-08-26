@@ -43,7 +43,12 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=91';
+} from './supabase.js?v=92';
+import {
+  PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
+  canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
+  checkPaywall, incrementLikes, resetMonthlyLikes, nextPlanUpgrade, renderPlanBadge
+} from './subscriptions.js?v=92';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -673,6 +678,7 @@ async function init() {
 }
 
 let accountInfo = null;
+let mySubscription = { planId: 'free', likesThisMonth: 0, expiresAt: null, incomeAddons: [] };
 
 async function refreshAccountInfo() {
   try {
@@ -680,7 +686,36 @@ async function refreshAccountInfo() {
   } catch {
     accountInfo = null;
   }
+  await refreshSubscription();
   renderAccountBadge();
+}
+
+async function refreshSubscription() {
+  if (!accountInfo?.id) { mySubscription = { planId: 'free', likesThisMonth: 0, expiresAt: null, incomeAddons: [] }; return; }
+  try {
+    const apiUrl = location.origin.includes('localhost') ? '' : '';
+    const base = apiUrl || '';
+    const resp = await fetch(`${base}/api/yookassa/status?userId=${encodeURIComponent(accountInfo.id)}`);
+    const data = await resp.json();
+    mySubscription = {
+      planId: data.planId || 'free',
+      likesThisMonth: mySubscription.likesThisMonth || 0,
+      expiresAt: data.expiresAt || null,
+      incomeAddons: data.addons || []
+    };
+  } catch {
+    mySubscription = { planId: 'free', likesThisMonth: mySubscription.likesThisMonth || 0, expiresAt: null, incomeAddons: [] };
+  }
+  checkMonthlyReset();
+}
+
+function checkMonthlyReset() {
+  const now = new Date();
+  const last = mySubscription.likesResetAt ? new Date(mySubscription.likesResetAt) : null;
+  if (!last || last.getMonth() !== now.getMonth() || last.getFullYear() !== now.getFullYear()) {
+    mySubscription.likesThisMonth = 0;
+    mySubscription.likesResetAt = now.toISOString();
+  }
 }
 
 function renderAccountBadge() {
@@ -1081,6 +1116,8 @@ function wireSettings() {
     });
   });
 
+  $('#btnOpenSubscription')?.addEventListener('click', () => openSubscriptionDialog());
+
   $('#btnAccountLogout')?.addEventListener('click', (e) => {
     haptic('light');
     const btn = $('#btnAccountLogout');
@@ -1446,6 +1483,112 @@ function openRegisterDialog() {
   });
 
   setTimeout(() => emailInput?.focus(), 120);
+}
+
+function openSubscriptionDialog(highlightFeature) {
+  const dlg = $('#dlgSubscription');
+  if (!dlg) return;
+  dlg.showModal();
+  renderSubscriptionContent(highlightFeature);
+  $('#btnSubClose')?.addEventListener('click', () => dlg.close(), { once: true });
+}
+
+function renderSubscriptionContent(highlightFeature) {
+  const current = getActivePlan(mySubscription);
+  const currentEl = $('#subCurrentPlan');
+  if (currentEl) {
+    if (current.id === 'free') {
+      const left = likesLeft(mySubscription);
+      currentEl.innerHTML = `<div class="sub-current">
+        <div style="font-weight:700;margin-bottom:4px">Free план</div>
+        <div class="muted">Лайков в этом месяце: ${mySubscription.likesThisMonth || 0}/100</div>
+      </div>`;
+    } else {
+      const exp = mySubscription.expiresAt ? new Date(mySubscription.expiresAt).toLocaleDateString('ru-RU') : '—';
+      currentEl.innerHTML = `<div class="sub-current">
+        <div style="font-weight:700;margin-bottom:4px">${renderPlanBadge(mySubscription)} ${current.label}</div>
+        <div class="muted">Действует до: ${exp}</div>
+      </div>`;
+    }
+  }
+
+  const plansEl = $('#subPlans');
+  if (!plansEl) return;
+  const planOrder = ['standard', 'premium', 'vip'];
+  let html = '';
+  for (const pid of planOrder) {
+    const p = PLANS[pid];
+    const isCurrent = current.id === pid;
+    const isPopular = pid === 'premium';
+    const features = [];
+    if (p.features.maxLikesPerMonth < 0) features.push('Безлимитные лайки');
+    else features.push(`До ${p.features.maxLikesPerMonth} лайков/мес`);
+    if (p.features.canUseFilters) features.push('Расширенные фильтры');
+    if (p.features.canSuperLike) features.push('Суперлайки');
+    if (p.features.canSeeWhoLiked) features.push('Кто поставил лайк');
+    if (p.features.canPromote) features.push('Продвижение в выдаче');
+    if (p.features.maxIncomeFilter > 50000) features.push(`Доход до ${p.features.maxIncomeFilter >= 1000000 ? (p.features.maxIncomeFilter / 1000000) + 'М' : (p.features.maxIncomeFilter / 1000) + 'к'} ₽`);
+    html += `<div class="sub-plan${isCurrent ? ' active' : ''}${isPopular ? ' popular' : ''}">
+      <div class="sub-plan-header">
+        <div class="sub-plan-name">${p.label}</div>
+        <div class="sub-plan-price">${p.priceFormatted}</div>
+      </div>
+      <ul class="sub-plan-features">${features.map((f) => `<li>${f}</li>`).join('')}</ul>
+      ${isCurrent ? '<div class="muted" style="margin-top:8px">Текущий план</div>' : `<button class="btn sub-plan-buy" data-plan="${pid}" type="button">Купить</button>`}
+    </div>`;
+  }
+  plansEl.innerHTML = html;
+
+  const paywallEl = $('#subPaywall');
+  if (paywallEl && highlightFeature) {
+    paywallEl.hidden = false;
+    const texts = {
+      likes: 'Вы использовали все бесплатные лайки на этот месяц. Оформите подписку для безлимитных лайков.',
+      filters: 'Расширенные фильтры доступны по подписке.',
+      superLike: 'Суперлайки доступны по подписке.',
+      seeWhoLiked: 'Просмотр «кто лайкнул» доступен по подписке.',
+      promote: 'Продвижение доступно по подписке.'
+    };
+    $('#subPaywallText').textContent = texts[highlightFeature] || '';
+  } else if (paywallEl) {
+    paywallEl.hidden = true;
+  }
+
+  plansEl.querySelectorAll('.sub-plan-buy').forEach((btn) => {
+    btn.addEventListener('click', () => startPayment(btn.dataset.plan));
+  });
+}
+
+async function startPayment(planId) {
+  if (!accountInfo?.id) {
+    toast('Войдите, чтобы купить подписку');
+    openRegisterDialog();
+    return;
+  }
+  const btn = document.querySelector(`.sub-plan-buy[data-plan="${planId}"]`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Одну секунду…'; }
+  try {
+    const resp = await fetch('/api/yookassa/create-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        planId,
+        userId: accountInfo.id,
+        email: accountInfo.email || state.cloud.email
+      })
+    });
+    const data = await resp.json();
+    if (data.confirmationUrl) {
+      window.open(data.confirmationUrl, '_blank');
+      toast('Откроется страница оплаты. После оплаты подписка активируется автоматически.');
+    } else if (data.error) {
+      toast('Ошибка: ' + data.error);
+    }
+  } catch (err) {
+    toast('Ошибка создания платежа');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Купить'; }
+  }
 }
 
 function openLoginDialog() {
@@ -3545,6 +3688,7 @@ function renderStats() {
         ${accountInfo
           ? `
           <div class="row-inline" style="margin-top:10px" id="accountSignedIn">
+            <button id="btnOpenSubscription" class="btn" type="button">${renderPlanBadge(mySubscription)} Подписка</button>
             <button id="btnChangePassword" class="btn" type="button">Сменить пароль</button>
             <button id="btnAccountLogout" class="btn danger" type="button">Выход</button>
           </div>
@@ -4126,7 +4270,13 @@ function renderGeoItem(p) {
 }
 
 function onLike(id) {
+  if (!canLike(mySubscription)) {
+    openSubscriptionDialog('likes');
+    toast('Лимит лайков исчерпан. Оформите подписку.');
+    return;
+  }
   state.dating.likes[id] = 'like';
+  mySubscription = incrementLikes(mySubscription);
   const candidate = DATING_PROFILES.find((x) => x.id === id) || liveProfiles.find((x) => x.id === id);
   const tree = treeMatchCompatibility(state.profile, candidate || {});
   const treeOk = tree.compatible;

@@ -576,6 +576,79 @@ a { color: inherit; }
 }
 .link-btn:hover { opacity: 0.7; }
 
+.sub-plans {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sub-plan {
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+}
+.sub-plan:hover { border-color: var(--brand); }
+.sub-plan.active {
+  border-color: var(--brand);
+  background: rgba(var(--brand-r, 180), var(--brand-g, 120), var(--brand-b, 255), 0.08);
+}
+.sub-plan.popular::before {
+  content: 'Популярный';
+  position: absolute;
+  top: -10px;
+  right: 12px;
+  background: linear-gradient(135deg, #b8860b, #ffd700);
+  color: #000;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+.sub-plan-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.sub-plan-name {
+  font-weight: 700;
+  font-size: 16px;
+}
+.sub-plan-price {
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--brand);
+}
+.sub-plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 13px;
+}
+.sub-plan-features li {
+  padding: 3px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sub-plan-features li::before {
+  content: '✓';
+  color: #22c55e;
+  font-weight: 700;
+}
+.sub-plan-buy {
+  margin-top: 12px;
+}
+.sub-current {
+  background: rgba(var(--brand-r, 180), var(--brand-g, 120), var(--brand-b, 255), 0.08);
+  border: 1px solid var(--brand);
+  border-radius: 12px;
+  padding: 12px 16px;
+  text-align: center;
+}
+
 .consent-doc {
   padding: 4px 0;
 }
