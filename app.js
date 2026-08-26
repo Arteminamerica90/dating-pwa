@@ -3309,6 +3309,7 @@ function renderDating() {
   const myGender = String(state.profile?.gender || '');
   const myName = normText(state.profile?.name || '');
   const candidatePool = liveProfiles.length ? liveProfiles : [];
+  const maxIncome = maxIncomeForPlan(mySubscription);
   const baseMatch = (p) => {
     if (myGender) {
       const g = String(p.gender || '');
@@ -3317,6 +3318,11 @@ function renderDating() {
     if (myName && normText(p.name || '') === myName) return false;
 
     if (!matchesTreeFilters(p, filters.tree)) return false;
+
+    if (maxIncome > 0 && maxIncome < Infinity) {
+      const pIncome = getProfileIncome(p);
+      if (pIncome > maxIncome) return false;
+    }
 
     if (selectedIntents.size) {
       const intents = new Set(p.meetingIntent || []);
@@ -5117,6 +5123,20 @@ function clampFloat(raw, min, max, fallback) {
 
 function normText(s) {
   return String(s || '').trim().toLowerCase();
+}
+
+function getProfileIncome(p) {
+  const answer = p?.answers?.q21;
+  if (!answer) return 0;
+  const INCOME_MAP = {
+    'доход_низкий': 30000,
+    'доход_средний': 60000,
+    'доход_выше_среднего': 120000,
+    'доход_высокий': 250000,
+    'доход_очень_высокий': 500000
+  };
+  if (typeof answer === 'number') return answer;
+  return INCOME_MAP[String(answer)] || 0;
 }
 
 function getPortraitSummaryFromAnswers(answers = {}) {
