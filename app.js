@@ -1055,6 +1055,7 @@ function wireSettings() {
         toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
         haptic('light');
         syncProfileAfterAuth().catch(() => {});
+        setTimeout(() => openSubscriptionDialog(), 1500);
       } catch (err) {
         toast(err?.message || 'Ошибка регистрации');
       }
@@ -1117,6 +1118,25 @@ function wireSettings() {
   });
 
   $('#btnOpenSubscription')?.addEventListener('click', () => openSubscriptionDialog());
+
+  $('#btnShareColleague')?.addEventListener('click', async () => {
+    const shareData = {
+      title: 'WalkDate — знакомства для прогулок',
+      text: 'Попробуй WalkDate — приложение для знакомств с прогулками и свиданиями',
+      url: 'https://xystar.ru'
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText('https://xystar.ru');
+        toast('Ссылка скопирована');
+      }
+      haptic('light');
+    } catch {
+      try { await navigator.clipboard.writeText('https://xystar.ru'); toast('Ссылка скопирована'); } catch {}
+    }
+  });
 
   $('#btnAccountLogout')?.addEventListener('click', (e) => {
     haptic('light');
@@ -1465,6 +1485,7 @@ function openRegisterDialog() {
       haptic('light');
       renderAll();
       syncProfileAfterAuth().catch(() => {});
+      setTimeout(() => openSubscriptionDialog(), 1500);
     } catch (err) {
       toast(err?.message || 'Ошибка регистрации');
     } finally {
@@ -1556,6 +1577,24 @@ function renderSubscriptionContent(highlightFeature) {
 
   plansEl.querySelectorAll('.sub-plan-buy').forEach((btn) => {
     btn.addEventListener('click', () => startPayment(btn.dataset.plan));
+  });
+
+  const existingShare = plansEl.parentElement?.querySelector('.sub-share');
+  if (existingShare) existingShare.remove();
+  const shareDiv = document.createElement('div');
+  shareDiv.className = 'sub-share';
+  shareDiv.style.cssText = 'text-align:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)';
+  shareDiv.innerHTML = `<button class="link-btn" type="button" id="btnSubShare" style="font-size:12px">📨 Поделиться с коллегой</button>`;
+  plansEl.parentElement?.appendChild(shareDiv);
+  shareDiv.querySelector('#btnSubShare')?.addEventListener('click', async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'WalkDate', text: 'Попробуй WalkDate — знакомства с прогулками', url: 'https://xystar.ru' });
+      } else {
+        await navigator.clipboard.writeText('https://xystar.ru');
+        toast('Ссылка скопирована');
+      }
+    } catch { try { await navigator.clipboard.writeText('https://xystar.ru'); toast('Ссылка скопирована'); } catch {} }
   });
 }
 
@@ -3694,7 +3733,6 @@ function renderStats() {
         ${accountInfo
           ? `
           <div class="row-inline" style="margin-top:10px" id="accountSignedIn">
-            <button id="btnOpenSubscription" class="btn" type="button">${renderPlanBadge(mySubscription)} Подписка</button>
             <button id="btnChangePassword" class="btn" type="button">Сменить пароль</button>
             <button id="btnAccountLogout" class="btn danger" type="button">Выход</button>
           </div>
@@ -3728,6 +3766,15 @@ function renderStats() {
           </form>
           <div class="muted" id="accountHint">Не можете войти по своему паролю? Нажмите «Забыли пароль?» — на почту придёт ссылка для смены пароля.</div>`}
         </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <button id="btnOpenSubscription" class="btn" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block">${renderPlanBadge(mySubscription)} ⭐ Подписка</button>
+        <div class="muted" style="text-align:center;margin-top:6px;font-size:12px">Безлимитные лайки, фильтры, суперлайки</div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <button id="btnShareColleague" class="btn" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block;font-size:13px">📨 Поделиться с коллегой</button>
       </div>
 
       <div class="card" id="legalConsentCard" ${allLegalConsentsAccepted && state.ui?.legalConsentExpanded !== true ? 'hidden' : ''}>
