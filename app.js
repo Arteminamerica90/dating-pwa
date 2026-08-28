@@ -43,12 +43,12 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=92';
+} from './supabase.js?v=93';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
   checkPaywall, incrementLikes, resetMonthlyLikes, nextPlanUpgrade, renderPlanBadge
-} from './subscriptions.js?v=92';
+} from './subscriptions.js?v=93';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1078,6 +1078,11 @@ function wireSettings() {
         toast('Вход выполнен');
         haptic('light');
         syncProfileAfterAuth().catch(() => {});
+        setTimeout(() => {
+          refreshSubscription().then(() => {
+            if (mySubscription.planId === 'free') openSubscriptionDialog();
+          });
+        }, 800);
       } catch (err) {
         const msg = String(err?.message || '');
         if (/invalid/i.test(msg)) {
@@ -1516,19 +1521,28 @@ function openSubscriptionDialog(highlightFeature) {
 
 function renderSubscriptionContent(highlightFeature) {
   const current = getActivePlan(mySubscription);
+  const dlgTitle = $('#subDialogTitle');
+  const heroEl = $('#subHero');
+  if (highlightFeature) {
+    if (dlgTitle) dlgTitle.textContent = 'Подписка';
+    if (heroEl) heroEl.hidden = true;
+  } else {
+    if (dlgTitle) dlgTitle.textContent = 'Выберите подписку';
+    if (heroEl) heroEl.hidden = false;
+  }
+
   const currentEl = $('#subCurrentPlan');
   if (currentEl) {
     if (current.id === 'free') {
-      const left = likesLeft(mySubscription);
       currentEl.innerHTML = `<div class="sub-current">
-        <div style="font-weight:700;margin-bottom:4px">Free план</div>
-        <div class="muted">Лайков в этом месяце: ${mySubscription.likesThisMonth || 0}/100</div>
+        <div style="font-weight:700;margin-bottom:4px">Ваш тариф: Free</div>
+        <div class="muted" style="font-size:13px">Лайков в этом месяце: ${mySubscription.likesThisMonth || 0} / 100 • Фильтры дохода: до 50 000 ₽</div>
       </div>`;
     } else {
       const exp = mySubscription.expiresAt ? new Date(mySubscription.expiresAt).toLocaleDateString('ru-RU') : '—';
       currentEl.innerHTML = `<div class="sub-current">
         <div style="font-weight:700;margin-bottom:4px">${renderPlanBadge(mySubscription)} ${current.label}</div>
-        <div class="muted">Действует до: ${exp}</div>
+        <div class="muted" style="font-size:13px">Действует до: ${exp}</div>
       </div>`;
     }
   }
@@ -1560,6 +1574,29 @@ function renderSubscriptionContent(highlightFeature) {
   }
   plansEl.innerHTML = html;
 
+  const addonsEl = $('#subAddons');
+  const addonsListEl = $('#subAddonsList');
+  if (addonsEl && addonsListEl) {
+    if (current.id === 'free' || current.id === 'standard') {
+      addonsEl.hidden = false;
+      let addonHtml = '';
+      for (const a of INCOME_ADDONS) {
+        const owned = (mySubscription.incomeAddons || []).includes(a.id);
+        addonHtml += `<div class="sub-plan${owned ? ' active' : ''}">
+          <div class="sub-plan-header">
+            <div class="sub-plan-name">${a.label}</div>
+            <div class="sub-plan-price">${a.priceFormatted}</div>
+          </div>
+          <div class="muted" style="font-size:12px">Доступ к анкетам с доходом от ${(a.minIncome / 1000)}к ₽</div>
+          ${owned ? '<div class="muted" style="margin-top:8px">Куплено</div>' : `<button class="btn sub-plan-buy" data-addon="${a.id}" type="button">Купить</button>`}
+        </div>`;
+      }
+      addonsListEl.innerHTML = addonHtml;
+    } else {
+      addonsEl.hidden = true;
+    }
+  }
+
   const paywallEl = $('#subPaywall');
   if (paywallEl && highlightFeature) {
     paywallEl.hidden = false;
@@ -1578,15 +1615,13 @@ function renderSubscriptionContent(highlightFeature) {
   plansEl.querySelectorAll('.sub-plan-buy').forEach((btn) => {
     btn.addEventListener('click', () => startPayment(btn.dataset.plan));
   });
+  if (addonsListEl) {
+    addonsListEl.querySelectorAll('.sub-plan-buy').forEach((btn) => {
+      btn.addEventListener('click', () => startPayment(btn.dataset.addon));
+    });
+  }
 
-  const existingShare = plansEl.parentElement?.querySelector('.sub-share');
-  if (existingShare) existingShare.remove();
-  const shareDiv = document.createElement('div');
-  shareDiv.className = 'sub-share';
-  shareDiv.style.cssText = 'text-align:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)';
-  shareDiv.innerHTML = `<button class="link-btn" type="button" id="btnSubShare" style="font-size:12px">📨 Поделиться с коллегой</button>`;
-  plansEl.parentElement?.appendChild(shareDiv);
-  shareDiv.querySelector('#btnSubShare')?.addEventListener('click', async () => {
+  $('#btnSubShareBottom')?.addEventListener('click', async () => {
     try {
       if (navigator.share) {
         await navigator.share({ title: 'WalkDate', text: 'Попробуй WalkDate — знакомства с прогулками', url: 'https://xystar.ru' });
@@ -1666,6 +1701,11 @@ function openLoginDialog() {
       haptic('light');
       renderAll();
       syncProfileAfterAuth().catch(() => {});
+      setTimeout(() => {
+        refreshSubscription().then(() => {
+          if (mySubscription.planId === 'free') openSubscriptionDialog();
+        });
+      }, 800);
     } catch (err) {
       const msg = String(err?.message || '');
       if (/invalid/i.test(msg)) {

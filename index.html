@@ -120,21 +120,33 @@
     </dialog>
 
     <dialog id="dlgSubscription" class="dialog">
-      <div class="dialog-card questionnaire-dialog">
+      <div class="dialog-card questionnaire-dialog" style="max-height:90vh;overflow-y:auto">
         <div class="dialog-head" style="justify-content:space-between">
-          <div class="dialog-title">Подписка</div>
-          <button class="btn ghost" id="btnSubClose" type="button">Закрыть</button>
+          <div class="dialog-title" id="subDialogTitle">Выберите подписку</div>
+          <button class="btn ghost" id="btnSubClose" type="button">✕</button>
         </div>
-        <div id="subCurrentPlan" style="margin:12px 0"></div>
+        <div id="subHero" style="text-align:center;margin:8px 0 16px">
+          <div style="font-size:40px">💎</div>
+          <div class="muted" style="font-size:13px;margin-top:6px">Откройте полный потенциал знакомств</div>
+        </div>
+        <div id="subCurrentPlan" style="margin:0 0 12px"></div>
         <div id="subPlans" class="sub-plans"></div>
+        <div id="subAddons" hidden>
+          <div style="font-weight:700;margin:16px 0 8px;font-size:14px">Дополнительные пакеты</div>
+          <div id="subAddonsList" class="sub-plans"></div>
+        </div>
         <div id="subPaywall" hidden>
           <div style="background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);border-radius:12px;padding:16px;margin:12px 0">
             <div style="font-weight:700;margin-bottom:8px">🔒 Эта функция доступна по подписке</div>
             <div class="muted" id="subPaywallText"></div>
           </div>
         </div>
-        <div class="row" style="margin-top:12px">
-          <div class="muted" style="text-align:center;font-size:12px">Оплата через ЮKassa • Безопасно • Отмена в любой момент</div>
+        <div id="subShare" style="text-align:center;margin-top:12px">
+          <div class="muted" style="font-size:11px;margin-bottom:6px">Нравится WalkDate? Расскажите друзьям</div>
+          <button class="link-btn" type="button" id="btnSubShareBottom" style="font-size:12px">📨 Поделиться с коллегой</button>
+        </div>
+        <div style="text-align:center;margin-top:12px;padding-top:8px;border-top:1px solid var(--border)">
+          <div class="muted" style="font-size:11px">Оплата через ЮKassa • Безопасно • Отмена в любой момент</div>
         </div>
       </div>
     </dialog>
@@ -251,7 +263,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=92')
+      import('./app.js?v=93')
         .then(() => {
           window.__walkdateImportOk = true;
         })
