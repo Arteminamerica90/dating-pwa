@@ -1,0 +1,7 @@
+{
+  "name": "walkdate-api",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  }
+}
