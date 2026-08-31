@@ -693,7 +693,7 @@ async function refreshAccountInfo() {
 async function refreshSubscription() {
   if (!accountInfo?.id) { mySubscription = { planId: 'free', likesThisMonth: 0, expiresAt: null, incomeAddons: [] }; return; }
   try {
-    const apiUrl = location.origin.includes('localhost') ? '' : '';
+    const apiUrl = location.origin.includes('localhost') ? '' : 'https://pwa-dating-delta.vercel.app';
     const base = apiUrl || '';
     const resp = await fetch(`${base}/api/yookassa/status?userId=${encodeURIComponent(accountInfo.id)}`);
     const data = await resp.json();
@@ -1642,7 +1642,7 @@ async function startPayment(planId) {
   const btn = document.querySelector(`.sub-plan-buy[data-plan="${planId}"]`);
   if (btn) { btn.disabled = true; btn.textContent = 'Одну секунду…'; }
   try {
-    const resp = await fetch('/api/yookassa/create-payment', {
+    const resp = await fetch('https://pwa-dating-delta.vercel.app/api/yookassa/create-payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
