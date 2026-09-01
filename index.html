@@ -16,6 +16,18 @@
   <body>
     <div id="app" class="app">
       <div style="position:fixed;top:0;right:0;z-index:100;background:#e11d48;color:#fff;font-weight:700;font-size:10px;padding:2px 6px;border-radius:0 0 0 8px">18+</div>
+
+      <div id="cookieBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9999;background:rgba(17,24,39,0.97);backdrop-filter:blur(12px);padding:16px;color:#e5e7eb;font-size:13px;border-top:1px solid rgba(255,255,255,0.1)">
+        <div style="max-width:600px;margin:0 auto">
+          <div style="font-weight:700;margin-bottom:6px">🍪 Cookies</div>
+          <div style="margin-bottom:10px;line-height:1.5">Сайт использует файлы cookies для работы функций, аутентификации и аналитики. Данные могут передаваться третьим лицам (Supabase, Vercel, GitHub, jsDelivr CDN). Подробнее: <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:#a78bfa">Политика конфиденциальности</a>.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button id="cookieAcceptAll" class="btn" type="button" style="font-size:12px;padding:6px 14px">Принять все</button>
+            <button id="cookieAcceptNecessary" class="btn ghost" type="button" style="font-size:12px;padding:6px 14px">Только необходимые</button>
+          </div>
+        </div>
+      </div>
+
       <nav class="tabs" aria-label="Разделы">
         <button class="tab" data-tab="home" type="button" aria-label="Сообщения">
           <span class="tab-ico" aria-hidden="true">💬</span>
@@ -270,7 +282,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=94')
+      import('./app.js?v=95')
         .then(() => {
           window.__walkdateImportOk = true;
         })

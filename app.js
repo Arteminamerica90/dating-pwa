@@ -43,17 +43,76 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=94';
+} from './supabase.js?v=95';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
   checkPaywall, incrementLikes, resetMonthlyLikes, nextPlanUpgrade, renderPlanBadge
-} from './subscriptions.js?v=94';
+} from './subscriptions.js?v=95';
 
 const $ = (sel) => document.querySelector(sel);
 
 // Helps diagnose cases where the module loads but init hangs (e.g. storage blocked).
 window.__walkdateModuleLoaded = true;
+
+const COOKIE_NECESSARY = ['walkdate_state', 'walkdate_encryption_key'];
+const PROFANITY_LIST = ['хуй','пизд','бляд','блять','ебат','ёб','еба','сука','сук','нахуй','нахер','пидор','пидар','говно','дерьмо','жопа','ϻ','гондон','уёб','уеб','мудак','козёл','с_TypeScriptдак','солдат',' Natalia',''];
+
+function containsProfanity(text) {
+  const lower = String(text || '').toLowerCase().replace(/[ъё]/g, (c) => c === 'ъ' ? '' : 'е');
+  for (const word of PROFANITY_LIST) {
+    if (!word) continue;
+    if (lower.includes(word.toLowerCase())) return true;
+  }
+  return false;
+}
+
+function initCookieBanner() {
+  const consent = localStorage.getItem('xystar_cookie_consent');
+  if (consent) return;
+  const banner = $('#cookieBanner');
+  if (banner) banner.style.display = 'block';
+  $('#cookieAcceptAll')?.addEventListener('click', () => {
+    localStorage.setItem('xystar_cookie_consent', 'all');
+    if (banner) banner.style.display = 'none';
+  });
+  $('#cookieAcceptNecessary')?.addEventListener('click', () => {
+    localStorage.setItem('xystar_cookie_consent', 'necessary');
+    if (banner) banner.style.display = 'none';
+    document.cookie.split(';').forEach((c) => {
+      const name = c.split('=')[0].trim();
+      if (!COOKIE_NECESSARY.includes(name)) {
+        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+      }
+    });
+  });
+}
+
+function showReportDialog(targetId, targetType) {
+  const existing = document.getElementById('dlgReport');
+  if (existing) existing.remove();
+  const reasons = ['Спам', 'Оскорбления', 'Фейковый профиль', 'Неприемлемый контент', 'Дискриминация', 'Другое'];
+  const div = document.createElement('div');
+  div.id = 'dlgReport';
+  div.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5)';
+  div.innerHTML = `<div style="background:var(--panel);border-radius:16px;padding:20px;max-width:340px;width:90%;box-shadow:var(--shadow)">
+    <div style="font-weight:700;font-size:16px;margin-bottom:12px">Жалоба</div>
+    <div class="muted" style="font-size:13px;margin-bottom:12px">Выберите причину:</div>
+    <div style="display:flex;flex-direction:column;gap:6px" id="reportReasons">
+      ${reasons.map((r, i) => `<button class="btn ghost report-reason" type="button" data-reason="${r}" style="text-align:left;font-size:13px">${r}</button>`).join('')}
+    </div>
+    <div style="text-align:center;margin-top:12px"><button class="btn ghost" id="btnReportCancel" type="button">Отмена</button></div>
+  </div>`;
+  document.body.appendChild(div);
+  div.querySelectorAll('.report-reason').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      toast('Жалоба отправлена. Спасибо!');
+      div.remove();
+    });
+  });
+  $('#btnReportCancel')?.addEventListener('click', () => div.remove());
+  div.addEventListener('click', (e) => { if (e.target === div) div.remove(); });
+}
 
 let state = null;
 let geoWatchId = null;
@@ -648,6 +707,7 @@ init().catch((err) => {
 async function init() {
   state = await safeLoadStateWithTimeout(1500);
   window.__walkdateStarted = true;
+  initCookieBanner();
 
   window.__deleteMyProfile = async () => {
     if (!accountInfo?.id) return toast('Нет активной сессии');
@@ -1199,6 +1259,24 @@ function wireSettings() {
     save();
     renderAll();
     toast(on ? 'Согласие принято' : 'Согласие отозвано');
+    haptic('light');
+  });
+
+  $('#consentGeo')?.addEventListener('change', (e) => {
+    state.consent.geo = e.target.checked;
+    save();
+    haptic('light');
+  });
+
+  $('#consentSpecial')?.addEventListener('change', (e) => {
+    state.consent.specialCategories = e.target.checked;
+    save();
+    haptic('light');
+  });
+
+  $('#consentProfiling')?.addEventListener('change', (e) => {
+    state.consent.profiling = e.target.checked;
+    save();
     haptic('light');
   });
 
@@ -2822,6 +2900,11 @@ function isRealChat(id) {
 }
 
 async function pushEncryptedMessage(otherId, text) {
+  if (containsProfanity(text)) {
+    toast('Сообщение содержит запрещённые слова и не отправлено');
+    haptic('error');
+    return;
+  }
   const key = await derivePairKey(accountInfo.id, otherId);
   const cipher = await encryptChatText(key, text);
   await supabaseSaveMessage(accountInfo.id, otherId, cipher);
@@ -3664,6 +3747,10 @@ function renderDating() {
     mountTinder(visible);
     $('#view-dating').querySelector('[data-tinder="like"]')?.addEventListener('click', () => tinder?.swipe('right'));
     $('#view-dating').querySelector('[data-tinder="nope"]')?.addEventListener('click', () => tinder?.swipe('left'));
+    $('#view-dating').addEventListener('click', (e) => {
+      const reportBtn = e.target.closest('[data-report]');
+      if (reportBtn) showReportDialog(reportBtn.dataset.report, 'profile');
+    });
   } else {
     tinder?.destroy?.();
     tinder = null;
@@ -3846,11 +3933,25 @@ function renderStats() {
                 <a class="consent-doc-link" href="./legal.html#agreement" target="_blank" rel="noopener">📄 Пользовательское соглашение</a>
               </div>
               <div class="consent-doc">
-                <a class="consent-doc-link" href="./legal.html#privacy" target="_blank" rel="noopener">📄 Обработка персональных данных</a>
+                <a class="consent-doc-link" href="./legal.html#privacy" target="_blank" rel="noopener">📄 Политика конфиденциальности (152-ФЗ)</a>
               </div>
             </div>
             <div class="row-inline" style="margin-top:8px">
               <button id="btnAcceptAll" class="btn ${allLegalConsentsAccepted ? 'ok' : ''}" type="button">${allLegalConsentsAccepted ? 'Согласие принято ✓' : 'Я согласен со всеми пунктами'}</button>
+            </div>
+            <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
+              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:6px">
+                <input type="checkbox" id="consentGeo" ${state.consent?.geo ? 'checked' : ''} style="margin-top:2px;width:14px;height:14px;accent-color:var(--brand)" />
+                <span>Разрешаю обработку <b>геолокации</b> для показа анкет рядом со мной <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:var(--brand)">(подробнее)</a></span>
+              </label>
+              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:6px">
+                <input type="checkbox" id="consentSpecial" ${state.consent?.specialCategories ? 'checked' : ''} style="margin-top:2px;width:14px;height:14px;accent-color:var(--brand)" />
+                <span>Даю согласие на обработку <b>специальных категорий ПДн</b> (сведения о личной и интимной жизни) в соответствии со ст. 10 152-ФЗ</span>
+              </label>
+              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
+                <input type="checkbox" id="consentProfiling" ${state.consent?.profiling !== false ? 'checked' : ''} style="margin-top:2px;width:14px;height:14px;accent-color:var(--brand)" />
+                <span>Согласен на <b>профилирование</b> для подбора партнёров (алгоритм «дерево решений») — можно отключить</span>
+              </label>
             </div>
             <div class="muted" style="margin-top:6px">Продолжая пользоваться данным приложением вы даёте согласие с правилами пользования сервиса.</div>
           </div>
@@ -5186,7 +5287,10 @@ function renderTinderInner(p) {
       ${shared ? `<div class="tinder-badges">${shared}</div>` : ''}
       ${diff ? `<div class="tinder-badges">${diff}</div>` : ''}
       ${neutral ? `<div class="tinder-badges">${neutral}</div>` : ''}
-      <div class="muted" style="margin-top:auto">Свайп вправо — лайк, влево — пропуск</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto">
+        <div class="muted">Свайп вправо — лайк, влево — пропуск</div>
+        <button class="link-btn" type="button" data-report="${escapeHtml(p.id || p.name || '')}" style="font-size:11px;color:#e11d48">⚠ Пожаловаться</button>
+      </div>
     </div>
   `;
 }

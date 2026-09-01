@@ -48,7 +48,9 @@ export function defaultState() {
       agreement: false,
       personalData: false,
       newsletters: false,
-      cookies: false
+      cookies: false,
+      specialCategories: false,
+      profiling: true
     },
     steps: {
       day: todayKey(),
