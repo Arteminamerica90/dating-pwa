@@ -15,6 +15,7 @@
   </head>
   <body>
     <div id="app" class="app">
+      <div style="position:fixed;top:0;right:0;z-index:100;background:#e11d48;color:#fff;font-weight:700;font-size:10px;padding:2px 6px;border-radius:0 0 0 8px">18+</div>
       <nav class="tabs" aria-label="Разделы">
         <button class="tab" data-tab="home" type="button" aria-label="Сообщения">
           <span class="tab-ico" aria-hidden="true">💬</span>
@@ -105,6 +106,12 @@
           <div class="row">
             <label class="label" for="regPassword">Пароль</label>
             <input id="regPassword" name="password" class="input" type="password" autocomplete="new-password" placeholder="минимум 6 символов" style="width:100%;max-width:360px" />
+          </div>
+          <div class="row" style="margin-bottom:4px">
+            <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="regAgeConfirm" required style="margin-top:3px;width:16px;height:16px;accent-color:var(--brand)" />
+              <span>Мне исполнилось 18 лет. Я подтверждаю, что достиг возраста совершеннолетия и принимаю <a href="./legal.html#offer" target="_blank" rel="noopener" style="color:var(--brand)">условия оферты</a> и <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:var(--brand)">политику конфиденциальности</a>.</span>
+            </label>
           </div>
           <div class="row-inline">
             <button id="btnRegSubmit" class="btn" type="submit">Зарегистрироваться</button>
@@ -263,7 +270,7 @@
 
       window.__walkdateImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=93')
+      import('./app.js?v=94')
         .then(() => {
           window.__walkdateImportOk = true;
         })

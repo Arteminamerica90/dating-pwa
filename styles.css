@@ -640,6 +640,9 @@ a { color: inherit; }
 }
 .sub-plan-buy {
   margin-top: 12px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 .sub-current {
   background: rgba(var(--brand-r, 180), var(--brand-g, 120), var(--brand-b, 255), 0.08);

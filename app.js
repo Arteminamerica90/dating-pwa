@@ -43,12 +43,12 @@ import {
   supabaseSignOut,
   supabaseSignUp,
   warmupSupabase
-} from './supabase.js?v=93';
+} from './supabase.js?v=94';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
   checkPaywall, incrementLikes, resetMonthlyLikes, nextPlanUpgrade, renderPlanBadge
-} from './subscriptions.js?v=93';
+} from './subscriptions.js?v=94';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -87,18 +87,16 @@ const VALUES = [
 ];
 
 const VALUES_ADULT = [
-  { id: 'sex', label: 'Секс' }
 ];
 
 const MEETING_INTENTS = [
   { id: 'serious', label: 'Серьезные отношения' },
-  { id: 'sex', label: 'Секс' },
   { id: 'acquaintance', label: 'Знакомство' },
   { id: 'friend', label: 'Дружеское общение' },
   { id: 'love', label: 'Любовь' },
   { id: 'business', label: 'Бизнес' },
   { id: 'party', label: 'Потусить' },
-  { id: 'hangout', label: 'Вписка' },
+  { id: 'hangout', label: 'Прогулка' },
   { id: 'work', label: 'Поработать вместе' },
   { id: 'skill', label: 'Приобрести навык' },
   { id: 'startup', label: 'Стартап' }
@@ -309,12 +307,12 @@ const DATING_PROFILES = [
     age: 31,
     city: 'Kazan',
     stepCount: 21800,
-    meetingIntent: ['sex', 'acquaintance', 'love', 'business', 'hangout', 'startup'],
+    meetingIntent: ['acquaintance', 'love', 'hangout'],
     meetingPlaces: ['club', 'culture'],
     photos: ['./assets/profile/source.jpg'],
     interests: ['food', 'music', 'night'],
     communication: ['chat', 'voice', 'video', 'meet'],
-    values: ['just', 'sex'],
+    values: ['just'],
     zodiac: 'Лев',
     jobTitle: 'Entrepreneur',
     education: 'КФУ',
@@ -1043,6 +1041,8 @@ function wireSettings() {
       const email = String($('#accountEmail').value || state.cloud.email || '').trim().toLowerCase();
       const password = String($('#accountPassword').value || '');
       if (!email || password.length < 6) return toast('Нужны email и пароль от 6 символов');
+      const ageConfirm = $('#accountAgeConfirm');
+      if (ageConfirm && !ageConfirm.checked) return toast('Подтвердите, что вам исполнилось 18 лет');
       try {
         const reg = await supabaseSignUp(email, password, {
           emailRedirectTo: location.origin + location.pathname
@@ -1475,6 +1475,8 @@ function openRegisterDialog() {
     const email = String(emailInput?.value || '').trim().toLowerCase();
     const password = String(passwordInput?.value || '');
     if (!email || password.length < 6) return toast('Нужны email и пароль от 6 символов');
+    const ageConfirm = $('#regAgeConfirm');
+    if (ageConfirm && !ageConfirm.checked) return toast('Подтвердите, что вам исполнилось 18 лет');
     submitBtn.disabled = true;
     submitBtn.textContent = 'Одну секунду…';
     try {
@@ -1639,29 +1641,34 @@ async function startPayment(planId) {
     openRegisterDialog();
     return;
   }
-  const btn = document.querySelector(`.sub-plan-buy[data-plan="${planId}"]`);
-  if (btn) { btn.disabled = true; btn.textContent = 'Одну секунду…'; }
-  try {
-    const resp = await fetch('https://pwa-dating-delta.vercel.app/api/yookassa/create-payment', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        planId,
-        userId: accountInfo.id,
-        email: accountInfo.email || state.cloud.email
-      })
-    });
-    const data = await resp.json();
-    if (data.confirmationUrl) {
-      window.open(data.confirmationUrl, '_blank');
-      toast('Откроется страница оплаты. После оплаты подписка активируется автоматически.');
-    } else if (data.error) {
-      toast('Ошибка: ' + data.error);
+  const prices = { standard: '299 ₽', premium: '999 ₽', vip: '2 999 ₽', income_200k: '199 ₽', income_500k: '499 ₽', income_1m: '999 ₽', income_5m: '2 999 ₽' };
+  const price = prices[planId] || '';
+  const dlg = $('#dlgSubscription');
+  if (dlg) {
+    const heroEl = $('#subHero');
+    if (heroEl) {
+      heroEl.hidden = false;
+      heroEl.innerHTML = `<div style="font-size:40px">📩</div>
+        <div style="font-weight:700;font-size:16px;margin-top:8px">Оформление подписки</div>
+        <div class="muted" style="font-size:13px;margin-top:6px">Для оплаты напишите нам:</div>
+        <div style="margin-top:12px;text-align:left;max-width:320px;margin-left:auto;margin-right:auto">
+          <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:8px">
+            <div class="muted" style="font-size:11px">Email</div>
+            <div style="font-weight:600;font-size:14px">arteminamerica@mail.ru</div>
+          </div>
+          <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:8px">
+            <div class="muted" style="font-size:11px">Телефон / Telegram</div>
+            <div style="font-weight:600;font-size:14px">+7 (915) 033-19-67</div>
+          </div>
+          <div class="muted" style="font-size:12px;margin-top:8px">Укажите ваш email в сервисе и план: <b>${planId}</b> (${price})</div>
+        </div>`;
     }
-  } catch (err) {
-    toast('Ошибка создания платежа');
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Купить'; }
+    const plansEl = $('#subPlans');
+    if (plansEl) plansEl.innerHTML = '';
+    const addonsEl = $('#subAddons');
+    if (addonsEl) addonsEl.hidden = true;
+    const shareEl = $('#subShare');
+    if (shareEl) shareEl.hidden = true;
   }
 }
 
@@ -3794,6 +3801,12 @@ function renderStats() {
             <div class="row">
               <label class="label" for="accountPassword">Пароль</label>
               <input id="accountPassword" name="password" class="input" type="password" autocomplete="current-password" placeholder="минимум 6 символов" />
+            </div>
+            <div class="row" style="margin-bottom:4px">
+              <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
+                <input type="checkbox" id="accountAgeConfirm" required style="margin-top:3px;width:16px;height:16px;accent-color:var(--brand)" />
+                <span>Мне исполнилось 18 лет. Я принимаю <a href="./legal.html#offer" target="_blank" rel="noopener" style="color:var(--brand)">оферту</a> и <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:var(--brand)">политику</a>.</span>
+              </label>
             </div>
             <div class="row-inline">
               <button id="btnAccountRegister" class="btn" type="submit" formnovalidate>Регистрация</button>
