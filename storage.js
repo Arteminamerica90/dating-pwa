@@ -50,7 +50,8 @@ export function defaultState() {
       newsletters: false,
       cookies: false,
       specialCategories: false,
-      profiling: true
+      profiling: true,
+      thirdPartyData: false
     },
     steps: {
       day: todayKey(),

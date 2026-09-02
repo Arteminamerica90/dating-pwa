@@ -39,8 +39,8 @@ export const PLANS = {
       canUseFilters: true,
       canSuperLike: true,
       canSeeWhoLiked: true,
-      canPromote: true,
-      maxIncomeFilter: 1000000
+      canPromote: false,
+      maxIncomeFilter: 500000
     }
   },
   vip: {
@@ -55,16 +55,31 @@ export const PLANS = {
       canSuperLike: true,
       canSeeWhoLiked: true,
       canPromote: true,
+      maxIncomeFilter: 1000000
+    }
+  },
+  exclusive: {
+    id: 'exclusive',
+    label: 'Эксклюзив',
+    price: 9999,
+    priceFormatted: '9 999 ₽/мес',
+    period: 'month',
+    features: {
+      maxLikesPerMonth: -1,
+      canUseFilters: true,
+      canSuperLike: true,
+      canSeeWhoLiked: true,
+      canPromote: true,
       maxIncomeFilter: -1
     }
   }
 };
 
 export const INCOME_ADDONS = [
-  { id: 'income_200k', label: 'Доход 200к+', minIncome: 200000, price: 199, priceFormatted: '199 ₽' },
-  { id: 'income_500k', label: 'Доход 500к+', minIncome: 500000, price: 499, priceFormatted: '499 ₽' },
-  { id: 'income_1m',   label: 'Доход 1М+',   minIncome: 1000000, price: 999, priceFormatted: '999 ₽' },
-  { id: 'income_5m',   label: 'Доход 5М+',   minIncome: 5000000, price: 2999, priceFormatted: '2 999 ₽' }
+  { id: 'income_200k', label: 'Доступ к 200к+', minIncome: 200000, price: 199, priceFormatted: '199 ₽' },
+  { id: 'income_500k', label: 'Доступ к 500к+', minIncome: 500000, price: 999, priceFormatted: '999 ₽' },
+  { id: 'income_1m',   label: 'Доступ к 1М+',   minIncome: 1000000, price: 999, priceFormatted: '999 ₽' },
+  { id: 'income_5m',   label: 'Доступ к 5М+',   minIncome: 5000000, price: 9999, priceFormatted: '9 999 ₽' }
 ];
 
 export function getActivePlanId(sub) {
@@ -154,7 +169,7 @@ export function resetMonthlyLikes(sub) {
 }
 
 export function nextPlanUpgrade(currentPlanId) {
-  const order = ['free', 'standard', 'premium', 'vip'];
+  const order = ['free', 'standard', 'premium', 'vip', 'exclusive'];
   const idx = order.indexOf(currentPlanId);
   if (idx < 0 || idx >= order.length - 1) return null;
   return PLANS[order[idx + 1]];

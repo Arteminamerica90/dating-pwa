@@ -42,8 +42,11 @@ import {
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp,
-  warmupSupabase
-} from './supabase.js?v=95';
+  warmupSupabase,
+  supabaseSaveConsent,
+  supabaseSaveConsentsBulk,
+  supabaseGetConsents
+} from './supabase.js?v=98';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
@@ -53,9 +56,11 @@ import {
 const $ = (sel) => document.querySelector(sel);
 
 // Helps diagnose cases where the module loads but init hangs (e.g. storage blocked).
-window.__walkdateModuleLoaded = true;
+window.__xystarModuleLoaded = true;
 
 const COOKIE_NECESSARY = ['walkdate_state', 'walkdate_encryption_key'];
+const COOKIE_CONSENT_KEY = 'xystar_cookie_consent_v2';
+const COOKIE_CONSENT_EXPIRY_DAYS = 365;
 const PROFANITY_LIST = ['хуй','пизд','бляд','блять','ебат','ёб','еба','сука','сук','нахуй','нахер','пидор','пидар','говно','дерьмо','жопа','ϻ','гондон','уёб','уеб','мудак','козёл','с_TypeScriptдак','солдат',' Natalia',''];
 
 function containsProfanity(text) {
@@ -67,24 +72,109 @@ function containsProfanity(text) {
   return false;
 }
 
+function loadCookieConsent() {
+  try {
+    const raw = localStorage.getItem(COOKIE_CONSENT_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || !data.consentAt) return null;
+    const expiresAt = new Date(data.consentAt);
+    expiresAt.setDate(expiresAt.getDate() + COOKIE_CONSENT_EXPIRY_DAYS);
+    if (new Date() > expiresAt) {
+      localStorage.removeItem(COOKIE_CONSENT_KEY);
+      return null;
+    }
+    return data;
+  } catch { return null; }
+}
+
+function saveCookieConsent(consent) {
+  localStorage.setItem(COOKIE_CONSENT_KEY, JSON.stringify({
+    necessary: true,
+    analytics: !!consent.analytics,
+    marketing: !!consent.marketing,
+    consentAt: new Date().toISOString()
+  }));
+}
+
+function getCookieConsent() {
+  return loadCookieConsent() || { necessary: true, analytics: false, marketing: false };
+}
+
+function isAnalyticsAllowed() { return getCookieConsent().analytics; }
+function isMarketingAllowed() { return getCookieConsent().marketing; }
+
 function initCookieBanner() {
-  const consent = localStorage.getItem('xystar_cookie_consent');
-  if (consent) return;
+  const existing = loadCookieConsent();
   const banner = $('#cookieBanner');
-  if (banner) banner.style.display = 'block';
-  $('#cookieAcceptAll')?.addEventListener('click', () => {
-    localStorage.setItem('xystar_cookie_consent', 'all');
+  const settingsPanel = $('#cookieSettings');
+  const btnSave = $('#cookieSaveSettings');
+  const btnShow = $('#cookieShowSettings');
+  const btnAcceptAll = $('#cookieAcceptAll');
+  const btnAcceptNecessary = $('#cookieAcceptNecessary');
+
+  function showBanner() {
+    if (banner) banner.style.display = 'block';
+    if (settingsPanel) settingsPanel.style.display = 'none';
+    if (btnSave) btnSave.style.display = 'none';
+    if (btnShow) btnShow.style.display = '';
+  }
+
+  function hideBanner() {
     if (banner) banner.style.display = 'none';
+  }
+
+  if (existing) return;
+
+  showBanner();
+
+  btnShow?.addEventListener('click', () => {
+    settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
+    btnSave.style.display = settingsPanel.style.display === 'none' ? 'none' : '';
+    btnShow.style.display = settingsPanel.style.display === 'none' ? '' : 'none';
   });
-  $('#cookieAcceptNecessary')?.addEventListener('click', () => {
-    localStorage.setItem('xystar_cookie_consent', 'necessary');
-    if (banner) banner.style.display = 'none';
+
+  btnAcceptAll?.addEventListener('click', () => {
+    saveCookieConsent({ necessary: true, analytics: true, marketing: true });
+    hideBanner();
+  });
+
+  btnAcceptNecessary?.addEventListener('click', () => {
+    saveCookieConsent({ necessary: true, analytics: false, marketing: false });
+    hideBanner();
     document.cookie.split(';').forEach((c) => {
       const name = c.split('=')[0].trim();
       if (!COOKIE_NECESSARY.includes(name)) {
         document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
       }
     });
+  });
+
+  btnSave?.addEventListener('click', () => {
+    const analytics = $('#cookieAnalytics')?.checked || false;
+    const marketing = $('#cookieMarketing')?.checked || false;
+    saveCookieConsent({ necessary: true, analytics, marketing });
+    hideBanner();
+    if (!analytics || !marketing) {
+      document.cookie.split(';').forEach((c) => {
+        const name = c.split('=')[0].trim();
+        if (!COOKIE_NECESSARY.includes(name)) {
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+        }
+      });
+    }
+  });
+
+  $('#btnCookieSettings')?.addEventListener('click', () => {
+    const consent = getCookieConsent();
+    const analyticsCb = $('#cookieAnalytics');
+    const marketingCb = $('#cookieMarketing');
+    if (analyticsCb) analyticsCb.checked = consent.analytics;
+    if (marketingCb) marketingCb.checked = consent.marketing;
+    showBanner();
+    if (settingsPanel) settingsPanel.style.display = 'block';
+    if (btnSave) btnSave.style.display = '';
+    if (btnShow) btnShow.style.display = 'none';
   });
 }
 
@@ -706,7 +796,31 @@ init().catch((err) => {
 
 async function init() {
   state = await safeLoadStateWithTimeout(1500);
-  window.__walkdateStarted = true;
+  window.__xystarStarted = true;
+
+  if (state.profile?.birthDate && !state.profile?.ageConfirmed) {
+    const birth = new Date(state.profile.birthDate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    if (age < 18) {
+      document.body.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui;padding:20px;text-align:center">
+          <div style="max-width:400px">
+            <div style="font-size:64px;margin-bottom:16px">🚫</div>
+            <div style="font-size:20px;font-weight:700;margin-bottom:12px">Доступ запрещён</div>
+            <div style="color:var(--muted);line-height:1.5">Сервис xystar доступен только для пользователей, достигших возраста 18 лет. Вернитесь, когда вам исполнится 18.</div>
+          </div>
+        </div>`;
+      return;
+    }
+    state.profile.ageConfirmed = true;
+    save();
+  }
+
   initCookieBanner();
 
   window.__deleteMyProfile = async () => {
@@ -795,11 +909,12 @@ function renderAccountBadge() {
 function syncLegalConsentFromStorage() {
   try {
     if (localStorage.getItem('xystar_legal_consent_v1') === '1') {
-      if (!(state.consent?.agreement && state.consent?.personalData && state.consent?.newsletters && state.consent?.cookies)) {
+      if (!(state.consent?.agreement && state.consent?.personalData && state.consent?.newsletters && state.consent?.cookies && state.consent?.thirdPartyData)) {
         state.consent.agreement = true;
         state.consent.personalData = true;
         state.consent.newsletters = true;
         state.consent.cookies = true;
+        state.consent.thirdPartyData = true;
         save();
         renderAll();
       }
@@ -924,7 +1039,8 @@ async function supabasePushProfile() {
         agreement: !!state.consent?.agreement,
         personalData: !!state.consent?.personalData,
         newsletters: !!state.consent?.newsletters,
-        cookies: !!state.consent?.cookies
+        cookies: !!state.consent?.cookies,
+        thirdPartyData: !!state.consent?.thirdPartyData
       },
       updated_at: new Date().toISOString()
     };
@@ -961,6 +1077,7 @@ async function syncProfileAfterAuth() {
         state.consent.personalData = !!payload.consent.personalData;
         state.consent.newsletters = !!payload.consent.newsletters;
         state.consent.cookies = !!payload.consent.cookies;
+        state.consent.thirdPartyData = !!payload.consent.thirdPartyData;
       }
     }
     await supabasePushProfile();
@@ -1186,8 +1303,8 @@ function wireSettings() {
 
   $('#btnShareColleague')?.addEventListener('click', async () => {
     const shareData = {
-      title: 'WalkDate — знакомства для прогулок',
-      text: 'Попробуй WalkDate — приложение для знакомств с прогулками и свиданиями',
+      title: 'xystar — знакомства для прогулок',
+      text: 'Попробуй xystar — приложение для знакомств с прогулками и свиданиями',
       url: 'https://xystar.ru'
     };
     try {
@@ -1250,44 +1367,69 @@ function wireSettings() {
     }
   });
 
-  $('#btnAcceptAll')?.addEventListener('click', () => {
-    const on = !(state.consent?.agreement && state.consent?.personalData && state.consent?.newsletters && state.consent?.cookies);
+  $('#btnAcceptAll')?.addEventListener('click', async () => {
+    const on = !(state.consent?.agreement && state.consent?.personalData && state.consent?.newsletters && state.consent?.cookies && state.consent?.thirdPartyData);
     state.consent.agreement = on;
     state.consent.personalData = on;
     state.consent.newsletters = on;
     state.consent.cookies = on;
+    state.consent.thirdPartyData = on;
     save();
+    if (accountInfo?.id) {
+      try {
+        await supabaseSaveConsentsBulk(accountInfo.id, {
+          agreement: on, personalData: on, newsletters: on, cookies: on, thirdPartyData: on
+        });
+      } catch {}
+    }
     renderAll();
     toast(on ? 'Согласие принято' : 'Согласие отозвано');
     haptic('light');
   });
 
-  $('#consentGeo')?.addEventListener('change', (e) => {
+  $('#consentGeo')?.addEventListener('change', async (e) => {
     state.consent.geo = e.target.checked;
     save();
+    if (accountInfo?.id) {
+      try { await supabaseSaveConsent(accountInfo.id, 'geo', e.target.checked); } catch {}
+    }
     haptic('light');
   });
 
-  $('#consentSpecial')?.addEventListener('change', (e) => {
+  $('#consentSpecial')?.addEventListener('change', async (e) => {
     state.consent.specialCategories = e.target.checked;
     save();
+    if (accountInfo?.id) {
+      try { await supabaseSaveConsent(accountInfo.id, 'specialCategories', e.target.checked); } catch {}
+    }
     haptic('light');
   });
 
-  $('#consentProfiling')?.addEventListener('change', (e) => {
+  $('#consentProfiling')?.addEventListener('change', async (e) => {
     state.consent.profiling = e.target.checked;
     save();
+    if (accountInfo?.id) {
+      try { await supabaseSaveConsent(accountInfo.id, 'profiling', e.target.checked); } catch {}
+    }
     haptic('light');
   });
 
-  window.addEventListener('message', (event) => {
+  window.addEventListener('message', async (event) => {
     if (event.origin !== location.origin) return;
     if (event.data && event.data.type === 'xystar-legal-consent') {
       state.consent.agreement = true;
       state.consent.personalData = true;
       state.consent.newsletters = true;
       state.consent.cookies = true;
+      state.consent.thirdPartyData = true;
       save();
+      if (accountInfo?.id) {
+        try {
+          await supabaseSaveConsentsBulk(accountInfo.id, {
+            agreement: true, personalData: true, newsletters: true, cookies: true, thirdPartyData: true
+          });
+        } catch {}
+      }
       renderAll();
       toast('Согласие принято');
       haptic('light');
@@ -1475,13 +1617,21 @@ function renderAll() {
 function maybeStartOnboarding() {
   const name = String(state.profile?.name || '').trim();
   const gender = String(state.profile?.gender || '').trim();
-  if (name && name !== 'Вы' && gender) return;
+  const hasAge = !!state.profile?.birthDate && !!state.profile?.ageConfirmed;
+
+  if (name && name !== 'Вы' && gender && hasAge) return;
 
   const dlg = $('#dlgOnboarding');
   if (!dlg) return;
   dlg.showModal();
 
   let chosenGender = gender === 'male' ? 'male' : gender === 'female' ? 'female' : '';
+
+  if (name && name !== 'Вы' && gender && !hasAge) {
+    $('#onboardingStep1').hidden = true;
+    $('#onboardingStep2').hidden = true;
+    $('#onboardingStepAge').hidden = false;
+  }
 
   function showStep2() {
     $('#onboardingStep1').hidden = true;
@@ -1515,8 +1665,63 @@ function maybeStartOnboarding() {
     save();
 
     $('#onboardingStep2').hidden = true;
+    $('#onboardingStepAge').hidden = false;
+  });
+
+  const birthDateInput = $('#obBirthDate');
+  const ageSubmitBtn = $('#obAgeSubmit');
+  const ageError = $('#obAgeError');
+
+  if (birthDateInput) {
+    birthDateInput.addEventListener('input', () => {
+      const val = birthDateInput.value;
+      if (!val) {
+        ageSubmitBtn.disabled = true;
+        return;
+      }
+      const birth = new Date(val);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const monthDiff = today.getMonth() - birth.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
+      if (age < 18) {
+        ageError.textContent = `Вам ${age} лет. Сервис доступен только для пользователей от 18 лет.`;
+        ageError.style.display = 'block';
+        ageSubmitBtn.disabled = true;
+      } else {
+        ageError.style.display = 'none';
+        ageSubmitBtn.disabled = false;
+      }
+    });
+  }
+
+  ageSubmitBtn?.addEventListener('click', () => {
+    const val = birthDateInput?.value;
+    if (!val) return;
+
+    const birth = new Date(val);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+
+    if (age < 18) {
+      ageError.textContent = `Вам ${age} лет. Сервис доступен только для пользователей от 18 лет.`;
+      ageError.style.display = 'block';
+      return;
+    }
+
+    state.profile.birthDate = val;
+    state.profile.ageConfirmed = true;
+    save();
+
+    $('#onboardingStepAge').hidden = true;
     $('#onboardingStep3').hidden = false;
-    $('#obGreeting').textContent = `Привет, ${nameVal}!`;
+    $('#obGreeting').textContent = `Привет, ${state.profile.name}!`;
 
     renderAll();
     scheduleCloudSync();
@@ -1555,6 +1760,8 @@ function openRegisterDialog() {
     if (!email || password.length < 6) return toast('Нужны email и пароль от 6 символов');
     const ageConfirm = $('#regAgeConfirm');
     if (ageConfirm && !ageConfirm.checked) return toast('Подтвердите, что вам исполнилось 18 лет');
+    const thirdPartyConfirm = $('#regThirdPartyConfirm');
+    if (thirdPartyConfirm && !thirdPartyConfirm.checked) return toast('Необходимо дать согласие на передачу данных третьим лицам');
     submitBtn.disabled = true;
     submitBtn.textContent = 'Одну секунду…';
     try {
@@ -1629,7 +1836,7 @@ function renderSubscriptionContent(highlightFeature) {
 
   const plansEl = $('#subPlans');
   if (!plansEl) return;
-  const planOrder = ['standard', 'premium', 'vip'];
+  const planOrder = ['standard', 'premium', 'vip', 'exclusive'];
   let html = '';
   for (const pid of planOrder) {
     const p = PLANS[pid];
@@ -1642,12 +1849,20 @@ function renderSubscriptionContent(highlightFeature) {
     if (p.features.canSuperLike) features.push('Суперлайки');
     if (p.features.canSeeWhoLiked) features.push('Кто поставил лайк');
     if (p.features.canPromote) features.push('Продвижение в выдаче');
-    if (p.features.maxIncomeFilter > 50000) features.push(`Доход до ${p.features.maxIncomeFilter >= 1000000 ? (p.features.maxIncomeFilter / 1000000) + 'М' : (p.features.maxIncomeFilter / 1000) + 'к'} ₽`);
+    if (p.features.maxIncomeFilter > 50000) features.push(`Доступ к анкетам с доходом до ${p.features.maxIncomeFilter >= 1000000 ? (p.features.maxIncomeFilter / 1000000) + 'М' : (p.features.maxIncomeFilter / 1000) + 'к'} ₽`);
+    const descriptions = {
+      standard: 'Базовые фильтры и безлимитные лайки для поиска партнёров',
+      premium: 'Полный доступ к анкетам и продвижение в выдаче для активного поиска',
+      vip: 'Ваш профиль показывается в приоритетном порядке партнёрам с доходом от 1М ₽. Идеально для тех, кто ищет стабильное качество знакомств',
+      exclusive: 'Максимальная видимость: ваш профиль рекомендуется партнёрам с доходом от 5М ₽. Приоритет в алгоритме подбора и персональный рекомендательный движок'
+    };
+    const desc = descriptions[pid] || '';
     html += `<div class="sub-plan${isCurrent ? ' active' : ''}${isPopular ? ' popular' : ''}">
       <div class="sub-plan-header">
         <div class="sub-plan-name">${p.label}</div>
         <div class="sub-plan-price">${p.priceFormatted}</div>
       </div>
+      ${desc ? `<div style="font-size:12px;color:#8a8a8a;margin:8px 0">${desc}</div>` : ''}
       <ul class="sub-plan-features">${features.map((f) => `<li>${f}</li>`).join('')}</ul>
       ${isCurrent ? '<div class="muted" style="margin-top:8px">Текущий план</div>' : `<button class="btn sub-plan-buy" data-plan="${pid}" type="button">Купить</button>`}
     </div>`;
@@ -1704,7 +1919,7 @@ function renderSubscriptionContent(highlightFeature) {
   $('#btnSubShareBottom')?.addEventListener('click', async () => {
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'WalkDate', text: 'Попробуй WalkDate — знакомства с прогулками', url: 'https://xystar.ru' });
+        await navigator.share({ title: 'xystar', text: 'Попробуй xystar — знакомства с прогулками', url: 'https://xystar.ru' });
       } else {
         await navigator.clipboard.writeText('https://xystar.ru');
         toast('Ссылка скопирована');
@@ -3793,7 +4008,7 @@ function renderStats() {
   const photos = state.profile?.photos || [];
   const stepsOn = !!state.consent?.steps;
   const stepsRunning = !!stepCounter?.running;
-  const allLegalConsentsAccepted = !!(state.consent?.agreement && state.consent?.personalData && state.consent?.newsletters && state.consent?.cookies);
+  const allLegalConsentsAccepted = !!(state.consent?.agreement && state.consent?.personalData && state.consent?.newsletters && state.consent?.cookies && state.consent?.thirdPartyData);
   const portrait = buildQuestionnairePortrait(state.profile?.questionnaireAnswers || {});
   const catsInfo = portrait.categories || {};
   const catsProgress = {

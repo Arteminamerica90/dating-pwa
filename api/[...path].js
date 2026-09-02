@@ -768,7 +768,7 @@ async function refreshMoscowRemoteEvents() {
   try {
     const res = await fetch(MOSCOW_AFFIS_URL, {
       headers: {
-        'user-agent': 'WalkDateBot/1.0 (+vercel)'
+        'user-agent': 'xystarBot/1.0 (+vercel)'
       }
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -943,7 +943,7 @@ async function handleYooKassaCreatePayment(req, res) {
     if (!YOOKASSA_SHOP_ID || !YOOKASSA_SECRET_KEY) return sendJson(res, 500, { error: 'yookassa_not_configured' }, headers);
 
     const amount = PLAN_PRICES[planId];
-    const description = `WalkDate — ${planId}`;
+    const description = `xystar — ${planId}`;
     const return_url = `${req.headers.referer || 'https://xystar.ru/'}?payment=success`;
 
     const yookassaRes = await fetch('https://api.yookassa.ru/v3/payments', {
@@ -1101,6 +1101,123 @@ function haversineKm(a, b) {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
+const VALID_CONSENT_TYPES = [
+  'agreement', 'personalData', 'newsletters', 'cookies', 'thirdPartyData',
+  'specialCategories', 'profiling', 'geo', 'steps'
+];
+
+const REQUIRED_CONSENTS_FOR_REGISTRATION = ['agreement', 'personalData', 'thirdPartyData'];
+
+async function supabaseRequest(path, options = {}) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseKey) return null;
+  const url = `${supabaseUrl}/rest/v1/${path}`;
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': supabaseKey,
+      'Authorization': `Bearer ${supabaseKey}`,
+      ...options.headers
+    }
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+async function handleConsent(req, res) {
+  const user = authUser(req);
+  if (!user) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
+
+  if (req.method === 'GET') {
+    const data = await supabaseRequest(`current_consents?user_id=eq.${encodeURIComponent(user.id)}&select=*`);
+    if (data && data.length > 0) {
+      return sendJson(res, 200, { consents: data[0] }, corsHeaders());
+    }
+    return sendJson(res, 200, { consents: null }, corsHeaders());
+  }
+
+  if (req.method === 'POST') {
+    try {
+      const body = await readJson(req);
+      const consents = body.consents;
+      if (!consents || typeof consents !== 'object') {
+        return sendJson(res, 400, { error: 'invalid_consents' }, corsHeaders());
+      }
+
+      const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '';
+      const userAgent = req.headers['user-agent'] || '';
+
+      const auditEntries = [];
+      const currentConsents = {};
+
+      for (const type of VALID_CONSENT_TYPES) {
+        if (type in consents) {
+          const granted = !!consents[type];
+          currentConsents[type] = granted;
+          auditEntries.push({
+            user_id: user.id,
+            consent_type: type,
+            granted,
+            ip_address: ipAddress.slice(0, 45),
+            user_agent: userAgent.slice(0, 500)
+          });
+        }
+      }
+
+      for (const entry of auditEntries) {
+        await supabaseRequest('consents', {
+          method: 'POST',
+          body: JSON.stringify(entry)
+        });
+      }
+
+      const updatePayload = {
+        user_id: user.id,
+        ...currentConsents,
+        updated_at: new Date().toISOString()
+      };
+
+      const existing = await supabaseRequest(`current_consents?user_id=eq.${encodeURIComponent(user.id)}&select=user_id`);
+      if (existing && existing.length > 0) {
+        await supabaseRequest(`current_consents?user_id=eq.${encodeURIComponent(user.id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify(updatePayload)
+        });
+      } else {
+        await supabaseRequest('current_consents', {
+          method: 'POST',
+          body: JSON.stringify(updatePayload)
+        });
+      }
+
+      return sendJson(res, 200, { ok: true, consents: currentConsents }, corsHeaders());
+    } catch {
+      return sendJson(res, 400, { error: 'bad_request' }, corsHeaders());
+    }
+  }
+
+  return sendJson(res, 405, { error: 'method_not_allowed' }, corsHeaders());
+}
+
+async function handleConsentCheck(req, res) {
+  const user = authUser(req);
+  if (!user) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
+
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const required = url.searchParams.get('required');
+  const requiredTypes = required ? required.split(',') : REQUIRED_CONSENTS_FOR_REGISTRATION;
+
+  const data = await supabaseRequest(`current_consents?user_id=eq.${encodeURIComponent(user.id)}&select=*`);
+  const consents = data && data.length > 0 ? data[0] : {};
+
+  const missing = requiredTypes.filter((type) => !consents[type]);
+  const allGranted = missing.length === 0;
+
+  return sendJson(res, 200, { allGranted, missing, consents }, corsHeaders());
+}
+
 export default async function handler(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   if (req.method === 'OPTIONS') {
@@ -1131,5 +1248,7 @@ export default async function handler(req, res) {
   if (req.method === 'POST' && url.pathname === '/api/yookassa/create-payment') return handleYooKassaCreatePayment(req, res);
   if (req.method === 'POST' && url.pathname === '/api/yookassa/webhook') return handleYooKassaWebhook(req, res);
   if (req.method === 'GET' && url.pathname === '/api/yookassa/status') return handleYooKassaStatus(req, res, url);
+  if (url.pathname === '/api/consent') return handleConsent(req, res);
+  if (url.pathname === '/api/consent/check') return handleConsentCheck(req, res);
   return sendJson(res, 404, { error: 'not_found' }, corsHeaders());
 }

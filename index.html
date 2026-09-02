@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="interactive-widget" content="resizes-content" />
     <meta name="theme-color" content="#f4f5fa" />
-    <title>WalkDate</title>
+    <title>xystar</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./styles.css" />
@@ -20,10 +20,36 @@
       <div id="cookieBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9999;background:rgba(17,24,39,0.97);backdrop-filter:blur(12px);padding:16px;color:#e5e7eb;font-size:13px;border-top:1px solid rgba(255,255,255,0.1)">
         <div style="max-width:600px;margin:0 auto">
           <div style="font-weight:700;margin-bottom:6px">🍪 Cookies</div>
-          <div style="margin-bottom:10px;line-height:1.5">Сайт использует файлы cookies для работы функций, аутентификации и аналитики. Данные могут передаваться третьим лицам (Supabase, Vercel, GitHub, jsDelivr CDN). Подробнее: <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:#a78bfa">Политика конфиденциальности</a>.</div>
+          <div style="margin-bottom:10px;line-height:1.5">Мы используем файлы cookies для работы функций сайта. Выберите, какие типы cookies вы разрешаете. Вы можете изменить свой выбор в любой момент, нажав «Настройки cookies» внизу сайта.</div>
+          <div style="margin-bottom:10px;line-height:1.5;font-size:12px;color:#9ca3af">Подробнее: <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:#a78bfa">Политика конфиденциальности</a></div>
+          <div id="cookieSettings" style="display:none;margin-bottom:12px">
+            <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;cursor:pointer">
+              <input type="checkbox" checked disabled style="accent-color:#a78bfa;width:16px;height:16px;margin-top:2px">
+              <div>
+                <div style="font-weight:600">Необходимые (технические)</div>
+                <div style="font-size:11px;color:#9ca3af">Всё время. Нужны для работы сайта (аутентификация, настройки). Отключить нельзя. Хранятся до 12 месяцев.</div>
+              </div>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;cursor:pointer">
+              <input type="checkbox" id="cookieAnalytics" style="accent-color:#a78bfa;width:16px;height:16px;margin-top:2px">
+              <div>
+                <div style="font-weight:600">Аналитические</div>
+                <div style="font-size:11px;color:#9ca3af">Помогают понять, как вы используете сайт. Хранятся до 12 месяцев.</div>
+              </div>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;cursor:pointer">
+              <input type="checkbox" id="cookieMarketing" style="accent-color:#a78bfa;width:16px;height:16px;margin-top:2px">
+              <div>
+                <div style="font-weight:600">Рекламные</div>
+                <div style="font-size:11px;color:#9ca3af">Для персонализированной рекламы. Хранятся до 6 месяцев.</div>
+              </div>
+            </label>
+          </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button id="cookieAcceptAll" class="btn" type="button" style="font-size:12px;padding:6px 14px">Принять все</button>
-            <button id="cookieAcceptNecessary" class="btn ghost" type="button" style="font-size:12px;padding:6px 14px">Только необходимые</button>
+            <button id="cookieAcceptAll" class="btn" type="button" style="font-size:12px;padding:6px 14px;color:#fff">Принять все</button>
+            <button id="cookieAcceptNecessary" class="btn ghost" type="button" style="font-size:12px;padding:6px 14px;color:#fff">Только необходимые</button>
+            <button id="cookieShowSettings" class="btn ghost" type="button" style="font-size:12px;padding:6px 14px;color:#fff">Настроить</button>
+            <button id="cookieSaveSettings" class="btn" type="button" style="display:none;font-size:12px;padding:6px 14px;color:#fff">Сохранить настройки</button>
           </div>
         </div>
       </div>
@@ -91,6 +117,23 @@
             <button class="btn" id="obNameSubmit" type="button" disabled>Далее →</button>
           </div>
         </div>
+        <div id="onboardingStepAge" hidden>
+          <div style="text-align:center">
+            <div style="font-size:48px;margin-bottom:12px">🔞</div>
+            <div style="font-weight:700;font-size:16px;margin-bottom:8px">Подтвердите возраст</div>
+            <div class="muted" style="margin-bottom:16px;line-height:1.5">Для использования сервиса вам должно исполниться 18 лет. Укажите дату рождения:</div>
+          </div>
+          <div style="max-width:320px;margin:0 auto">
+            <input id="obBirthDate" class="input" type="date" max="2008-01-01" style="width:100%;max-width:320px" />
+            <div id="obAgeError" style="color:#e11d48;font-size:12px;margin-top:8px;text-align:center;display:none"></div>
+          </div>
+          <div style="text-align:center;margin-top:16px">
+            <button class="btn" id="obAgeSubmit" type="button" disabled>Подтвердить</button>
+          </div>
+          <div style="text-align:center;margin-top:12px">
+            <div class="muted" style="font-size:11px">Нажимая «Подтвердить», вы подтверждаете, что достигли возраста 18 лет и принимаете <a href="./legal.html#offer" target="_blank" rel="noopener" style="color:var(--brand)">условия оферты</a></div>
+          </div>
+        </div>
         <div id="onboardingStep3" hidden>
           <div style="text-align:center">
             <div style="font-size:48px;margin-bottom:12px">👋</div>
@@ -123,6 +166,12 @@
             <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
               <input type="checkbox" id="regAgeConfirm" required style="margin-top:3px;width:16px;height:16px;accent-color:var(--brand)" />
               <span>Мне исполнилось 18 лет. Я подтверждаю, что достиг возраста совершеннолетия и принимаю <a href="./legal.html#offer" target="_blank" rel="noopener" style="color:var(--brand)">условия оферты</a> и <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:var(--brand)">политику конфиденциальности</a>.</span>
+            </label>
+          </div>
+          <div class="row" style="margin-bottom:4px">
+            <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="regThirdPartyConfirm" required style="margin-top:3px;width:16px;height:16px;accent-color:var(--brand)" />
+              <span>Я даю отдельное согласие на передачу моих персональных данных третьим лицам (Supabase, Vercel, GitHub, jsDelivr CDN, платёжная система) в целях обеспечения работы Сервиса. Подробнее: <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:var(--brand)">Политика конфиденциальности, п. 3.7</a>.</span>
             </label>
           </div>
           <div class="row-inline">
@@ -161,7 +210,7 @@
           </div>
         </div>
         <div id="subShare" style="text-align:center;margin-top:12px">
-          <div class="muted" style="font-size:11px;margin-bottom:6px">Нравится WalkDate? Расскажите друзьям</div>
+          <div class="muted" style="font-size:11px;margin-bottom:6px">Нравится xystar? Расскажите друзьям</div>
           <button class="link-btn" type="button" id="btnSubShareBottom" style="font-size:12px">📨 Поделиться с коллегой</button>
         </div>
         <div style="text-align:center;margin-top:12px;padding-top:8px;border-top:1px solid var(--border)">
@@ -183,21 +232,22 @@
       </div>
     </dialog>
 
+    <a href="javascript:void(0)" id="btnCookieSettings" style="position:fixed;bottom:1px;left:2px;font-size:5px;color:rgba(0,0,0,0.04);text-decoration:none;z-index:-1;line-height:1" aria-hidden="true" tabindex="-1">Настройки cookies</a>
     <a href="./legal-entity.html" style="position:fixed;bottom:1px;right:2px;font-size:5px;color:rgba(0,0,0,0.04);text-decoration:none;z-index:-1;line-height:1" aria-hidden="true" tabindex="-1">.</a>
 
     <script>
       // Non-module watchdog so we can tell if module JS never starts.
-      window.__walkdateStarted = false;
-      window.__walkdateModuleLoaded = false;
-      window.__walkdateImportAttempted = false;
-      window.__walkdateImportOk = false;
-      window.__walkdateImportErr = null;
+      window.__xystarStarted = false;
+      window.__xystarModuleLoaded = false;
+      window.__xystarImportAttempted = false;
+      window.__xystarImportOk = false;
+      window.__xystarImportErr = null;
 
-      const renderWalkdateDebug = () => {
-        let el = document.getElementById('walkdateDebug');
+      const renderXystarDebug = () => {
+        let el = document.getElementById('xystarDebug');
         if (!el) {
           el = document.createElement('div');
-          el.id = 'walkdateDebug';
+          el.id = 'xystarDebug';
           el.style.position = 'fixed';
           el.style.left = '12px';
           el.style.right = '12px';
@@ -216,22 +266,22 @@
           document.body.appendChild(el);
         }
         const lines = [
-          `WalkDate debug:`,
-          `import attempted: ${window.__walkdateImportAttempted}`,
-          `import ok: ${window.__walkdateImportOk}`,
-          `module loaded: ${window.__walkdateModuleLoaded}`,
-          `started: ${window.__walkdateStarted}`
+          `xystar debug:`,
+          `import attempted: ${window.__xystarImportAttempted}`,
+          `import ok: ${window.__xystarImportOk}`,
+          `module loaded: ${window.__xystarModuleLoaded}`,
+          `started: ${window.__xystarStarted}`
         ];
-        if (window.__walkdateImportErr) lines.push(`import err: ${String(window.__walkdateImportErr).slice(0, 220)}`);
+        if (window.__xystarImportErr) lines.push(`import err: ${String(window.__xystarImportErr).slice(0, 220)}`);
         el.textContent = lines.join('\n');
         // Show only if something is wrong.
-        el.style.display = window.__walkdateStarted ? 'none' : 'block';
+        el.style.display = window.__xystarStarted ? 'none' : 'block';
       };
 
       // Update debug overlay a few times during boot.
-      setInterval(renderWalkdateDebug, 500);
+      setInterval(renderXystarDebug, 500);
       setTimeout(() => {
-        if (window.__walkdateStarted) return;
+        if (window.__xystarStarted) return;
         const el = document.createElement('div');
         el.style.position = 'fixed';
         el.style.left = '12px';
@@ -248,9 +298,9 @@
         el.style.font = '600 13px ui-sans-serif, system-ui';
         el.style.whiteSpace = 'pre-wrap';
         el.textContent =
-          (window.__walkdateModuleLoaded
-            ? 'WalkDate: app.js загрузился, но инициализация зависла (скорее всего storage/IndexedDB).\\n'
-            : 'WalkDate: JS не стартовал (app.js не выполнился).\\n') +
+          (window.__xystarModuleLoaded
+            ? 'xystar: app.js загрузился, но инициализация зависла (скорее всего storage/IndexedDB).\\n'
+            : 'xystar: JS не стартовал (app.js не выполнился).\\n') +
           'Откройте DevTools -> Console и Network и пришлите: status app.js и первую ошибку (не Vytal).\\n' +
           'Также попробуйте Incognito (Cmd+Shift+N) и отключите расширения (Vytal мешает консолью).';
         document.body.appendChild(el);
@@ -259,7 +309,7 @@
 
     <script type="module">
       const showBootError = (err) => {
-        window.__walkdateImportErr = err?.message || err;
+        window.__xystarImportErr = err?.message || err;
         const el = document.createElement('div');
         el.style.position = 'fixed';
         el.style.left = '12px';
@@ -280,11 +330,11 @@
         document.body.appendChild(el);
       };
 
-      window.__walkdateImportAttempted = true;
+      window.__xystarImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=95')
+      import('./app.js?v=100')
         .then(() => {
-          window.__walkdateImportOk = true;
+          window.__xystarImportOk = true;
         })
         .catch(showBootError);
     </script>

@@ -1,6 +1,6 @@
 {
-  "name": "WalkDate",
-  "short_name": "WalkDate",
+  "name": "xystar",
+  "short_name": "xystar",
   "description": "PWA для знакомств: интересы, шаги, геометки и рекомендации событий по городу.",
   "start_url": "./index.html",
   "scope": "./",

@@ -50,7 +50,6 @@ create policy "likes_delete_own" on public.likes for delete
 
 -- ============ МАТЧИ (реальная таблица, а не view) ============
 -- Появляется только после взаимного лайка. a_user < b_user (упорядоченная пара).
-drop view if exists public.matches;
 
 create table if not exists public.matches (
   id uuid primary key default gen_random_uuid(),
@@ -180,4 +179,56 @@ create policy "events_read_all" on public.events for select using (true);
 
 drop policy if exists "events_write_own" on public.events;
 create policy "events_write_own" on public.events for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ============ СОГЛАСИЯ (аудит-журнал) ============
+create table if not exists public.consents (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  consent_type text not null check (consent_type in (
+    'agreement', 'personalData', 'newsletters', 'cookies', 'thirdPartyData',
+    'specialCategories', 'profiling', 'geo', 'steps'
+  )),
+  granted boolean not null,
+  ip_address text,
+  user_agent text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists consents_user_idx on public.consents (user_id, consent_type);
+create index if not exists consents_created_idx on public.consents (created_at desc);
+
+alter table public.consents enable row level security;
+
+drop policy if exists "consents_read_own" on public.consents;
+create policy "consents_read_own" on public.consents for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "consents_write_own" on public.consents;
+create policy "consents_write_own" on public.consents for insert
+  with check (auth.uid() = user_id);
+
+-- ============ ТЕКУЩИЕ СОГЛАСИЯ (быстрый доступ) ============
+create table if not exists public.current_consents (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  agreement boolean not null default false,
+  personal_data boolean not null default false,
+  newsletters boolean not null default false,
+  cookies boolean not null default false,
+  third_party_data boolean not null default false,
+  special_categories boolean not null default false,
+  profiling boolean not null default true,
+  geo boolean not null default false,
+  steps boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.current_consents enable row level security;
+
+drop policy if exists "current_consents_read_own" on public.current_consents;
+create policy "current_consents_read_own" on public.current_consents for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "current_consents_write_own" on public.current_consents;
+create policy "current_consents_write_own" on public.current_consents for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);

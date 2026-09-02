@@ -124,8 +124,17 @@ export async function supabaseSaveProfile(userId, payload) {
 
 export async function supabaseDeleteProfile(userId) {
   const supabase = await getSupabase();
+  await supabase.from('consents').delete().eq('user_id', userId);
+  await supabase.from('current_consents').delete().eq('user_id', userId);
+  await supabase.from('likes').delete().or(`from_user.eq.${userId},to_user.eq.${userId}`);
+  await supabase.from('messages').delete().or(`from_user.eq.${userId},to_user.eq.${userId}`);
+  await supabase.from('matches').delete().or(`a_user.eq.${userId},b_user.eq.${userId}`);
+  await supabase.from('plans').delete().eq('user_id', userId);
+  await supabase.from('locations').delete().eq('user_id', userId);
+  await supabase.from('events').delete().eq('user_id', userId);
   const { error } = await supabase.from('profiles').delete().eq('id', userId);
   if (error) throw new Error(error.message);
+  await supabase.auth.admin.deleteUser(userId).catch(() => {});
 }
 
 export async function supabaseListPublicProfiles({ excludeUserId, limit = 50 } = {}) {
@@ -338,4 +347,116 @@ export function supabaseOnAuth(cb) {
     })
     .catch(() => {});
   return () => {};
+}
+
+export async function supabaseSaveConsent(userId, consentType, granted) {
+  if (!isSupabaseConfigured()) return;
+  const supabase = await getSupabase();
+
+  const { error: auditError } = await supabase.from('consents').insert({
+    user_id: userId,
+    consent_type: consentType,
+    granted,
+    user_agent: navigator.userAgent.slice(0, 500)
+  });
+  if (auditError) console.warn('consent audit log error:', auditError.message);
+
+  const { data: existing } = await supabase
+    .from('current_consents')
+    .select('user_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const columnMap = {
+    agreement: 'agreement',
+    personalData: 'personal_data',
+    newsletters: 'newsletters',
+    cookies: 'cookies',
+    thirdPartyData: 'third_party_data',
+    specialCategories: 'special_categories',
+    profiling: 'profiling',
+    geo: 'geo',
+    steps: 'steps'
+  };
+
+  const column = columnMap[consentType];
+  if (!column) return;
+
+  if (existing) {
+    const { error } = await supabase
+      .from('current_consents')
+      .update({ [column]: granted, updated_at: new Date().toISOString() })
+      .eq('user_id', userId);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase.from('current_consents').insert({
+      user_id: userId,
+      [column]: granted
+    });
+    if (error) throw new Error(error.message);
+  }
+}
+
+export async function supabaseSaveConsentsBulk(userId, consents) {
+  if (!isSupabaseConfigured()) return;
+  const supabase = await getSupabase();
+
+  const columnMap = {
+    agreement: 'agreement',
+    personalData: 'personal_data',
+    newsletters: 'newsletters',
+    cookies: 'cookies',
+    thirdPartyData: 'third_party_data',
+    specialCategories: 'special_categories',
+    profiling: 'profiling',
+    geo: 'geo',
+    steps: 'steps'
+  };
+
+  for (const [type, granted] of Object.entries(consents)) {
+    await supabase.from('consents').insert({
+      user_id: userId,
+      consent_type: type,
+      granted: !!granted,
+      user_agent: navigator.userAgent.slice(0, 500)
+    }).catch(() => {});
+  }
+
+  const updatePayload = { updated_at: new Date().toISOString() };
+  for (const [type, granted] of Object.entries(consents)) {
+    const column = columnMap[type];
+    if (column) updatePayload[column] = !!granted;
+  }
+
+  const { data: existing } = await supabase
+    .from('current_consents')
+    .select('user_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from('current_consents')
+      .update(updatePayload)
+      .eq('user_id', userId);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase.from('current_consents').insert({
+      user_id: userId,
+      ...updatePayload
+    });
+    if (error) throw new Error(error.message);
+  }
+}
+
+export async function supabaseGetConsents(userId) {
+  if (!isSupabaseConfigured()) return null;
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from('current_consents')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) return null;
+  return data;
 }

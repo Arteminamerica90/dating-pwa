@@ -560,6 +560,7 @@ a { color: inherit; }
 }
 .btn:hover { background: rgba(15, 23, 42, 0.10); }
 .btn.ghost { background: transparent; }
+.btn.ghost:hover { color: #fff; }
 .btn.danger { border-color: rgba(251, 113, 133, 0.6); color: #be123c; }
 .btn.ok { background: var(--ok); border-color: var(--ok); color: #fff; }
 .btn.ok:hover { background: var(--ok); opacity: 0.9; }
@@ -1842,4 +1843,19 @@ textarea.input {
 .avatar,
 .chip {
   text-align: initial;
+}
+
+#cookieBanner .btn {
+  color: #fff !important;
+  background: rgba(99, 102, 241, 0.9) !important;
+  border-color: rgba(99, 102, 241, 0.5) !important;
+}
+
+#cookieBanner .btn.ghost {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+#cookieBanner .btn:hover {
+  opacity: 0.85;
 }

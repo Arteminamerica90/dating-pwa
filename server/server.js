@@ -1,4 +1,4 @@
-// WalkDate sync server: Node.js + Express + SQLite.
+// xystar sync server: Node.js + Express + SQLite.
 //
 // Клиент (PWA на GitHub Pages) хранит данные локально и по кнопке
 // «Загрузить»/«Скачать» в Настройках синхронизирует ПОЛНОЕ состояние,
@@ -347,5 +347,5 @@ app.get('/api/public', (req, res) => {
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
 app.listen(PORT, () => {
-  console.log(`WalkDate server listening on http://localhost:${PORT} (db: ${DB_PATH})`);
+  console.log(`xystar server listening on http://localhost:${PORT} (db: ${DB_PATH})`);
 });
