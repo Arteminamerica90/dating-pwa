@@ -39,6 +39,7 @@ export function defaultState() {
       values: [],
       valuesAdultUnlocked: false,
       photos: [],
+      photosPending: [],
       onboarded: false
     },
     consent: {

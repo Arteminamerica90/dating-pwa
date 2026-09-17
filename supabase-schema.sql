@@ -232,3 +232,118 @@ create policy "current_consents_read_own" on public.current_consents for select
 drop policy if exists "current_consents_write_own" on public.current_consents;
 create policy "current_consents_write_own" on public.current_consents for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ============ ЖАЛОБЫ (модерация) ============
+create table if not exists public.reports (
+  id text primary key,
+  reporter_id text not null,
+  target_id text not null,
+  target_type text not null default 'user',
+  reason text not null,
+  details text,
+  status text not null default 'pending' check (status in ('pending', 'reviewed', 'resolved', 'dismissed')),
+  reviewed_by text,
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists reports_status_idx on public.reports (status);
+create index if not exists reports_target_idx on public.reports (target_id);
+create index if not exists reports_created_idx on public.reports (created_at desc);
+
+alter table public.reports enable row level security;
+
+drop policy if exists "reports_read_admin" on public.reports;
+create policy "reports_read_admin" on public.reports for select using (true);
+
+drop policy if exists "reports_insert_auth" on public.reports;
+create policy "reports_insert_auth" on public.reports for insert with check (true);
+
+-- ============ ПЕРСИСТЕНТНЫЙ СТАТУС МОДЕРАЦИИ ============
+-- Хранит решение (авто-кворум или модератор) независимо от in-memory store,
+-- чтобы переживать рестарты бессерверной платформы.
+-- status: 'approved' — анкета видна; 'pending_review' — скрыта до разбора; 'blocked' — забанена.
+create table if not exists public.moderation_status (
+  target_id text primary key,
+  status text not null default 'approved'
+    check (status in ('approved', 'pending_review', 'blocked')),
+  reason text,
+  changed_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists moderation_status_status_idx
+  on public.moderation_status (status, updated_at desc);
+
+alter table public.moderation_status enable row level security;
+-- Читается/пишется только служебным ключом (сервис-роль). Публичных политик нет.
+
+-- ============ АУДИТ-ЖУРНАЛ (152-ФЗ, ст. 18.1; срок хранения 3 года) ============
+create table if not exists public.audit_log (
+  id bigserial primary key,
+  user_id text not null,
+  action text not null,
+  details jsonb not null default '{}'::jsonb,
+  ip_address text,
+  user_agent text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists audit_user_idx on public.audit_log (user_id, created_at desc);
+create index if not exists audit_action_idx on public.audit_log (action, created_at desc);
+create index if not exists audit_created_idx on public.audit_log (created_at desc);
+
+-- Хранение не менее 3 лет: удалять записи старше 1100 дней.
+create table if not exists public.audit_retention (
+  id int primary key default 1 check (id = 1),
+  retention_days int not null default 1095,
+  updated_at timestamptz not null default now()
+);
+insert into public.audit_retention (id) values (1) on conflict (id) do nothing;
+
+alter table public.audit_log enable row level security;
+
+drop policy if exists "audit_read_own" on public.audit_log;
+create policy "audit_read_own" on public.audit_log for select
+  using (auth.uid()::text = user_id);
+
+drop policy if exists "audit_insert_service" on public.audit_log;
+create policy "audit_insert_service" on public.audit_log for insert with check (true);
+
+-- ============ ПОДПИСКИ (CloudPayments) ============
+-- provider всегда 'cloudpayments'; subscription_id / token — для автопродления и отмены.
+create table if not exists public.subscriptions (
+  id bigserial primary key,
+  user_id text not null,
+  plan_id text not null,
+  payment_id text,
+  subscription_id text,
+  token text,
+  provider text not null default 'cloudpayments',
+  status text not null default 'active',
+  addons jsonb not null default '[]'::jsonb,
+  expires_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists subscriptions_user_plan_idx
+  on public.subscriptions (user_id, plan_id, status);
+
+create index if not exists subscriptions_expires_idx on public.subscriptions (expires_at desc);
+
+-- Обратная совместимость, если таблица уже была создана без новых колонок.
+alter table public.subscriptions add column if not exists subscription_id text;
+alter table public.subscriptions add column if not exists token text;
+alter table public.subscriptions add column if not exists addons jsonb not null default '[]'::jsonb;
+
+alter table public.subscriptions enable row level security;
+
+drop policy if exists "subscriptions_read_own" on public.subscriptions;
+create policy "subscriptions_read_own" on public.subscriptions for select
+  using (auth.uid()::text = user_id);
+
+-- Вставка/обновление идёт со служебным ключом (сервис-роль, SRP/full_access),
+-- поэтому для публичной роли нужен только select. Защита от записи самим юзером:
+drop policy if exists "subscriptions_no_user_write" on public.subscriptions;
+create policy "subscriptions_no_user_write" on public.subscriptions for insert with check (false);

@@ -63,7 +63,32 @@ db.exec(`
     profile TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS consents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    consent_type TEXT NOT NULL,
+    granted INTEGER NOT NULL,
+    ip_address TEXT,
+    user_agent TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    details TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    created_at TEXT NOT NULL
+  );
 `);
+
+function logAudit(db, userId, action, details, ip, userAgent) {
+  db.prepare(`
+    INSERT INTO audit_log (user_id, action, details, ip_address, user_agent, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(userId, String(action), JSON.stringify(details || {}), String(ip || '').slice(0, 45) || null, String(userAgent || '').slice(0, 500) || null, now());
+}
 
 const hashPassword = (password, salt) =>
   crypto.scryptSync(String(password), salt, 64).toString('hex');
@@ -112,7 +137,7 @@ const app = express();
 app.use(express.json({ limit: '30mb' }));
 app.use((req, res, next) => {
   res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'content-type, authorization');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
@@ -304,7 +329,10 @@ app.post('/api/login', (req, res) => {
   if (!email || !password) return res.status(400).json({ error: 'Укажите email и пароль' });
   const user = findUserByCredentials(email, password);
   if (!user) return res.status(401).json({ error: 'Неверный email или пароль' });
-  res.json({ email: user.email, token: createSession(user.id) });
+  const token = createSession(user.id);
+  const ip = String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '');
+  logAudit(db, user.id, 'login', { email: user.email }, ip, req.headers['user-agent']);
+  res.json({ email: user.email, token });
 });
 
 app.get('/api/sync', auth, (req, res) => {
@@ -342,6 +370,40 @@ app.get('/api/public', (req, res) => {
     ORDER BY p.updated_at DESC
   `).all();
   res.json(rows.map((r) => ({ email: r.email, profile: JSON.parse(r.profile), updatedAt: r.updated_at })));
+});
+
+// 152-ФЗ ст. 14 п. 7: копия всех ПДн субъекта.
+app.get('/api/data/export', auth, (req, res) => {
+  const user = db.prepare('SELECT id, email, created_at FROM users WHERE id = ?').get(req.userId);
+  if (!user) return res.status(404).json({ error: 'not_found' });
+  const stateRow = db.prepare('SELECT payload, updated_at FROM state WHERE user_id = ?').get(req.userId);
+  const pub = db.prepare('SELECT profile, updated_at FROM public_profiles WHERE user_id = ?').get(req.userId);
+  const ip = String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '');
+  logAudit(db, req.userId, 'data_export', { tables: ['users', 'state', 'public_profiles'] }, ip, req.headers['user-agent']);
+  res.json({
+    exportedAt: now(),
+    operator: 'ИП Меньшиков Артем Геннадьевич',
+    data: {
+      account: { email: user.email, createdAt: user.created_at },
+      state: stateRow ? JSON.parse(stateRow.payload) : null,
+      stateUpdatedAt: stateRow?.updated_at || null,
+      publicProfile: pub ? JSON.parse(pub.profile) : null
+    }
+  });
+});
+
+// 152-ФЗ ст. 14 п. 7, ст. 21: уничтожение ПДн.
+app.delete('/api/account', auth, (req, res) => {
+  const user = db.prepare('SELECT id, email FROM users WHERE id = ?').get(req.userId);
+  const ip = String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '');
+  if (user) logAudit(db, req.userId, 'account_delete_requested', { email: user.email }, ip, req.headers['user-agent']);
+  // data/state/public_profiles/consents/audit удалятся каскадом (FK ON DELETE CASCADE) + явно:
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(req.userId);
+  db.prepare('DELETE FROM state WHERE user_id = ?').run(req.userId);
+  db.prepare('DELETE FROM public_profiles WHERE user_id = ?').run(req.userId);
+  db.prepare('DELETE FROM consents WHERE user_id = ?').run(req.userId);
+  db.prepare('DELETE FROM users WHERE id = ?').run(req.userId);
+  res.json({ ok: true, message: 'account_deleted' });
 });
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));

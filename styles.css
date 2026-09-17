@@ -1265,6 +1265,31 @@ a { color: inherit; }
   display: block;
 }
 
+.photo-pending-strip {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.photo-thumb.pending {
+  position: relative;
+  border-color: rgba(245, 158, 11, 0.6);
+  cursor: pointer;
+}
+
+.photo-pending-badge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 2px 0;
+  font-size: 8px;
+  text-align: center;
+  color: #fff;
+  background: rgba(245, 158, 11, 0.85);
+  border-radius: 0 0 6px 6px;
+}
+
 .kpis {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

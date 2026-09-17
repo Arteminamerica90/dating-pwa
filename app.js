@@ -61,7 +61,7 @@ window.__xystarModuleLoaded = true;
 const COOKIE_NECESSARY = ['walkdate_state', 'walkdate_encryption_key'];
 const COOKIE_CONSENT_KEY = 'xystar_cookie_consent_v2';
 const COOKIE_CONSENT_EXPIRY_DAYS = 365;
-const PROFANITY_LIST = ['хуй','пизд','бляд','блять','ебат','ёб','еба','сука','сук','нахуй','нахер','пидор','пидар','говно','дерьмо','жопа','ϻ','гондон','уёб','уеб','мудак','козёл','с_TypeScriptдак','солдат',' Natalia',''];
+const PROFANITY_LIST = ['хуй','пизд','бляд','блять','ебат','ёб','еба','сука','сук','нахуй','нахер','пидор','пидар','говно','дерьмо','жопа','гондон','уёб','уеб','мудак','козёл','террори','джихад','смертник','взрывать','халифат','игил','даиш','наркотик','наркоту','наркота','марихуан','гашиш','кокаин','амфетамин','героин','фентанил','спайс','детское порно','педофил','иностранный агент','иностранного агента','иностранные агенты','иностранных агентов','иноагент','иноагента','foreign agent','хайль','фашист','нацист','свастик','богохул','кощунств','порно','porn','порнх','pornhub','анальн','вагин','вульв','penis','pussy','dick','cock','fuck','fucking','отсос','минет','куни','дроч','мастурб','онанизм','эскорт','sex video','sex tape','nude','naked','nudes','нюдс','вебкам','webcam','голые фото','фото голой','обнаженн','обнажённ','интим услу','интим за ','эротич','эротик','секс видео','секс игрушк','adult content','взросл контент','проститутк','девочка по вызову','девушка по вызову','мужчина по вызову','интим досуг','массаж с продолжением'];
 
 function containsProfanity(text) {
   const lower = String(text || '').toLowerCase().replace(/[ъё]/g, (c) => c === 'ъ' ? '' : 'е');
@@ -126,7 +126,12 @@ function initCookieBanner() {
 
   if (existing) return;
 
-  showBanner();
+  // Баннер показываем намеренно позже: как только откроется его окно поверх онбординга,
+  // иначе модальный диалог (top-layer) его перекрывает до конца заполнения анкеты.
+  window.__showCookieBanner = () => {
+    if (loadCookieConsent()) return;
+    showBanner();
+  };
 
   btnShow?.addEventListener('click', () => {
     settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
@@ -181,27 +186,102 @@ function initCookieBanner() {
 function showReportDialog(targetId, targetType) {
   const existing = document.getElementById('dlgReport');
   if (existing) existing.remove();
-  const reasons = ['Спам', 'Оскорбления', 'Фейковый профиль', 'Неприемлемый контент', 'Дискриминация', 'Другое'];
+  const reasons = ['Спам', 'Оскорбления', 'Фейковый профиль', 'Неприемлемый контент', 'Дискриминация', 'Мошенничество', 'Другое'];
   const div = document.createElement('div');
   div.id = 'dlgReport';
   div.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5)';
   div.innerHTML = `<div style="background:var(--panel);border-radius:16px;padding:20px;max-width:340px;width:90%;box-shadow:var(--shadow)">
     <div style="font-weight:700;font-size:16px;margin-bottom:12px">Жалоба</div>
-    <div class="muted" style="font-size:13px;margin-bottom:12px">Выберите причину:</div>
+    <div class="muted" style="font-size:13px;margin-bottom:12px">Выберите причину. Модератор рассмотрит жалобу в течение 24 часов:</div>
     <div style="display:flex;flex-direction:column;gap:6px" id="reportReasons">
       ${reasons.map((r, i) => `<button class="btn ghost report-reason" type="button" data-reason="${r}" style="text-align:left;font-size:13px">${r}</button>`).join('')}
+    </div>
+    <div style="margin-top:10px">
+      <input id="txtReportDetails" class="input" placeholder="Детали (необязательно)" maxlength="500" style="width:100%;box-sizing:border-box;font-size:13px" />
     </div>
     <div style="text-align:center;margin-top:12px"><button class="btn ghost" id="btnReportCancel" type="button">Отмена</button></div>
   </div>`;
   document.body.appendChild(div);
   div.querySelectorAll('.report-reason').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      toast('Жалоба отправлена. Спасибо!');
-      div.remove();
+    btn.addEventListener('click', async () => {
+      const details = String(document.getElementById('txtReportDetails')?.value || '').trim().slice(0, 500);
+      btn.disabled = true;
+      btn.textContent = 'Отправка...';
+      const ok = await submitReport(targetId, targetType, btn.dataset.reason, details);
+      btn.disabled = false;
+      if (ok) {
+        trackReportSubmission(targetId, btn.dataset.reason);
+        toast('Жалоба отправлена. Модератор рассмотрит её в течение 24 часов.');
+        haptic('light');
+        div.remove();
+      } else {
+        btn.textContent = btn.dataset.reason;
+        toast('Не удалось отправить жалобу. Проверьте подключение.');
+        haptic('error');
+      }
     });
   });
   $('#btnReportCancel')?.addEventListener('click', () => div.remove());
   div.addEventListener('click', (e) => { if (e.target === div) div.remove(); });
+}
+
+async function syncReportStatuses() {
+  if (!state.cloud?.token || !state.cloud?.serverUrl) return;
+  try {
+    const apiBase = normalizeServerUrl(state.cloud.serverUrl);
+    const resp = await fetch(`${apiBase}/api/reports/my`, {
+      headers: { Authorization: `Bearer ${state.cloud.token}` }
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const reports = Array.isArray(data.reports) ? data.reports : [];
+    state.moderation = state.moderation || { reports: {}, hidden: [] };
+    let changed = false;
+    for (const r of reports) {
+      const cur = state.moderation.reports[r.targetId];
+      if (!cur || cur.status !== r.status) {
+        state.moderation.reports[r.targetId] = { reason: r.reason, at: r.statusChangedAt ? new Date(r.statusChangedAt).getTime() : cur?.at || Date.now(), status: r.status };
+        changed = true;
+      }
+    }
+    if (changed) save();
+  } catch (e) {
+    console.warn('sync report statuses', e?.message);
+  }
+}
+
+async function submitReport(targetId, targetType, reason, details) {
+  try {
+    const apiBase = normalizeServerUrl(state.cloud?.serverUrl || location.origin);
+    const resp = await fetch(`${apiBase}/api/report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.cloud?.token}` },
+      body: JSON.stringify({ targetId, targetType, reason, details })
+    });
+    if (resp.ok) return true;
+    return false;
+  } catch (e) {
+    console.warn('report submit', e?.message);
+    return false;
+  }
+}
+
+function trackReportSubmission(targetId, reason) {
+  try {
+    state.moderation = state.moderation || { reports: {}, hidden: [] };
+    state.moderation.reports[targetId] = { reason, at: Date.now(), status: 'pending' };
+    if (!state.moderation.hidden.includes(targetId)) state.moderation.hidden.push(targetId);
+    save();
+    renderAll();
+  } catch (e) {
+    console.warn('track report', e?.message);
+  }
+}
+
+function getApplicableProfilesForFeed() {
+  const all = DATING_PROFILES;
+  const hidden = new Set((state.moderation?.hidden || []));
+  return all.filter((p) => !hidden.has(p.id || p.name || ''));
 }
 
 let state = null;
@@ -867,7 +947,7 @@ async function refreshSubscription() {
   try {
     const apiUrl = location.origin.includes('localhost') ? '' : 'https://pwa-dating-delta.vercel.app';
     const base = apiUrl || '';
-    const resp = await fetch(`${base}/api/yookassa/status?userId=${encodeURIComponent(accountInfo.id)}`);
+    const resp = await fetch(`${base}/api/cloudpayments/status?userId=${encodeURIComponent(accountInfo.id)}`);
     const data = await resp.json();
     mySubscription = {
       planId: data.planId || 'free',
@@ -1032,7 +1112,7 @@ async function supabasePushProfile() {
     if (!user) return;
     if (!state.consent?.personalData) return;
     const payload = {
-      profile: state.profile,
+      profile: { ...state.profile, photosPending: undefined },
       plans: state.plans,
       dating: { likes: state.dating?.likes || {}, matches: state.dating?.matches || [] },
       consent: {
@@ -1367,6 +1447,80 @@ function wireSettings() {
     }
   });
 
+  $('#btnExportData')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    // 152-ФЗ ст. 14 п. 7: субъект вправе получить копию своих ПДн.
+    runWithButton($('#btnExportData'), 'Экспорт данных', async () => {
+      try {
+        let exported = {
+          exportedAt: new Date().toISOString(),
+          operator: 'ИП Меньшиков Артем Геннадьевич',
+          source: 'client',
+          account: accountInfo ? { id: accountInfo.id, email: accountInfo.email } : null,
+          profile: state.profile || {},
+          consent: state.consent || {},
+          dating: state.dating || {}
+        };
+        const server = state.cloud?.serverUrl;
+        const token = state.cloud?.token;
+        if (server && token) {
+          try {
+            const apiBase = normalizeServerUrl(server);
+            const resp = await fetch(`${apiBase}/api/data/export`, { headers: { Authorization: `Bearer ${token}` } });
+            if (resp.ok) {
+              const remote = await resp.json();
+              exported = { ...exported, remote };
+              exported.source = 'client+server';
+            }
+          } catch (err) {
+            console.warn('export server', err?.message);
+          }
+        }
+        downloadJson(exported, `walkdate-data-export-${new Date().toISOString().slice(0, 10)}.json`);
+        toast('Экспорт готов — файл скачан');
+        haptic('light');
+      } catch (err) {
+        toast(err?.message || 'Экспорт не удался');
+      }
+    });
+  });
+
+  $('#btnDeleteAccount')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    haptic('light');
+    if (!confirm('Удалить аккаунт? \n\nБудут уничтожены анкета, переписки, согласия и все персональные данные. Восстановление невозможно.')) return;
+    const btn = $('#btnDeleteAccount');
+    runWithButton($('#btnDeleteAccount'), 'Удалить аккаунт', async () => {
+      try {
+        const server = state.cloud?.serverUrl;
+        const token = state.cloud?.token;
+        if (server && token) {
+          try {
+            const apiBase = normalizeServerUrl(server);
+            await fetch(`${apiBase}/api/account`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+          } catch (err) {
+            console.warn('delete server', err?.message);
+          }
+        }
+        if (accountInfo?.id) {
+          try { await supabaseDeleteProfile(accountInfo.id); } catch (err) { console.warn('delete supabase', err?.message); }
+        }
+        // Уничтожаем локальное состояние (152-ФЗ ст. 21).
+        const fresh = defaultState();
+        state.profile = fresh.profile;
+        state.cloud = fresh.cloud;
+        state.dating = fresh.dating;
+        state.consent = fresh.consent;
+        accountInfo = null;
+        save();
+        renderAll();
+        toast('Аккаунт удалён. Прощайте!');
+      } catch (err) {
+        toast(err?.message || 'Не удалось удалить аккаунт');
+      }
+    });
+  });
+
   $('#btnAcceptAll')?.addEventListener('click', async () => {
     const on = !(state.consent?.agreement && state.consent?.personalData && state.consent?.newsletters && state.consent?.cookies && state.consent?.thirdPartyData);
     state.consent.agreement = on;
@@ -1619,7 +1773,10 @@ function maybeStartOnboarding() {
   const gender = String(state.profile?.gender || '').trim();
   const hasAge = !!state.profile?.birthDate && !!state.profile?.ageConfirmed;
 
-  if (name && name !== 'Вы' && gender && hasAge) return;
+  if (name && name !== 'Вы' && gender && hasAge) {
+    window.__showCookieBanner?.();
+    return;
+  }
 
   const dlg = $('#dlgOnboarding');
   if (!dlg) return;
@@ -1631,6 +1788,7 @@ function maybeStartOnboarding() {
     $('#onboardingStep1').hidden = true;
     $('#onboardingStep2').hidden = true;
     $('#onboardingStepAge').hidden = false;
+    window.__showCookieBanner?.();
   }
 
   function showStep2() {
@@ -1648,11 +1806,13 @@ function maybeStartOnboarding() {
 
   $('#obGenderMale')?.addEventListener('click', () => {
     chosenGender = 'male';
+    window.__showCookieBanner?.();
     showStep2();
   });
 
   $('#obGenderFemale')?.addEventListener('click', () => {
     chosenGender = 'female';
+    window.__showCookieBanner?.();
     showStep2();
   });
 
@@ -1834,6 +1994,23 @@ function renderSubscriptionContent(highlightFeature) {
     }
   }
 
+  // Управление активной подпиской: отмена автопродления (CloudPayments).
+  const manageEl = $('#subManage');
+  if (manageEl) {
+    if (current.id !== 'free' && ['standard', 'premium', 'vip', 'exclusive'].includes(String(current.id))) {
+      manageEl.innerHTML = `
+        <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <div class="muted" style="font-size:12px">Автопродление вашей подписки активно. Отмените в любой момент — преимущества сохранятся до конца оплаченного периода.</div>
+            <button class="btn ghost" id="btnCancelSub" type="button" style="font-size:12px;color:#f43f5e">Отменить подписку</button>
+          </div>
+        </div>`;
+      $('#btnCancelSub')?.addEventListener('click', () => cancelSubscription());
+    } else {
+      manageEl.innerHTML = '';
+    }
+  }
+
   const plansEl = $('#subPlans');
   if (!plansEl) return;
   const planOrder = ['standard', 'premium', 'vip', 'exclusive'];
@@ -1928,40 +2105,112 @@ function renderSubscriptionContent(highlightFeature) {
   });
 }
 
+async function cancelSubscription() {
+  if (!accountInfo?.id) {
+    toast('Войдите, чтобы управлять подпиской');
+    return;
+  }
+  if (!confirm('Отменить автопродление подписки?\n\nПовторных списаний не будет, а преимущества сохранятся до конца оплаченного периода.')) return;
+  try {
+    const apiBase = normalizeServerUrl(state.cloud?.serverUrl || location.origin);
+    const resp = await fetch(`${apiBase}/api/cloudpayments/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.cloud?.token}` },
+      body: JSON.stringify({ accountId: accountInfo.id })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data?.error || 'Не удалось отменить подписку');
+    toast('Подписка отменена. Действует до конца оплаченного периода');
+    haptic('success');
+    await refreshSubscription();
+    renderAll();
+  } catch (err) {
+    toast(err?.message || 'Ошибка отмены подписки');
+  }
+}
+
 async function startPayment(planId) {
   if (!accountInfo?.id) {
     toast('Войдите, чтобы купить подписку');
     openRegisterDialog();
     return;
   }
-  const prices = { standard: '299 ₽', premium: '999 ₽', vip: '2 999 ₽', income_200k: '199 ₽', income_500k: '499 ₽', income_1m: '999 ₽', income_5m: '2 999 ₽' };
-  const price = prices[planId] || '';
-  const dlg = $('#dlgSubscription');
-  if (dlg) {
-    const heroEl = $('#subHero');
-    if (heroEl) {
-      heroEl.hidden = false;
-      heroEl.innerHTML = `<div style="font-size:40px">📩</div>
-        <div style="font-weight:700;font-size:16px;margin-top:8px">Оформление подписки</div>
-        <div class="muted" style="font-size:13px;margin-top:6px">Для оплаты напишите нам:</div>
-        <div style="margin-top:12px;text-align:left;max-width:320px;margin-left:auto;margin-right:auto">
-          <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:8px">
-            <div class="muted" style="font-size:11px">Email</div>
-            <div style="font-weight:600;font-size:14px">arteminamerica@mail.ru</div>
-          </div>
-          <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:8px">
-            <div class="muted" style="font-size:11px">Телефон / Telegram</div>
-            <div style="font-weight:600;font-size:14px">+7 (915) 033-19-67</div>
-          </div>
-          <div class="muted" style="font-size:12px;margin-top:8px">Укажите ваш email в сервисе и план: <b>${planId}</b> (${price})</div>
-        </div>`;
+
+  let planPrice;
+  if (planId.startsWith('income_')) {
+    const addon = INCOME_ADDONS.find((a) => a.id === planId);
+    planPrice = addon?.price;
+  } else {
+    planPrice = PLANS[planId]?.price;
+  }
+  if (!planPrice) {
+    toast('Неизвестный план');
+    return;
+  }
+
+  const isSubscription = ['standard', 'premium', 'vip', 'exclusive'].includes(planId);
+
+  try {
+    const apiBase = normalizeServerUrl(state.cloud?.serverUrl || location.origin);
+    const cfgResp = await fetch(`${apiBase}/api/cloudpayments/charge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.cloud?.token}` },
+      body: JSON.stringify({ planId, userId: accountInfo.id, accountId: accountInfo.id, email: accountInfo.email || '' })
+    });
+    const cfg = await cfgResp.json();
+    if (!cfgResp.ok || !cfg.widget) {
+      throw new Error(cfg?.error || 'Платёжный сервис недоступен');
     }
-    const plansEl = $('#subPlans');
-    if (plansEl) plansEl.innerHTML = '';
-    const addonsEl = $('#subAddons');
-    if (addonsEl) addonsEl.hidden = true;
-    const shareEl = $('#subShare');
-    if (shareEl) shareEl.hidden = true;
+
+    const configResp = await fetch(`${apiBase}/api/cloudpayments/config`);
+    const pub = await configResp.json();
+    if (!pub?.enabled || !pub?.publicId) {
+      throw new Error('CloudPayments не настроен');
+    }
+    if (typeof window.cp === 'undefined') {
+      throw new Error('Платёжный виджет не загружен');
+    }
+
+    const widget = new window.cp.CloudPayments();
+    const data = { planId: cfg.planId, userId: cfg.accountId };
+    if (isSubscription) {
+      data.CloudPayments = { recurrent: { interval: 'Month', period: 1, amount: cfg.amount } };
+    }
+    const launchParams = {
+      publicId: pub.publicId,
+      description: cfg.description,
+      amount: cfg.amount,
+      currency: 'RUB',
+      invoiceId: cfg.invoiceId,
+      accountId: cfg.accountId,
+      email: cfg.email,
+      skin: 'modern',
+      data
+    };
+
+    const callbacks = {
+      onSuccess: async (options) => {
+        toast('Оплата прошла! Подписка активируется');
+        haptic('success');
+        await refreshSubscription();
+        renderAll();
+      },
+      onFail: (reason, options) => {
+        toast(reason && reason.includes('declined') ? 'Платёж отклонён' : 'Платёж не прошёл');
+        haptic('error');
+      },
+      onComplete: (paymentResult, options) => {
+        if (paymentResult?.Success) {
+          toast('Оплата подтверждена');
+          refreshSubscription().catch(() => {});
+          renderAll();
+        }
+      }
+    };
+
+    widget.pay('charge', launchParams, callbacks);
+  } catch (err) {
+    toast(err?.message || 'Ошибка запуска оплаты');
   }
 }
 
@@ -2085,11 +2334,82 @@ async function addProfilePhotoFromUrl(url) {
 async function addProfilePhotoFromFile(file) {
   syncProfileFormFields();
   const dataUrl = await readImageAsDataUrl(file, 1024);
+  const analysis = await analyzePhotoNsfw(dataUrl);
+  if (analysis.verdict === 'reject') {
+    toast('Фото не прошло модерацию (признаки откровенного контента)');
+    haptic('error');
+    return;
+  }
+  if (analysis.verdict === 'review') {
+    const pending = Array.isArray(state.profile.photosPending) ? state.profile.photosPending : [];
+    pending.unshift(dataUrl);
+    state.profile.photosPending = pending.slice(0, 3);
+    save();
+    sendPhotoAnalysisToServer(analysis).catch(() => {});
+    renderAll();
+    toast('Фото отправлено на проверку модератором и временно скрыто');
+    haptic('warning');
+    return;
+  }
+  sendPhotoAnalysisToServer(analysis).catch(() => {});
   state.profile.photos = [dataUrl, ...(state.profile.photos || [])].slice(0, 3);
   save();
   pushPublicProfileNow().catch(() => {});
   renderAll();
   toast('Фото добавлено');
+}
+
+function analyzePhotoNsfw(dataUrl) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const d = imageData.data;
+        let skinPixels = 0;
+        let totalPixels = 0;
+        for (let i = 0; i < d.length; i += 16 * 4) {
+          const r = d[i];
+          const g = d[i + 1];
+          const b = d[i + 2];
+          totalPixels++;
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          if (r > 95 && g > 40 && b > 20 && max - min > 15 && Math.abs(r - g) > 15 && r > g && r > b) {
+            skinPixels++;
+          }
+        }
+        const skinRatio = totalPixels ? skinPixels / totalPixels : 0;
+        let verdict = 'ok';
+        let risk = 'low';
+        if (skinRatio >= 0.45) { verdict = 'reject'; risk = 'high'; }
+        else if (skinRatio >= 0.28) { verdict = 'review'; risk = 'medium'; }
+        resolve({ verdict, risk, skinRatio: Math.round(skinRatio * 1000) / 1000, dims: { width: img.width, height: img.height } });
+      } catch {
+        resolve({ verdict: 'review', risk: 'unknown', skinRatio: 0, dims: null });
+      }
+    };
+    img.onerror = () => resolve({ verdict: 'review', risk: 'unknown', skinRatio: 0, dims: null });
+    img.src = dataUrl;
+  });
+}
+
+async function sendPhotoAnalysisToServer(analysis) {
+  try {
+    const apiBase = normalizeServerUrl(state.cloud?.serverUrl || location.origin);
+    await fetch(`${apiBase}/api/photo/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.cloud?.token}` },
+      body: JSON.stringify(analysis)
+    });
+  } catch (e) {
+    console.warn('photo analyze sync', e?.message);
+  }
 }
 
 function syncProfileFormFields() {
@@ -3089,24 +3409,85 @@ function wireHomeContentHandlers(rootSelector) {
       loadRemoteChat(matchId);
     });
   });
-  root.querySelector('[data-action="sendChat"]')?.addEventListener('click', () => {
+  root.querySelector('[data-action="sendChat"]')?.addEventListener('click', async () => {
     const input = root.querySelector('#chatInput');
     const text = String(input?.value || '').trim();
     if (!text) return;
     const activeId = state.messages?.activeThreadId;
     if (!activeId) return;
+    if (text.length > 300) {
+      toast('Сообщение слишком длинное (максимум 300 символов)');
+      haptic('error');
+      return;
+    }
+    const localProfanity = containsProfanity(text);
+    let finalText = text;
+    if (isRealChat(activeId)) {
+      try {
+        const apiBase = normalizeServerUrl(state.cloud?.serverUrl || location.origin);
+        const resp = await fetch(`${apiBase}/api/message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.cloud?.token}` },
+          body: JSON.stringify({ text })
+        });
+        if (resp.status === 403) {
+          const data = await resp.json().catch(() => ({}));
+          const reasons = (data.reasons || []).join(', ');
+          toast(`Сообщение заблокировано модерацией: ${reasons}`);
+          haptic('error');
+          return;
+        }
+        if (resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          if (data.censored && data.censoredText) {
+            finalText = data.censoredText;
+            toast('Запрещённые слова заменены звёздочками');
+            haptic('light');
+          }
+        } else {
+          toast('Ошибка проверки сообщения');
+          haptic('error');
+          return;
+        }
+      } catch (e) {
+        toast('Не удалось проверить сообщение. Отправка отменена.');
+        haptic('error');
+        return;
+      }
+    } else if (localProfanity) {
+      finalText = censorTextLocal(text);
+    }
     const thread = ensureMessageThread(activeId);
-    thread.messages.push({ from: 'me', text: text.slice(0, 300), ts: Date.now() });
+    thread.messages.push({ from: 'me', text: finalText.slice(0, 300), ts: Date.now() });
     thread.unread = false;
     input.value = '';
     save();
     renderAll();
     if (isRealChat(activeId)) {
-      pushEncryptedMessage(activeId, text.slice(0, 300)).catch((err) => {
+      pushEncryptedMessage(activeId, finalText.slice(0, 300)).catch((err) => {
         console.warn('encrypted send', err?.message);
       });
     }
   });
+}
+
+function censorTextLocal(text) {
+  const original = String(text || '');
+  const lower = original.toLowerCase().replace(/ё/g, 'е');
+  const stems = [...PROFANITY_LIST]
+    .map((w) => String(w || '').toLowerCase().replace(/ё/g, 'е'))
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+  const out = original.split('');
+  const wordRe = /[а-яёa-z][а-яёa-z0-9_'-]*/gi;
+  for (const m of lower.matchAll(wordRe)) {
+    const w = m[0].toLowerCase().replace(/ё/g, 'е');
+    const hit = stems.find((s) => w.includes(s));
+    if (hit) {
+      for (let i = m.index; i < m.index + m[0].length; i++) out[i] = '*';
+    }
+  }
+  return out.join('');
 }
 
 function isRealChat(id) {
@@ -3134,7 +3515,11 @@ async function loadRemoteChat(chatId) {
     for (const row of rows) {
       try {
         const text = await decryptChatText(key, { iv: row.iv, ct: row.ct });
-        messages.push({ from: row.from_user === accountInfo.id ? 'me' : 'them', text, ts: new Date(row.created_at).getTime() });
+        if (containsProfanity(text)) {
+          messages.push({ from: row.from_user === accountInfo.id ? 'me' : 'them', text: '[сообщение скрыто модерацией]', ts: new Date(row.created_at).getTime() });
+        } else {
+          messages.push({ from: row.from_user === accountInfo.id ? 'me' : 'them', text: censorTextLocal(text), ts: new Date(row.created_at).getTime() });
+        }
       } catch {
         // skip undecryptable
       }
@@ -3665,6 +4050,7 @@ function treeMatchCompatibility(userProfile = state.profile, candidate = {}) {
 }
 
 function renderDating() {
+  syncReportStatuses().catch(() => {});
   const cityKey = currentCityKey();
   const userPortrait = buildQuestionnairePortrait(state.profile?.questionnaireAnswers || {});
   const interests = new Set(state.profile.interests || []);
@@ -3748,7 +4134,7 @@ function renderDating() {
   const pool = (withinRadius.length >= 2 || !canMeasure ? withinRadius : candidatePool.filter((p) => baseMatch(p))).map(scored).sort(sorter);
   const candidates = pool;
 
-  const visible = candidates.filter((p) => !state.dating.likes[p.id]).slice(0, 6);
+  const visible = candidates.filter((p) => !state.dating.likes[p.id] && !(state.moderation?.hidden || []).includes(p.id)).slice(0, 6);
   const matches = getMutualMatches();
   const seenMatches = state.dating.seenMatches || {};
 
@@ -4006,6 +4392,7 @@ function renderStats() {
   const wishlistPlaces = new Set(state.profile?.wishlistPlaces || []);
   const customPlaces = Array.isArray(state.profile?.customPlaces) ? state.profile.customPlaces : [];
   const photos = state.profile?.photos || [];
+  const photosPending = state.profile?.photosPending || [];
   const stepsOn = !!state.consent?.steps;
   const stepsRunning = !!stepCounter?.running;
   const allLegalConsentsAccepted = !!(state.consent?.agreement && state.consent?.personalData && state.consent?.newsletters && state.consent?.cookies && state.consent?.thirdPartyData);
@@ -4040,6 +4427,13 @@ function renderStats() {
                   .join('')
               : ''}
             ${photos.length < 3 ? '<div class="muted photo-hint" style="text-align:center;font-size:10px">Можно загрузить до 3 фото</div>' : ''}
+            ${photosPending.length
+              ? `<div class="photo-pending-strip">
+                  ${photosPending
+                    .map((src, idx) => `<button class="photo-thumb pending" type="button" data-pending-index="${idx}"><img alt="photo на проверке ${idx + 1}" src="${src}" /><span class="photo-pending-badge">на проверке</span></button>`)
+                    .join('')}
+                </div>`
+              : ''}
           </div>
         </div>
 
@@ -4083,7 +4477,12 @@ function renderStats() {
           ? `
           <div class="row-inline" style="margin-top:10px" id="accountSignedIn">
             <button id="btnChangePassword" class="btn" type="button">Сменить пароль</button>
+            <button id="btnExportData" class="btn" type="button" title="Скачать копию своих персональных данных (152-ФЗ, ст. 14)">Экспорт данных</button>
             <button id="btnAccountLogout" class="btn danger" type="button">Выход</button>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button id="btnDeleteAccount" class="btn danger" type="button" style="flex:none">Удалить аккаунт</button>
+            <span class="muted" style="font-size:12px">Уничтожение всех данных, включая анкету, переписки и согласия (152-ФЗ, ст. 21). Восстановление невозможно.</span>
           </div>
           <div class="row" id="changePasswordBox" hidden>
             <label class="label">Новый пароль</label>
@@ -4202,10 +4601,20 @@ function renderStats() {
     if (!confirm('Удалить все фото?')) return;
     syncProfileFormFields();
     state.profile.photos = [];
+    state.profile.photosPending = [];
     save();
     pushPublicProfileNow().catch(() => {});
     toast('Фото удалены');
     renderAll();
+  });
+
+  $('#view-stats').querySelectorAll('[data-pending-index]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.pendingIndex);
+      state.profile.photosPending = (state.profile.photosPending || []).filter((_, i) => i !== idx);
+      save();
+      renderAll();
+    });
   });
 
   $('#view-stats').querySelectorAll('[data-wishlist-place]').forEach((btn) => {
@@ -4754,6 +5163,18 @@ function onSkip(id) {
 function normalizeServerUrl(u) {
   const s = String(u || '').trim();
   return s.endsWith('/') ? s.slice(0, -1) : s;
+}
+
+function downloadJson(data, filename) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 async function apiJson(serverUrl, path, { method, headers, body } = {}) {
@@ -5483,6 +5904,11 @@ function renderTinderInner(p) {
     : tree.known.length === 0
       ? '<span class="pill muted-pill">дерево: нет данных</span>'
       : `<span class="pill status-pill ${tree.compatible ? 'good' : 'bad'}">дерево: ${Math.round(tree.pct * 100)}% совпадений${tree.conflicts.length ? ` • ${tree.conflicts.length} конфликт` : ''}</span>`;
+  const pid = p.id || p.name || '';
+  const reportRec = state.moderation?.reports?.[pid];
+  const reportStatus = reportRec
+    ? `<div class="pill muted-pill" data-report-status="${reportRec.status}">Жалоба: ${reportStatusLabel(reportRec.status)}</div>`
+    : '';
   return `
     <div class="tinder-stamp like">LIKE</div>
     <div class="tinder-stamp nope">NOPE</div>
@@ -5502,12 +5928,23 @@ function renderTinderInner(p) {
       ${shared ? `<div class="tinder-badges">${shared}</div>` : ''}
       ${diff ? `<div class="tinder-badges">${diff}</div>` : ''}
       ${neutral ? `<div class="tinder-badges">${neutral}</div>` : ''}
+      ${reportStatus}
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto">
         <div class="muted">Свайп вправо — лайк, влево — пропуск</div>
-        <button class="link-btn" type="button" data-report="${escapeHtml(p.id || p.name || '')}" style="font-size:11px;color:#e11d48">⚠ Пожаловаться</button>
+        <button class="link-btn" type="button" data-report="${escapeHtml(pid)}" style="font-size:11px;color:#e11d48">${reportRec ? 'Изменить жалобу' : '⚠ Пожаловаться'}</button>
       </div>
     </div>
   `;
+}
+
+function reportStatusLabel(status) {
+  const map = {
+    pending: 'на рассмотрении',
+    reviewed: 'рассмотрена',
+    resolved: 'принята',
+    dismissed: 'отклонена'
+  };
+  return map[status] || status;
 }
 
 function escapeHtml(s) {

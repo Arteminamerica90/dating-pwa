@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 const SECRET = process.env.SECRET || 'vercel-dev-secret-change-me';
 const MOSCOW_AFFIS_URL = process.env.MOSCOW_AFFIS_URL || 'https://transport.mos.ru/events';
@@ -372,6 +372,17 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function addWorkdays(start, n) {
+  let d = new Date(start);
+  let added = 0;
+  while (added < n) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    const day = d.getUTCDay();
+    if (day !== 0 && day !== 6) added += 1;
+  }
+  return d;
+}
+
 function base64url(buf) {
   return Buffer.from(buf)
     .toString('base64')
@@ -445,12 +456,797 @@ function sendJson(res, status, obj, extraHeaders = {}) {
   res.end(JSON.stringify(obj));
 }
 
+const PROFANITY_WORDS = ['хуй','хуи','пизд','бля','бляд','блять','ебат','ёб','еба','сука','сук','нахуй','нахер','пидор','пидар','говно','дерьмо','жопа','гондон','уёб','уеб','мудак','козёл'];
+const EXTREMISM_WORDS = ['хайль','фашист','нацист','нацик','свастик','арийск','призываю к экстремизму','призыв к экстремизму','экстремистскую деятельность','оправдываю экстремизм','уничтожим иноземцев'];
+const HATE_WORDS = ['хачи','хач','жиды','жид','чурок','чурк','чучмеки','чучмек','черножоп','понаех','вон из города'];
+const RELIGIOUS_INSULT_WORDS = ['оскорбл','богохул','богохульств','богоубийц','святотатств','кощунств'];
+const TERRORISM_WORDS = ['террори','джихад','смертник','взрывать','захват заложник','исламское государство','игил','даиш','халифат','оправдани терроризм'];
+const SEPARATISM_WORDS = ['сепарати','отделени кавказ','отделени сибир','отделени кра','отделени республ','отделение кавказ','отделения кавказ','отделение кра','отделения кра','отделение республ','независимости кавказ','независимость кавказ','независимости сибир','независимость сибир','независимости чечн','независимы кавказ','независимы сибир','отделен от росси','отделение от росси'];
+const DRUG_WORDS = ['наркотик','наркоту','наркота','марихуан','гашиш','кокаин','кокс','травк','амфетамин','метамфетамин','героин','фентанил','спайс','склоняю к наркотикам','давай покурим'];
+const CP_WORDS = ['child porn','детское порно','child sex','педофил','child abuse','непристойные действия','ср материалы','малолетк','несовершеннолетн для интим','несовершеннолетнюю для интим','несовершеннолетней для интим'];
+const SUICIDE_WORDS = ['удавис','повесся','повесис','убей себя','убить себя','сделай это с собой','сделай с собой это','реж вены','уничтожь себя'];
+const COERCION_WORDS = ['заставлю тебя переспать','заставлю тебя со мной','понужд к сексу','развратн действие','развратн действий','развратн действи','принужд к сексу','не по своему желанию секс','изнасилую'];
+const MINOR_SEX_WORDS = ['пересплю с','встречусь с летней','встречусь с леткой','с 15-летней','с 14-леткой','с 16-летн','с 13-летн','с 17-летн','с пятнадцатилетн','с четырнадцатилетн','с шестнадцатилетн','с тринадцатилетн'];
+const PROSTITUTION_WORDS = ['сниму проститутк','снять проститутк','эскорт','интим за ','секс за деньги','за деньги сниму'];
+const NSFW_WORDS = [
+  // === Порнография и площадки ===
+  'порно','порнх','porn','porno','xxx','ххх','тройство','анал','анальн','вагина','вагин','вульв','penis','pussy','dick','cock','ass','fuck','fucking','сайт порно','порно са','порносайт','порнух','порнограф','pornhub','xnxx','xvideo','эротик','эротич','еротик','эротк',
+  // === Вульгарные обозначения половых органов и тела ===
+  'писюн','писюх','песька','вагин','клитор','клitor','клитty','половой орган','полов орган','мужское достоинств','мужской половой','сиськ','сисек','сиськи','титьк','титк','сосок','соски','сосочк','грудь голая','голая грудь','задниц','ягодиц',
+  // === Вульгарные сексуальные действия ===
+  'отсос','отсас','отсоси','минет','минетт','минтить','куни','кунил','кyни','дроч','мастурб','онанизм','игрушки для секса','секс игрушк','анал для','щет мастурб','секс для друг','разврат','развратн','порно видео','секс видео','сексуальный контент','половой акт','совокуплен','заняться сексом','занялись сексом',
+  // === Продажа интим-услуг ===
+  'интим услу','интим предлож','интим в подарок','массаж с продолжением','массаж продолжение','эротический массаж','эротич массаж','вип эскорт','vip эскорт','эскорт услуги','эскорт услуг','снять девушку на ночь','сниму девушк на ночь','ночь за ','за ночь с','работаю за ','работа за ','девушк за деньги','парн за деньги','свидание за деньги','спутниц','спутницу','сопровождени','досуг для почтенн','досуг почтенн','интим досуг','интимный досуг','интимного досуга','интимн досуг','мальчик по вызову','девочка по вызову','девушка по вызову','мужчина по вызову','вызвать проститу','вызывать проститутку',
+  // === Другое явно непристойное ===
+  'грязн чаты','взросл контент','взрослый контент','adult content','sex камера','вебкам','webcam модель','контент для взрослых','свот снимок','интимн снимок','обнаж тела','обнаженн','обнажённ','голое тело','голые фото','фото голой','фото голый','нюдс','нюдсы','nude','naked','ню фото','интим фото','фото интим','видео интим'
+];
+const FOREIGN_AGENT_WORDS = ['иностранный агент','иностранного агента','иностранному агенту','иностранным агентом','иностранные агенты','иностранных агентов','иностранными агентами','иностранном агенте','иностранных агентах','иностраных агент','иностраный агент','иностраного агента','иностраная агитаци','иностраного агентства','иноагент','иноагента','иноагенты','иноагентов','иностранное влияние','иностранного влияния','иностранным влиянием','foreign agent','foreign agents'];
+const EXTREMIST_MATERIAL_WORDS = ['экстремистск','запрещённая информация','единый реестр запрещён'];
+
+const LAT_TO_CYR = { 'a':'а','e':'е','o':'о','p':'р','c':'с','x':'х','y':'у','h':'н','k':'к','m':'м','t':'т','b':'в' };
+const CYR_TO_LAT = { 'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'j','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'h','ц':'ts','ч':'ch','ш':'sh','щ':'sch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya' };
+const BRUSH_CHARS = new Set(['.', ',', ' ', '-', '_', '*', '!', '?', '@', '#', '$', '%', '^', '&', '(', ')', '+', '=', '/', '\\', '|', ':', ';', '"', "'", '<', '>', '~', '`', '№']);
+function stripBrush(s) { return String(s || '').split('').filter((c) => !BRUSH_CHARS.has(c)).join(''); }
+
+function normalizeForMatch(text) {
+  let out = String(text || '').toLowerCase().replace(/ё/g, 'е').replace(/ъ/g, '');
+  out = out.split('').map((c) => LAT_TO_CYR[c] ?? c).join('');
+  return out;
+}
+
+function translitOf(text) {
+  return String(text || '').toLowerCase().replace(/ё/g, 'е').split('').map((c) => CYR_TO_LAT[c] ?? c).join('');
+}
+
+function containsProfanity(text) {
+  const lower = normalizeForMatch(text);
+  for (const word of PROFANITY_WORDS) {
+    if (!word) continue;
+    if (lower.includes(word.toLowerCase())) return true;
+  }
+  // Ё/Е нормализация: 'ёб' → 'еб' ловится только как отдельное слово (не "небо"/"хлеб").
+  if (/(^|[^а-яё0-9_])еб([^а-яё0-9_]|$)/.test(lower.replace(/[^а-яё0-9_]/g, ' '))) return true;
+  const brushed = stripBrush(text.toLowerCase());
+  if (translitOf(brushed).includes('hui')) return true;
+  if (translitOf(brushed).includes('blyat')) return true;
+  if (translitOf(brushed).includes('blya')) return true;
+  if (translitOf(brushed).includes('suka')) return true;
+  if (translitOf(brushed).includes('ebat')) return true;
+  if (translitOf(brushed).includes('yob')) return true;
+  if (translitOf(brushed).includes('pidor')) return true;
+  if (translitOf(brushed).includes('govno')) return true;
+  return false;
+}
+
+function containsExtremism(text) {
+  const lower = normalizeForMatch(text);
+  for (const word of EXTREMISM_WORDS) {
+    if (lower.includes(word)) return true;
+  }
+  if (translitOf(text.toLowerCase()).includes('nazi')) return true;
+  if (translitOf(text.toLowerCase()).includes('faschist')) return true;
+  return false;
+}
+
+function containsReligiousInsult(text) {
+  const lower = normalizeForMatch(text);
+  for (const word of RELIGIOUS_INSULT_WORDS) {
+    if (lower.includes(word)) return true;
+  }
+  return false;
+}
+
+function containsTerrorism(text) {
+  const lower = normalizeForMatch(text);
+  for (const word of TERRORISM_WORDS) {
+    if (!word) continue;
+    if (lower.includes(word)) return true;
+  }
+  if (translitOf(text.toLowerCase()).includes('terror')) return true;
+  if (translitOf(text.toLowerCase()).includes('dzhihad')) return true;
+  return false;
+}
+
+function containsSeparatism(text) {
+  const lower = normalizeForMatch(text);
+  for (const word of SEPARATISM_WORDS) {
+    if (lower.includes(word)) return true;
+  }
+  return false;
+}
+
+function containsDrugs(text) {
+  const lower = normalizeForMatch(text);
+  for (const word of DRUG_WORDS) {
+    if (lower.includes(word)) return true;
+  }
+  const t = translitOf(text.toLowerCase());
+  if (t.includes('drug') || t.includes('cocaine') || t.includes('heroin') || t.includes('marihuana') || t.includes('gashish') || t.includes('amfetamin')) return true;
+  return false;
+}
+
+function containsCP(text) {
+  const lower = normalizeForMatch(text);
+  for (const word of CP_WORDS) {
+    if (lower.includes(word)) return true;
+  }
+  if (translitOf(text.toLowerCase()).includes('child porn')) return true;
+  if (translitOf(text.toLowerCase()).includes('pedophil')) return true;
+  return false;
+}
+
+function containsForeignAgent(text) {
+  const lower = normalizeForMatch(text).replace(/\s+/g, ' ');
+  for (const word of FOREIGN_AGENT_WORDS) {
+    if (lower.includes(word.toLowerCase())) return true;
+  }
+  return false;
+}
+
+function containsExtremistMaterial(text) {
+  const lower = normalizeForMatch(text);
+  for (const word of EXTREMIST_MATERIAL_WORDS) {
+    if (lower.includes(word)) return true;
+  }
+  return false;
+}
+
+function containsHate(text) {
+  const lower = normalizeForMatch(text);
+  for (const word of HATE_WORDS) {
+    if (!word) continue;
+    if (lower.includes(word)) return true;
+  }
+  return false;
+}
+
+function containsSuicide(text) {
+  const lower = normalizeForMatch(text).replace(/[^а-яё0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  const phrases = ['убей себя', 'убить себя', 'сделай это с собой', 'сдели это с собой', 'повесься', 'повесись', 'удавись', 'реж вены', 'уничтожь себя'];
+  for (const p of phrases) {
+    if (lower.includes(p)) return true;
+  }
+  for (const word of SUICIDE_WORDS) {
+    if (!word) continue;
+    if (lower.includes(word)) return true;
+  }
+  return false;
+}
+
+function containsCoercion(text) {
+  const lower = normalizeForMatch(text).replace(/\s+/g, ' ');
+  for (const word of COERCION_WORDS) {
+    if (!word) continue;
+    if (lower.includes(word)) return true;
+  }
+  // Падежные словоформы: "понуждение к сексу", "понуждаю к сексу", "развратные действия".
+  if (/понужд[а-яёa-z]* к секс/i.test(lower)) return true;
+  if (/(?:развратн|развратн[а-яёa-z]+) действи/i.test(lower)) return true;
+  if (/принужд[а-яёa-z]* к секс/i.test(lower)) return true;
+  return false;
+}
+
+function containsMinorSex(text) {
+  const lower = normalizeForMatch(text);
+  for (const word of MINOR_SEX_WORDS) {
+    if (!word) continue;
+    if (lower.includes(word)) return true;
+  }
+  return false;
+}
+
+function containsProstitution(text) {
+  const lower = normalizeForMatch(text).replace(/\s+/g, ' ');
+  for (const word of PROSTITUTION_WORDS) {
+    if (!word) continue;
+    if (lower.includes(word)) return true;
+  }
+  return false;
+}
+
+function containsNsfw(text) {
+  const lower = normalizeForMatch(text);
+  for (const word of NSFW_WORDS) {
+    if (!word) continue;
+    if (lower.includes(word)) return true;
+  }
+  // Латинское написание и homoglyph-обходы для базовых непристойных корней.
+  // Только целые слова (word boundaries), чтобы 'rasskazhi' не матчилось как 'ass'.
+  const translit = ` ${translitOf(text.toLowerCase())} `;
+  if (/(?:[^a-z](?:fuck|fucking|porn|pornhub|xnxx|xvideos|nude|naked|cock|dick|pussy|penis|ass|boobs|tits|escort|nudes|webcam)[^a-z])/.test(translit)) return true;
+  if (/\b(?:sex tape|sex video|sex cam|adult content)\b/.test(translit)) return true;
+  return false;
+}
+
+const BLOCK_REASONS = new Set(['extremism', 'religious_insult', 'terrorism', 'separatism', 'drugs', 'child_exploitation', 'foreign_agent', 'extremist_material', 'hate', 'suicide', 'coercion', 'minor_sex', 'prostitution', 'nsfw']);
+const CENSOR_REASONS = new Set(['profanity']);
+
+function normalizeCyrWord(w) {
+  return String(w || '').toLowerCase().replace(/[ё]/g, 'е');
+}
+
+const TRANSLIT_PROFANITY = new Set([
+  'hui', 'huj', 'huy', 'nahui', 'nahuj',
+  'blya', 'blyat', 'blyad', 'blia', 'blat', 'bljad', 'bliat',
+  'suka', 'suki',
+  'ebat', 'jebat', 'yob', 'yobb', 'zab', 'zaebat',
+  'pidor', 'pidar', 'piidor',
+  'govno', 'dermo', 'jopa',
+  'pizdec', 'pizda', 'pizd', 'pzd',
+  'mudak', 'mudak',
+  'huinya', 'hujnya', 'guynya',
+]);
+
+function censorText(text) {
+  const original = String(text || '');
+  const lower = original.toLowerCase().replace(/ё/g, 'е');
+  const normalized = lower.split('').map((c) => LAT_TO_CYR[c] ?? c).join('');
+  const stems = [...PROFANITY_WORDS, ...EXTREMISM_WORDS, ...RELIGIOUS_INSULT_WORDS, ...DRUG_WORDS]
+    .map((w) => normalizeCyrWord(w))
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+  const out = original.split('');
+  const wordRe = /[а-яёa-z][а-яёa-z0-9_'-]*/gi;
+  for (const m of normalized.matchAll(wordRe)) {
+    const w = m[0].toLowerCase();
+    const hit = stems.find((s) => w.includes(s));
+    if (hit) {
+      for (let i = m.index; i < m.index + m[0].length; i++) out[i] = '*';
+    }
+  }
+  for (const m of lower.matchAll(wordRe)) {
+    const w = m[0].toLowerCase();
+    if (/^[a-z]+$/.test(w) && TRANSLIT_PROFANITY.has(w)) {
+      for (let i = m.index; i < m.index + m[0].length; i++) out[i] = '*';
+    }
+  }
+  return out.join('');
+}
+
+function moderateText(text) {
+  const reasons = [];
+  if (containsProfanity(text)) reasons.push('profanity');
+  if (containsExtremism(text)) reasons.push('extremism');
+  if (containsHate(text)) reasons.push('hate');
+  if (containsReligiousInsult(text)) reasons.push('religious_insult');
+  if (containsTerrorism(text)) reasons.push('terrorism');
+  if (containsSeparatism(text)) reasons.push('separatism');
+  if (containsDrugs(text)) reasons.push('drugs');
+  if (containsCP(text)) reasons.push('child_exploitation');
+  if (containsMinorSex(text)) reasons.push('minor_sex');
+  if (containsCoercion(text)) reasons.push('coercion');
+  if (containsProstitution(text)) reasons.push('prostitution');
+  if (containsNsfw(text)) reasons.push('nsfw');
+  if (containsSuicide(text)) reasons.push('suicide');
+  if (containsForeignAgent(text)) reasons.push('foreign_agent');
+  if (containsExtremistMaterial(text)) reasons.push('extremist_material');
+  const blockReasons = reasons.filter((r) => BLOCK_REASONS.has(r));
+  const censorReasons = reasons.filter((r) => CENSOR_REASONS.has(r));
+  const blocked = blockReasons.length > 0;
+  const censored = censorReasons.length > 0;
+  return {
+    allowed: !blocked,
+    blocked,
+    censored,
+    action: blocked ? 'block' : censored ? 'censor' : 'allow',
+    blockedReasons: blockReasons,
+    censoredReasons: censorReasons,
+    reasons,
+    censoredText: censored && !blocked ? censorText(text) : null
+  };
+}
+
+const auditLog = [];
+
+function auditAction(userId, action, details, meta = {}) {
+  const entry = {
+    userId,
+    action,
+    details,
+    timestamp: new Date().toISOString(),
+    ip: meta.ip || ''
+  };
+  auditLog.push(entry);
+  if (auditLog.length > 10000) auditLog.shift();
+  // 152-ФЗ ст. 18.1: журнал хранится >= 3 лет. Персистим в Supabase (best-effort).
+  const ipAddress = String(meta.ip || '').slice(0, 45);
+  supabaseRequest('audit_log', {
+    method: 'POST',
+    body: JSON.stringify({
+      user_id: String(userId || ''),
+      action: String(action || ''),
+      details: details || {},
+      ip_address: ipAddress || null,
+      user_agent: String(meta.userAgent || '').slice(0, 500) || null
+    })
+  }).catch(() => {});
+  return entry;
+}
+
+const reportQueue = [];
+
+async function handleReport(req, res) {
+  const user = authUser(req);
+  if (!user) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
+  try {
+    const body = await readJson(req);
+    const targetId = String(body.targetId || '');
+    const targetType = String(body.targetType || 'user');
+    const reason = String(body.reason || '');
+    const details = String(body.details || '').slice(0, 500);
+
+    if (!targetId || !reason) return sendJson(res, 400, { error: 'invalid_report' }, corsHeaders());
+
+    const report = {
+      id: `report-${Date.now()}-${randomBytes(4).toString('hex')}`,
+      reporterId: user.id || user.email,
+      targetId,
+      targetType,
+      reason,
+      details,
+      status: 'pending',
+      statusChangedAt: null,
+      reviewedBy: null,
+      createdAt: new Date().toISOString()
+    };
+    reportQueue.push(report);
+    auditAction(user.id || user.email, 'report', { targetId, targetType, reason }, { ip: String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '') });
+
+    await supabaseRequest('reports', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: report.id,
+        reporter_id: report.reporterId,
+        target_id: report.targetId,
+        target_type: report.targetType,
+        reason: report.reason,
+        details: report.details,
+        status: report.status
+      })
+    }).catch(() => {});
+
+    await applyAutoModerationQuorum(report.targetId);
+
+    return sendJson(res, 200, { ok: true, reportId: report.id }, corsHeaders());
+  } catch {
+    return sendJson(res, 400, { error: 'bad_request' }, corsHeaders());
+  }
+}
+
+const REPORT_STATUS_CHANGE_AT = { pending: 0, reviewed: 2, resolved: 3, dismissed: 1 };
+
+function handleReportStatus(req, res) {
+  const user = authUser(req);
+  if (!user) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const limit = Math.min(parseInt(url.searchParams.get('limit') || '50', 10), 200);
+  const mine = reportQueue
+    .filter((r) => r.reporterId === (user.id || user.email))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, limit)
+    .map((r) => ({
+      id: r.id,
+      targetId: r.targetId,
+      targetType: r.targetType,
+      reason: r.reason,
+      status: r.status,
+      createdAt: r.createdAt,
+      statusChangedAt: r.statusChangedAt || null
+    }));
+  return sendJson(res, 200, { reports: mine }, corsHeaders());
+}
+
+// Админ: очередь разбора анкет (по ADMIN_SECRET). Роутер: GET /api/moderation/review
+async function handleModerationReview(req, res) {
+  const headers = corsHeaders();
+  if (!adminKeyOk(req)) return sendJson(res, 401, { error: 'unauthorized' }, headers);
+  try {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '50', 10), 200);
+
+    // Объединяем отчёты из Supabase и in-memory очереди.
+    const raw = [];
+    const supbaseRows = await supabaseRequest(
+      `reports?status=in.(pending,reviewed)&order=created_at.desc&limit=${limit}&select=id,reporter_id,target_id,reason,details,status,created_at,reviewed_by`
+    ).catch(() => null);
+    if (Array.isArray(supbaseRows)) raw.push(...supbaseRows);
+    for (const r of reportQueue) {
+      if (r.status === 'pending' || r.status === 'reviewed') {
+        raw.push({ target_id: r.targetId, reporter_id: r.reporterId, reason: r.reason, details: r.details, status: r.status, created_at: r.createdAt, reviewed_by: r.reviewedBy || null });
+      }
+    }
+
+    const groups = new Map();
+    for (const r of raw) {
+      const t = r.target_id;
+      if (!groups.has(t)) groups.set(t, { targetId: t, reportCount: 0, distinctReporters: new Set(), reasons: [], status: '' });
+      const g = groups.get(t);
+      g.reportCount++;
+      g.distinctReporters.add(r.reporter_id);
+      if (r.reason && !g.reasons.includes(r.reason)) g.reasons.push(r.reason);
+      g.status = r.status;
+    }
+    const queues = [...groups.values()].map((g) => ({
+      targetId: g.targetId,
+      reportCount: g.reportCount,
+      distinctReporters: g.distinctReporters.size,
+      reasons: g.reasons.slice(0, 8),
+      status: g.status
+    })).sort((a, b) => b.reportCount - a.reportCount).slice(0, limit);
+
+    const flaggedUsers = [];
+    for (const [email, u] of Object.entries(store.users)) {
+      const status = u.moderation || 'approved';
+      if (status === 'blocked' || status === 'pending_review') {
+        flaggedUsers.push({
+          email,
+          moderation: status,
+          name: u.publicProfile?.name || u.syncPayload?.profile?.name || '',
+          reason: u.moderationReason || '',
+          updatedAt: u.updatedAt || null
+        });
+      }
+    }
+
+    const persisted = await supabaseRequest(
+      `moderation_status?status=in.(pending_review,blocked)&order=updated_at.desc&limit=${limit}&select=target_id,status,reason,changed_by,updated_at`
+    ).catch(() => null);
+    const persistedFlagged = Array.isArray(persisted) ? persisted : [];
+
+    auditAction('admin', 'moderation_review_open', {}, { ip: String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '') });
+    return sendJson(res, 200, { queues, flaggedUsers, persistedFlagged }, headers);
+  } catch {
+    return sendJson(res, 400, { error: 'bad_request' }, headers);
+  }
+}
+
+// Админ: решение по анкете. Роутер: POST /api/moderation/resolve { targetId, action: approve|block|dismiss }
+async function handleModerationResolve(req, res) {
+  const headers = corsHeaders();
+  if (!adminKeyOk(req)) return sendJson(res, 401, { error: 'unauthorized' }, headers);
+  try {
+    const body = await readJson(req);
+    const targetId = String(body.targetId || '').trim();
+    const action = String(body.action || '').trim();
+    if (!targetId || !['approve', 'block', 'dismiss'].includes(action)) {
+      return sendJson(res, 400, { error: 'invalid_action' }, headers);
+    }
+    const ip = String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '');
+    const now = nowIso();
+    const targetUser = store.users[targetId];
+
+    let newStatus = null;
+    if (action === 'approve') {
+      newStatus = 'approved';
+      if (targetUser) targetUser.moderation = 'approved';
+      await persistModeration(targetId, 'approved', 'approved by moderator', 'admin');
+    } else if (action === 'block') {
+      newStatus = 'blocked';
+      if (targetUser) { targetUser.moderation = 'blocked'; targetUser.moderationReason = 'blocked by moderator'; }
+      await persistModeration(targetId, 'blocked', 'blocked by moderator', 'admin');
+    }
+
+    // Отчёты по цели: resolved для approve/block, dismissed для dismiss.
+    const reportStatus = action === 'dismiss' ? 'dismissed' : 'resolved';
+    for (const r of reportQueue) {
+      if (r.targetId === targetId && (r.status === 'pending' || r.status === 'reviewed')) {
+        r.status = reportStatus;
+        r.statusChangedAt = now;
+        r.reviewedBy = 'admin';
+      }
+    }
+    await supabaseRequest(`reports?target_id=eq.${encodeURIComponent(targetId)}&status=in.(pending,reviewed)`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: reportStatus, reviewed_by: 'admin', reviewed_at: now })
+    }).catch(() => {});
+
+    auditAction('admin', 'moderation_resolve', { targetId, action, newStatus }, { ip });
+    return sendJson(res, 200, { ok: true, targetId, status: newStatus || reportStatus }, headers);
+  } catch {
+    return sendJson(res, 400, { error: 'bad_request' }, headers);
+  }
+}
+
+async function handleModerate(req, res) {
+  const user = authUser(req);
+  if (!user) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
+  try {
+    const body = await readJson(req);
+    const text = String(body.text || '');
+    const result = moderateText(text);
+    auditAction(user.id || user.email, 'moderate_check', { textLength: text.length, allowed: result.allowed }, { ip: String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '') });
+    return sendJson(res, 200, result, corsHeaders());
+  } catch {
+    return sendJson(res, 400, { error: 'bad_request' }, corsHeaders());
+  }
+}
+
+async function handleAuditLog(req, res) {
+  // 152-ФЗ ст. 7: конфиденциальность. Субъект видит ТОЛЬКО свои записи.
+  const user = authUser(req);
+  if (!user) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const limit = Math.min(parseInt(url.searchParams.get('limit') || '100', 10), 500);
+  const uid = user.id || user.email;
+  const logs = auditLog.filter((l) => l.userId === uid || l.userId === user.email).slice(-limit);
+  return sendJson(res, 200, { logs }, corsHeaders());
+}
+
+async function handleDataExport(req, res) {
+  // 152-ФЗ ст. 14 п. 7: субъект вправе получить копию своих ПДн.
+  const user = authUser(req);
+  if (!user) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
+  try {
+    const email = user.email;
+    const uid = user.id || email;
+    let profile = await supabaseRequest(`profiles?user_id=eq.${encodeURIComponent(uid)}&select=*`).catch(() => null);
+    let consents = await supabaseRequest(`current_consents?user_id=eq.${encodeURIComponent(uid)}&select=*`).catch(() => null);
+    const plans = await supabaseRequest(`plans?user_id=eq.${encodeURIComponent(uid)}&select=*`).catch(() => null);
+    const ip = String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '');
+    auditAction(uid, 'data_export', { tables: ['local_store', 'profiles', 'current_consents', 'plans'] }, { ip, userAgent: req.headers['user-agent'] });
+
+    const local = store.users[email] || {};
+    const localProfile = user.publicProfile || local.publicProfile || null;
+    const localPlans = user.plans || local.plans || {};
+    const consentsRecord = consents && consents.length ? consents[0] : null;
+
+    // Профиль: если локальный существеннее supabase-ного, используем локальный.
+    if (!profile || !profile.length || (localProfile && JSON.stringify(localProfile).length > JSON.stringify(profile[0] || {}).length)) {
+      profile = localProfile;
+    }
+
+    return sendJson(res, 200, {
+      exportedAt: new Date().toISOString(),
+      deadlineRespondBy: addWorkdays(new Date(), 10).toISOString(),
+      operator: 'ИП Меньшиков Артем Геннадьевич',
+      data: {
+        account: { email, createdAt: local.createdAt, updatedAt: local.updatedAt },
+        profile,
+        consents: consentsRecord,
+        plans: Object.keys(localPlans).length ? localPlans : ((plans || []).length ? plans : null),
+        lastLocation: user.lastLocation || null,
+        syncPayload: user.syncPayload || null,
+        syncUpdatedAt: user.syncUpdatedAt || null,
+        moderation: user.moderation || null
+      }
+    }, corsHeaders());
+  } catch {
+    return sendJson(res, 400, { error: 'bad_request' }, corsHeaders());
+  }
+}
+
+function erasedUserId(uid) {
+  return 'erased_' + createHash('sha256').update(String(uid)).digest('hex').slice(0, 32);
+}
+
+// 152-ФЗ ст. 21: субъект требует уничтожения ПДн. Журнал учета обращений (ст. 18.1)
+// хранится 3 года, но без связи с личностью: user_id заменяем необратимым хэшем,
+// из details вычищаем email и прочие прямые идентификаторы.
+async function anonymizeAuditFor(uid) {
+  const rows = await supabaseRequest(
+    `audit_log?user_id=eq.${encodeURIComponent(uid)}&limit=500&select=id,details`
+  ).catch(() => null);
+  if (!Array.isArray(rows)) return 0;
+  const erased = erasedUserId(uid);
+  let n = 0;
+  for (const row of rows) {
+    const details = row.details && typeof row.details === 'object' ? row.details : {};
+    const clean = {};
+    for (const [k, v] of Object.entries(details)) {
+      if (k === 'email' || k === 'accountId' || k === 'targetId') continue;
+      clean[k] = v;
+    }
+    await supabaseRequest(`audit_log?id=eq.${encodeURIComponent(row.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ user_id: erased, details: clean })
+    }).catch(() => {});
+    n++;
+  }
+  return n;
+}
+
+async function cancelActiveSubscriptionsFor(uid) {
+  const canceled = [];
+  if (cloudPaymentsUnavailable()) return canceled;
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || '';
+  if (!supabaseUrl) return canceled;
+  const rows = await fetch(
+    `${supabaseUrl}/rest/v1/subscriptions?user_id=eq.${encodeURIComponent(uid)}&status=in.(active,unsubscribed)&select=subscription_id`,
+    { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
+  ).then((r) => r.json()).catch(() => []);
+  if (Array.isArray(rows)) {
+    for (const row of rows) {
+      if (!row.subscription_id) continue;
+      try {
+        await cpApiPost('/subscriptions/cancel', { Id: row.subscription_id });
+        canceled.push(row.subscription_id);
+      } catch { /* CloudPayments уже отменил сам или недоступен — продолжаем удаление */ }
+    }
+  }
+  return canceled;
+}
+
+async function handleAccountDelete(req, res) {
+  // 152-ФЗ ст. 14 п. 7, ст. 21: право на уничтожение ПДн.
+  const user = authUser(req);
+  if (!user) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
+  try {
+    const email = user.email;
+    const uid = user.id || email;
+    const ip = String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '');
+    // Аудит ДО удаления (сам аккаунт уже есть в сессии).
+    auditAction(uid, 'account_delete_requested', { email }, { ip, userAgent: req.headers['user-agent'] });
+
+    // 1. Отменяем автопродления CloudPayments, чтобы не списывали после удаления.
+    const canceledSubscriptions = await cancelActiveSubscriptionsFor(uid);
+
+    // 2. Удаляем локальное состояние (пароль, анкета, лайки в store).
+    delete store.users[email];
+
+    // 3. Удаляем из Supabase все строки, связанные с аккаунтом.
+    const tables = ['current_consents', 'locations', 'plans', 'likes', 'messages', 'profiles', 'reports', 'subscriptions'];
+    await Promise.all(tables.map((t) => supabaseRequest(`${t}?user_id=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null)));
+    supabaseRequest(`moderation_status?target_id=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null);
+
+    // Сообщения/лайки — по обоим направлениям; проверки удаляются по цели и автору.
+    await Promise.all([
+      supabaseRequest(`messages?from_user=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null),
+      supabaseRequest(`messages?to_user=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null),
+      supabaseRequest(`likes?from_user=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null),
+      supabaseRequest(`likes?to_user=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null),
+      supabaseRequest(`reports?reporter_id=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null),
+      supabaseRequest(`reports?target_id=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null),
+      supabaseRequest(`events?user_id=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null)
+    ]);
+    for (const sid of canceledSubscriptions) {
+      supabaseRequest(`subscriptions?subscription_id=eq.${encodeURIComponent(sid)}`, { method: 'DELETE' }).catch(() => null);
+    }
+
+    // 4. Журнал не удаляем, но лишаем связи с личностью (остаётся минимум 3 года).
+    const anonymizedAudit = await anonymizeAuditFor(uid);
+
+    return sendJson(res, 200, {
+      ok: true,
+      message: 'account_deleted',
+      canceledSubscriptions: canceledSubscriptions.length,
+      anonymizedAudit
+    }, corsHeaders());
+  } catch {
+    return sendJson(res, 400, { error: 'bad_request' }, corsHeaders());
+  }
+}
+
+function validateImageBuffer(buffer, filename) {
+  if (!buffer || buffer.length < 100) return { ok: false, error: 'empty_file' };
+  if (buffer.length > 10 * 1024 * 1024) return { ok: false, error: 'file_too_large_10mb' };
+  const header = buffer.slice(0, 12);
+  const isJPEG = header[0] === 0xFF && header[1] === 0xD8;
+  const isPNG = header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47;
+  const isWebP = header[0] === 0x52 && header[1] === 0x49 && header[2] === 0x46 && header[3] === 0x46 && header[8] === 0x57 && header[9] === 0x45 && header[10] === 0x42 && header[11] === 0x50;
+  const isGIF = header[0] === 0x47 && header[1] === 0x49 && header[2] === 0x46;
+  const isHEIC = header[4] === 0x66 && header[5] === 0x74 && header[6] === 0x79 && header[7] === 0x70;
+  const allowed = isJPEG || isPNG || isWebP || isGIF || isHEIC;
+  if (!allowed) return { ok: false, error: 'invalid_image_format' };
+  const ext = (filename || '').split('.').pop().toLowerCase();
+  const allowedExts = ['jpg','jpeg','png','webp','gif','heic','heif'];
+  if (ext && !allowedExts.includes(ext)) return { ok: false, error: 'invalid_extension' };
+  return { ok: true, format: isJPEG ? 'jpeg' : isPNG ? 'png' : isWebP ? 'webp' : isGIF ? 'gif' : 'heic' };
+}
+
+function checkImageFilename(filename) {
+  const suspiciousPatterns = [/\.\./i, /<script/i, /javascript:/i, /\.exe$/i, /\.bat$/i, /\.sh$/i];
+  for (const pattern of suspiciousPatterns) {
+    if (pattern.test(filename)) return false;
+  }
+  return true;
+}
+
+const NSFW_SKIN_HARD_LIMIT = 0.45;
+const NSFW_SKIN_REVIEW_LIMIT = 0.28;
+
+function photoAnalysisVerdict({ skinRatio, dims }) {
+  let verdict = 'ok';
+  let risk = 'low';
+  const ratio = Math.min(1, Math.max(0, Number(skinRatio) || 0));
+  if (ratio >= NSFW_SKIN_HARD_LIMIT) {
+    verdict = 'reject';
+    risk = 'high';
+  } else if (ratio >= NSFW_SKIN_REVIEW_LIMIT) {
+    verdict = 'review';
+    risk = 'medium';
+  }
+  return { verdict, risk, skinRatio: Math.round(ratio * 1000) / 1000, dims: dims || null };
+}
+
+async function handlePhotoAnalyze(req, res) {
+  const user = authUser(req);
+  if (!user) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
+  try {
+    const body = await readJson(req);
+    const { skinRatio, dims, filename } = body;
+    const result = photoAnalysisVerdict({ skinRatio, dims });
+    auditAction(user.id || user.email, 'photo_analyze', { ...result, filename }, { ip: String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '') });
+    if (result.verdict !== 'ok') {
+      const report = {
+        id: `report-${Date.now()}-${randomBytes(4).toString('hex')}`,
+        reporterId: user.id || user.email,
+        targetId: user.id || user.email,
+        targetType: 'photo',
+        reason: `nsfw_${result.verdict}`,
+        details: `skin_ratio=${result.skinRatio}`,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      };
+      reportQueue.push(report);
+      await supabaseRequest('reports', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: report.id,
+          reporter_id: report.reporterId,
+          target_id: report.targetId,
+          target_type: report.targetType,
+          reason: report.reason,
+          details: report.details,
+          status: report.status
+        })
+      }).catch(() => {});
+    }
+    return sendJson(res, 200, result, corsHeaders());
+  } catch {
+    return sendJson(res, 400, { error: 'bad_request' }, corsHeaders());
+  }
+}
+
+async function handleValidatePhoto(req, res) {
+  const user = authUser(req);
+  if (!user) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
+  try {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const body = Buffer.concat(chunks);
+    let parsed;
+    try { parsed = JSON.parse(body.toString()); } catch { return sendJson(res, 400, { error: 'invalid_json' }, corsHeaders()); }
+    const { filename, mimeType, base64Data } = parsed;
+    const buffer = base64Data ? Buffer.from(base64Data, 'base64') : body;
+    const fnCheck = checkImageFilename(String(filename || ''));
+    if (!fnCheck) return sendJson(res, 400, { error: 'suspicious_filename' }, corsHeaders());
+    const validation = validateImageBuffer(buffer, filename);
+    auditAction(user.id || user.email, 'photo_validate', { filename, ...validation }, { ip: String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '') });
+    if (!validation.ok) return sendJson(res, 400, { error: validation.error }, corsHeaders());
+    return sendJson(res, 200, { ok: true, format: validation.format }, corsHeaders());
+  } catch {
+    return sendJson(res, 400, { error: 'bad_request' }, corsHeaders());
+  }
+}
+
+async function handleMessage(req, res) {
+  const user = authUser(req);
+  if (!user) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
+  try {
+    const body = await readJson(req);
+    const text = String(body.text || '');
+    if (text.length > 2000) return sendJson(res, 400, { error: 'message_too_long' }, corsHeaders());
+    const moderation = moderateText(text);
+    if (moderation.blocked) {
+      auditAction(user.id || user.email, 'message_blocked', { reasons: moderation.blockedReasons }, { ip: String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '') });
+      return sendJson(res, 403, { error: 'content_blocked', reasons: moderation.blockedReasons }, corsHeaders());
+    }
+    auditAction(user.id || user.email, 'message', { censored: moderation.censored, reasons: moderation.censoredReasons }, { ip: String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '') });
+    return sendJson(res, 200, { ok: true, censored: moderation.censored, censoredText: moderation.censoredText }, corsHeaders());
+  } catch {
+    return sendJson(res, 400, { error: 'bad_request' }, corsHeaders());
+  }
+}
+
 function authUser(req) {
   const auth = String(req.headers.authorization || '');
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   const payload = verifyToken(token);
   if (!payload) return null;
-  return store.users[payload.sub] || null;
+  const user = store.users[payload.sub] || null;
+  if (user && user.moderation === 'blocked') return null;
+  return user;
 }
 
 function ensureSeedEvents() {
@@ -581,6 +1377,11 @@ async function handleLogin(req, res) {
     if (!passwordMatches(password, user.saltB64, user.hashB64)) {
       return sendJson(res, 401, { error: 'invalid_credentials' }, corsHeaders());
     }
+    await loadPersistedModeration(user);
+    if (user.moderation === 'blocked') {
+      auditAction(user.id || user.email, 'login_blocked', { reason: 'account_blocked' }, { ip: String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '') });
+      return sendJson(res, 403, { error: 'account_blocked' }, corsHeaders());
+    }
     const token = signToken({ sub: email, exp: Date.now() + 1000 * 60 * 60 * 24 * 30 });
     sendJson(res, 200, { token, email }, corsHeaders());
   } catch {
@@ -588,11 +1389,137 @@ async function handleLogin(req, res) {
   }
 }
 
+const MODERATION_REVIEW_COOLDOWN_MS = 1000 * 60 * 60 * 6;
+
+function inferModerationStatus(user, profileText) {
+  const m = moderateText(String(profileText || ''));
+  const reasons = m.reasons;
+  if (m.blocked) return 'blocked';
+  if (reasons.length) return 'pending_review';
+  return 'approved';
+}
+
+function profileModerationStatus(user) {
+  if (user.moderation) return user.moderation;
+  const text = [
+    user.publicProfile?.name,
+    user.publicProfile?.jobTitle,
+    user.publicProfile?.education,
+    user.publicProfile?.interests?.join(' '),
+    user.publicProfile?.values?.join(' ')
+  ].filter(Boolean).join(' ');
+  return inferModerationStatus(user, text);
+}
+
+function moderationDueForReview(user) {
+  if (!user.syncUpdatedAt) return true;
+  return Date.now() - new Date(user.syncUpdatedAt).getTime() > MODERATION_REVIEW_COOLDOWN_MS;
+}
+
+// ============ МОДЕРАЦИЯ АНКЕТ: кворум жалоб + админ-разбор + персистентность ============
+
+const REPORT_QUORUM_REVIEW = 3;   // уникальных жалобщиков за 24 ч → скрыть анкету до разбора
+const REPORT_QUORUM_BLOCK = 7;    // уникальных жалобщиков за 24 ч → заблокировать насовсем
+const MODERATION_ADMIN_SECRET = process.env.MODERATION_ADMIN_SECRET || process.env.ADMIN_SECRET || '';
+
+function adminKeyOk(req) {
+  const secret = String(req.headers['x-admin-key'] || String(req.headers.authorization || '').replace(/^Bearer /i, ''));
+  return !!(MODERATION_ADMIN_SECRET && secret &&
+    timingSafeEqual(Buffer.from(MODERATION_ADMIN_SECRET), Buffer.from(secret)));
+}
+
+async function loadPersistedModeration(user) {
+  try {
+    const rows = await supabaseRequest(`moderation_status?target_id=eq.${encodeURIComponent(user.id || user.email)}&select=status,reason`);
+    if (Array.isArray(rows) && rows[0] && rows[0].status) {
+      user.moderation = rows[0].status;
+      user.moderationReason = rows[0].reason || '';
+      user._modPersisted = true;
+      return user.moderation;
+    }
+  } catch { /* supabase недоступен — используем in-memory */ }
+  return user.moderation || null;
+}
+
+async function persistModeration(targetId, status, reason, by) {
+  const payload = {
+    target_id: targetId,
+    status,
+    reason: reason || '',
+    changed_by: by || 'system',
+    updated_at: nowIso()
+  };
+  const existing = await supabaseRequest(`moderation_status?target_id=eq.${encodeURIComponent(targetId)}&select=target_id`).catch(() => null);
+  if (Array.isArray(existing) && existing.length) {
+    await supabaseRequest(`moderation_status?target_id=eq.${encodeURIComponent(targetId)}`, { method: 'PATCH', body: JSON.stringify(payload) }).catch(() => {});
+  } else {
+    await supabaseRequest('moderation_status', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates' },
+      body: JSON.stringify({ ...payload, created_at: nowIso() })
+    }).catch(() => {});
+  }
+}
+
+async function countDistinctReporters(targetId, hours = 24) {
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+  let reporters = [];
+  try {
+    const rows = await supabaseRequest(
+      `reports?target_id=eq.${encodeURIComponent(targetId)}&created_at=gt.${encodeURIComponent(since)}&select=reporter_id`
+    );
+    if (Array.isArray(rows)) reporters = rows.map((r) => r.reporter_id);
+  } catch { /* ignore */ }
+  for (const r of reportQueue) {
+    if (r.targetId === targetId && new Date(r.createdAt).getTime() > Date.now() - hours * 60 * 60 * 1000) {
+      reporters.push(r.reporterId);
+    }
+  }
+  return new Set(reporters).size;
+}
+
+async function applyAutoModerationQuorum(targetId) {
+  const distinct = await countDistinctReporters(targetId);
+  if (distinct < REPORT_QUORUM_REVIEW) return;
+  const status = distinct >= REPORT_QUORUM_BLOCK ? 'blocked' : 'pending_review';
+  const reason = `auto_quorum: ${distinct} жалоб за 24 ч`;
+
+  const targetUser = store.users[targetId];
+  if (targetUser) {
+    targetUser.moderation = status;
+    targetUser.moderationReason = reason;
+  }
+
+  const now = nowIso();
+  for (const r of reportQueue) {
+    if (r.targetId === targetId && r.status === 'pending') {
+      r.status = 'reviewed';
+      r.statusChangedAt = now;
+      r.reviewedBy = 'auto-quorum';
+    }
+  }
+
+  await persistModeration(targetId, status, reason, 'auto-quorum');
+  await supabaseRequest(`reports?target_id=eq.${encodeURIComponent(targetId)}&status=eq.pending`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'reviewed', reviewed_by: 'auto-quorum', reviewed_at: now })
+  }).catch(() => {});
+  auditAction('system', 'auto_moderation', { targetId, status, distinctReporters: distinct }, { ip: '' });
+}
+
 async function handleSync(req, res) {
   const user = authUser(req);
   if (!user) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
+  await loadPersistedModeration(user);
+  if (user.moderation === 'blocked') {
+    return sendJson(res, 403, { error: 'account_blocked' }, corsHeaders());
+  }
   if (req.method === 'GET') {
-    return sendJson(res, 200, { payload: user.syncPayload || null, updatedAt: user.syncUpdatedAt || null }, corsHeaders());
+    return sendJson(res, 200, {
+      payload: user.syncPayload || null,
+      updatedAt: user.syncUpdatedAt || null,
+      moderation: profileModerationStatus(user)
+    }, corsHeaders());
   }
   try {
     const body = await readJson(req);
@@ -602,10 +1529,27 @@ async function handleSync(req, res) {
     user.syncPayload = payload;
     user.syncUpdatedAt = updatedAt;
     user.updatedAt = nowIso();
-    sendJson(res, 200, { ok: true, updatedAt }, corsHeaders());
+    if (!user._modPersisted || !user.moderation) {
+      user.moderation = inferModerationStatus(user, safeJoin(payload, 2000));
+      persistModeration(user.id || user.email, user.moderation, 'auto_inferred', 'system').catch(() => {});
+    }
+    auditAction(user.id || user.email, 'sync_moderation', { status: user.moderation }, { ip: String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '') });
+    sendJson(res, 200, { ok: true, updatedAt, moderation: user.moderation }, corsHeaders());
   } catch {
     sendJson(res, 400, { error: 'bad_request' }, corsHeaders());
   }
+}
+
+function safeJoin(payload, maxLen) {
+  if (!payload || typeof payload !== 'object') return '';
+  const collect = [];
+  const walk = (node) => {
+    if (typeof node === 'string') collect.push(node);
+    else if (Array.isArray(node)) node.forEach(walk);
+    else if (node && typeof node === 'object') Object.values(node).forEach(walk);
+  };
+  walk(payload);
+  return collect.join(' ').slice(0, maxLen);
 }
 
 async function handlePublic(req, res) {
@@ -623,8 +1567,16 @@ async function handlePublic(req, res) {
     const jobTitle = String(profile.jobTitle || '').slice(0, 60);
     const education = String(profile.education || '').slice(0, 80);
     user.publicProfile = { name, communication, interests, values, zodiac, jobTitle, education };
+    if (!user._modPersisted || !user.moderation) {
+      user.moderation = inferModerationStatus(user, [name, jobTitle, education, interests.join(' '), values.join(' ')].join(' '));
+      persistModeration(user.id || user.email, user.moderation, 'auto_inferred', 'system').catch(() => {});
+    }
+    if (user.moderation === 'blocked') {
+      return sendJson(res, 403, { error: 'account_blocked' }, corsHeaders());
+    }
     user.updatedAt = nowIso();
-    sendJson(res, 200, { ok: true }, corsHeaders());
+    auditAction(user.id || user.email, 'public_profile_moderation', { status: user.moderation }, { ip: String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '') });
+    sendJson(res, 200, { ok: true, moderation: user.moderation }, corsHeaders());
   } catch {
     sendJson(res, 400, { error: 'bad_request' }, corsHeaders());
   }
@@ -664,6 +1616,7 @@ function handleNearby(req, res, url) {
   const out = [];
   for (const [email, u] of Object.entries(store.users)) {
     if (!u || email === user.email) continue;
+    if (u.moderation === 'blocked' || u.moderation === 'rejected' || u.moderation === 'pending_review') continue;
     const loc = u.lastLocation;
     if (!loc || loc.cityKey !== city) continue;
     const distKm = haversineKm({ lat, lon }, { lat: loc.lat, lon: loc.lon });
@@ -917,116 +1870,227 @@ function cleanText(value) {
   return String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-const YOOKASSA_SHOP_ID = process.env.YOOKASSA_SHOP_ID || '';
-const YOOKASSA_SECRET_KEY = process.env.YOOKASSA_SECRET_KEY || '';
-
-function yookassaAuth() {
-  return 'Basic ' + Buffer.from(`${YOOKASSA_SHOP_ID}:${YOOKASSA_SECRET_KEY}`).toString('base64');
-}
-
 const PLAN_PRICES = {
   standard: 29900,
   premium: 99900,
   vip: 299900,
+  exclusive: 999900,
   income_200k: 19900,
-  income_500k: 49900,
+  income_500k: 99900,
   income_1m: 99900,
-  income_5m: 299900
+  income_5m: 999900
 };
 
-async function handleYooKassaCreatePayment(req, res) {
-  const headers = corsHeaders();
-  try {
-    const body = await readBody(req);
-    const { planId, userId, email } = JSON.parse(body || '{}');
-    if (!planId || !PLAN_PRICES[planId]) return sendJson(res, 400, { error: 'invalid_plan' }, headers);
-    if (!YOOKASSA_SHOP_ID || !YOOKASSA_SECRET_KEY) return sendJson(res, 500, { error: 'yookassa_not_configured' }, headers);
+const SUBSCRIPTION_PLANS = new Set(['standard', 'premium', 'vip', 'exclusive']);
 
-    const amount = PLAN_PRICES[planId];
-    const description = `xystar — ${planId}`;
-    const return_url = `${req.headers.referer || 'https://xystar.ru/'}?payment=success`;
+const CLOUDPAYMENTS_PUBLIC_ID = process.env.CLOUDPAYMENTS_PUBLIC_ID || '';
+const CLOUDPAYMENTS_API_SECRET = process.env.CLOUDPAYMENTS_API_SECRET || '';
+const CLOUDPAYMENTS_API_URL = 'https://api.cloudpayments.ru';
 
-    const yookassaRes = await fetch('https://api.yookassa.ru/v3/payments', {
-      method: 'POST',
-      headers: {
-        'Authorization': yookassaAuth(),
-        'Content-Type': 'application/json',
-        'Idempotence-Key': `${userId || 'anon'}-${planId}-${Date.now()}`
-      },
-      body: JSON.stringify({
-        amount: { value: (amount / 100).toFixed(2), currency: 'RUB' },
-        capture: true,
-        confirmation: { type: 'redirect', return_url },
-        description,
-        metadata: { userId: userId || '', planId, email: email || '' },
-        receipt: email ? {
-          customer: { email },
-          items: [{
-            description,
-            quantity: '1.00',
-            amount: { value: (amount / 100).toFixed(2), currency: 'RUB' },
-            vat_code: 1,
-            payment_mode: 'full_payment',
-            payment_subject: 'service'
-          }]
-        } : undefined
-      })
-    });
-
-    const data = await yookassaRes.json();
-    if (!yookassaRes.ok) return sendJson(res, yookassaRes.status, { error: data?.error?.message || 'yookassa_error' }, headers);
-
-    return sendJson(res, 200, {
-      paymentId: data.id,
-      confirmationUrl: data.confirmation?.confirmation_url || null,
-      status: data.status
-    }, headers);
-  } catch (err) {
-    return sendJson(res, 500, { error: err?.message || 'internal' }, headers);
-  }
+function cloudPaymentsAuth() {
+  return 'Basic ' + Buffer.from(`${CLOUDPAYMENTS_PUBLIC_ID}:${CLOUDPAYMENTS_API_SECRET}`).toString('base64');
 }
 
-async function handleYooKassaWebhook(req, res) {
+function cloudPaymentsUnavailable() {
+  return !CLOUDPAYMENTS_PUBLIC_ID || !CLOUDPAYMENTS_API_SECRET;
+}
+
+function cloudPaymentsHmac(secret, body, urlEncoded) {
+  const normalized = urlEncoded ? body.replace(/%2F/g, '/').replace(/%3A/g, ':') : body;
+  return createHmac('sha256', secret).update(normalized, 'utf8').digest('base64');
+}
+
+// Одноразовый платёж для addon'ов и первый платёж подписки через CloudPayments
+async function cpApiPost(path, payload) {
+  const form = new URLSearchParams();
+  for (const [k, v] of Object.entries(payload || {})) {
+    if (v !== undefined && v !== null) form.append(k, String(v));
+  }
+  const resp = await fetch(`${CLOUDPAYMENTS_API_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': cloudPaymentsAuth(),
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: form.toString()
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok || data.Success === false) {
+    throw new Error(data.Message || `cloudpayments ${resp.status}`);
+  }
+  return data.Model || {};
+}
+
+async function supabaseUpsertSubscription({ userId, planId, paymentId, subscriptionId, token, provider, status, expiresAt }) {
+  const supabaseUrl = process.env.SUPABASE_URL || 'https://mdabznllmqnhddgwontq.supabase.co';
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || '';
+  const payload = {
+    user_id: userId,
+    plan_id: planId,
+    payment_id: paymentId || '',
+    subscription_id: subscriptionId || '',
+    token: token || '',
+    provider: provider || 'cloudpayments',
+    status,
+    expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+    created_at: new Date().toISOString()
+  };
+  await fetch(`${supabaseUrl}/rest/v1/subscriptions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': supabaseKey,
+      'Authorization': `Bearer ${supabaseKey}`,
+      'Prefer': 'resolution=merge-duplicates'
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+// Config для запуска виджета на клиенте (только публичный ID, без секретов)
+function handleCloudPaymentsConfig(req, res) {
+  const headers = corsHeaders();
+  return sendJson(res, 200, {
+    enabled: !cloudPaymentsUnavailable(),
+    publicId: CLOUDPAYMENTS_PUBLIC_ID,
+    webhookUrl: `${req.headers.referer ? String(req.headers.referer).split('/').slice(0, 3).join('/') : ''}/api/cloudpayments/webhook`
+  }, headers);
+}
+
+// Вебхук от CloudPayments: Check / Pay / Fail / Confirm / Refund / Recurrent / Cancel
+async function handleCloudPaymentsWebhook(req, res) {
   const headers = corsHeaders();
   try {
-    const body = await readBody(req);
-    const event = JSON.parse(body || '{}');
+    const rawBody = await readBody(req, 1_000_000);
+    if (!rawBody) return sendJson(res, 200, { code: 0 }, headers);
 
-    if (event.type === 'payment.succeeded') {
-      const meta = event.object?.metadata || {};
-      const userId = meta.userId;
-      const planId = meta.planId;
-      if (userId && planId) {
-        const expiresAt = new Date();
-        expiresAt.setMonth(expiresAt.getMonth() + 1);
-        const supabaseUrl = process.env.SUPABASE_URL || 'https://mdabznllmqnhddgwontq.supabase.co';
-        const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || '';
-        await fetch(`${supabaseUrl}/rest/v1/subscriptions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Prefer': 'resolution=merge-duplicates'
-          },
-          body: JSON.stringify({
-            user_id: userId,
-            plan_id: planId,
-            payment_id: event.object.id,
-            status: 'active',
-            expires_at: expiresAt.toISOString(),
-            created_at: new Date().toISOString()
-          })
-        });
-      }
+    // Проверка подписи запроса (X-Content-HMAC / Content-HMAC)
+    const provided = req.headers['x-content-hmac'] || req.headers['content-hmac'] || '';
+    if (provided && !cloudPaymentsUnavailable()) {
+      const decoded = cloudPaymentsHmac(CLOUDPAYMENTS_API_SECRET, rawBody, false);
+      const decodedUrlEncoded = cloudPaymentsHmac(CLOUDPAYMENTS_API_SECRET, rawBody, true);
+      const okHmac = timingSafeEqual(Buffer.from(decoded, 'utf8'), Buffer.from(provided, 'utf8')) ||
+        timingSafeEqual(Buffer.from(decodedUrlEncoded, 'utf8'), Buffer.from(provided, 'utf8')) ||
+        timingSafeEqual(Buffer.from(decoded, 'base64'), Buffer.from(provided, 'base64')) ||
+        timingSafeEqual(Buffer.from(decodedUrlEncoded, 'base64'), Buffer.from(provided, 'base64'));
+      if (!okHmac) return sendJson(res, 401, { error: 'invalid_signature' }, headers);
     }
 
-    if (event.type === 'payment.canceled') {
-      const meta = event.object?.metadata || {};
-      if (meta.userId) {
+    let params;
+    try {
+      params = JSON.parse(rawBody);
+    } catch {
+      params = Object.fromEntries(new URLSearchParams(rawBody));
+    }
+    if (!params || typeof params !== 'object') return sendJson(res, 200, { code: 0 }, headers);
+
+    const type = params.NotificationType || params.ClType || (params.SubscriptionId ? 'Recurrent' : params.Data?.Type ? params.Data.Type[0]?.Name : 'Check');
+
+    const amountRub = Number(params.Amount || params.Data?.CloudPayments?.Amount);
+    const planId = String(params.InvoiceId || params.Data?.CloudPayments?.InvoiceId || '').replace(/^(cp|sub)[_:-]/i, '');
+    const accountId = String(params.AccountId || params.Data?.CloudPayments?.AccountId || '');
+    const email = String(params.Email || params.Data?.CloudPayments?.Email || '');
+    const transactionId = String(params.TransactionId || params.Data?.CloudPayments?.TransactionId || '');
+    const subscriptionId = String(params.SubscriptionId || params.Data?.CloudPayments?.SubscriptionId || '');
+    const token = String(params.Token || params.Data?.CloudPayments?.CardId || params.Data?.CloudPayments?.Token || '');
+
+    // Check — проверяем возможность принятия платежа
+    if (type === 'Check') {
+      if (!planId || !PLAN_PRICES[planId]) return sendJson(res, 200, { code: 10 }, headers);
+      if (!accountId) return sendJson(res, 200, { code: 11 }, headers);
+      const priceCop = PLAN_PRICES[planId];
+      const expectedRub = Number((priceCop / 100).toFixed(2));
+      if (Math.abs(amountRub - expectedRub) > 0.009 && !(planId && amountRub > 0)) {
+        return sendJson(res, 200, { code: 12 }, headers);
+      }
+      return sendJson(res, 200, { code: 0 }, headers);
+    }
+
+    // Pay / Confirm — активация или продление подписки
+    if (type === 'Pay' || type === 'Confirm') {
+      const allPlans = new Map();
+      for (const [pid, price] of Object.entries(PLAN_PRICES)) {
+        allPlans.set(pid, pid);
+        const rubKey = (price / 100).toFixed(2);
+        allPlans.set(`${rubKey.replace('.', '_')}_rub`, pid);
+      }
+      let finalPlan = planId;
+      if (!finalPlan || !PLAN_PRICES[finalPlan]) {
+        finalPlan = allPlans.get(`${amountRub.toFixed(2).replace('.', '_')}_rub`) || '';
+      }
+      if (!accountId || !finalPlan || !PLAN_PRICES[finalPlan]) {
+        return sendJson(res, 200, { code: 0 }, headers);
+      }
+
+      const isAddon = finalPlan.startsWith('income_');
+
+      // Находим существующую активную подписку для продления
+      let existingExpiry = null;
+      try {
         const supabaseUrl = process.env.SUPABASE_URL || 'https://mdabznllmqnhddgwontq.supabase.co';
         const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || '';
-        await fetch(`${supabaseUrl}/rest/v1/subscriptions?user_id=eq.${encodeURIComponent(meta.userId)}&payment_id=eq.${encodeURIComponent(event.object.id)}`, {
+        const q = subscriptionId
+          ? `subscription_id=eq.${encodeURIComponent(subscriptionId)}`
+          : `user_id=eq.${encodeURIComponent(accountId)}&plan_id=eq.${encodeURIComponent(finalPlan)}`;
+        const resp = await fetch(
+          `${supabaseUrl}/rest/v1/subscriptions?${q}&order=expires_at.desc&limit=1`,
+          { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
+        );
+        const rows = await resp.json();
+        if (Array.isArray(rows) && rows[0]) existingExpiry = rows[0].expires_at;
+      } catch { /* ignore */ }
+
+      const now = Date.now();
+      const base = existingExpiry ? Math.max(now, new Date(existingExpiry).getTime()) : now;
+      const oneMonth = 1000 * 60 * 60 * 24 * 30;
+      const expiresIso = new Date(base + oneMonth).toISOString();
+
+      await supabaseUpsertSubscription({
+        userId: accountId,
+        planId: isAddon ? `income_${finalPlan.replace('income_', '')}` : finalPlan,
+        paymentId: transactionId,
+        subscriptionId,
+        token,
+        provider: 'cloudpayments',
+        status: 'active',
+        expiresAt: expiresIso
+      });
+      return sendJson(res, 200, { code: 0 }, headers);
+    }
+
+    // Recurrent — статус подписки изменён (Reactivate: активна после паузы; сиализованно)
+    if (type === 'Recurrent') {
+      const subStatus = String(params.Status || params.Data?.CloudPayments?.Status || '');
+      if (!accountId && !subscriptionId) return sendJson(res, 200, { code: 0 }, headers);
+      const desiredStatus = subStatus === 'Active' ? 'active' : 'canceled';
+      const supabaseUrl = process.env.SUPABASE_URL || 'https://mdabznllmqnhddgwontq.supabase.co';
+      const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || '';
+      const query = subscriptionId
+        ? `subscription_id=eq.${encodeURIComponent(subscriptionId)}`
+        : `user_id=eq.${encodeURIComponent(accountId)}`;
+      await fetch(`${supabaseUrl}/rest/v1/subscriptions?${query}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`
+        },
+        body: JSON.stringify({ status: desiredStatus })
+      });
+      return sendJson(res, 200, { code: 0 }, headers);
+    }
+
+    // Cancel / Refund — деактивация
+    if (type === 'Cancel' || type === 'Refund') {
+      const supabaseUrl = process.env.SUPABASE_URL || 'https://mdabznllmqnhddgwontq.supabase.co';
+      const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || '';
+      const query = transactionId
+        ? `payment_id=eq.${encodeURIComponent(transactionId)}`
+        : accountId
+          ? `user_id=eq.${encodeURIComponent(accountId)}`
+          : '';
+      if (query) {
+        await fetch(`${supabaseUrl}/rest/v1/subscriptions?${query}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -1036,15 +2100,34 @@ async function handleYooKassaWebhook(req, res) {
           body: JSON.stringify({ status: 'canceled' })
         });
       }
+      return sendJson(res, 200, { code: 0 }, headers);
     }
 
-    return sendJson(res, 200, { ok: true }, headers);
+    // Fail — запоминаем неудачу
+    if (type === 'Fail') {
+      if (accountId && transactionId) {
+        const supabaseUrl = process.env.SUPABASE_URL || 'https://mdabznllmqnhddgwontq.supabase.co';
+        const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || '';
+        await fetch(`${supabaseUrl}/rest/v1/subscriptions?payment_id=eq.${encodeURIComponent(transactionId)}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`
+          },
+          body: JSON.stringify({ status: 'failed' })
+        });
+      }
+      return sendJson(res, 200, { code: 0 }, headers);
+    }
+
+    return sendJson(res, 200, { code: 0 }, headers);
   } catch (err) {
-    return sendJson(res, 200, { ok: true }, headers);
+    return sendJson(res, 200, { code: 0 }, headers);
   }
 }
 
-async function handleYooKassaStatus(req, res, url) {
+async function handleCloudPaymentsStatus(req, res, url) {
   const headers = corsHeaders();
   const userId = url.searchParams.get('userId');
   if (!userId) return sendJson(res, 400, { error: 'userId required' }, headers);
@@ -1052,7 +2135,7 @@ async function handleYooKassaStatus(req, res, url) {
     const supabaseUrl = process.env.SUPABASE_URL || 'https://mdabznllmqnhddgwontq.supabase.co';
     const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || '';
     const resp = await fetch(
-      `${supabaseUrl}/rest/v1/subscriptions?user_id=eq.${encodeURIComponent(userId)}&status=eq.active&expires_at=gt.${new Date().toISOString()}&order=expires_at.desc&limit=1`,
+      `${supabaseUrl}/rest/v1/subscriptions?user_id=eq.${encodeURIComponent(userId)}&status=in.(active,unsubscribed)&expires_at=gt.${new Date().toISOString()}&order=expires_at.desc&limit=1`,
       { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
     );
     const rows = await resp.json();
@@ -1060,10 +2143,105 @@ async function handleYooKassaStatus(req, res, url) {
     return sendJson(res, 200, {
       planId: data?.plan_id || 'free',
       expiresAt: data?.expires_at || null,
-      addons: data?.addons || []
+      addons: data?.addons || [],
+      provider: data?.provider || null
     }, headers);
   } catch (err) {
     return sendJson(res, 200, { planId: 'free' }, headers);
+  }
+}
+
+// Создание одноразового счёта / привязки лично повторного платежа (для addon за 1 раз)
+// Через CloudPayments виды использования: подписки и addon'ы идут черрез виджет на клиенте
+// (PCI DSS безопасно: карточные данные не проходят через наш сервер).
+// Этот эндпоинт возвращает конфигурацию запуска виджета для конкертной позиции.
+async function handleCloudPaymentsCharge(req, res) {
+  const headers = corsHeaders();
+  try {
+    const body = await readBody(req);
+    const parsed = JSON.parse(body || '{}');
+    const { planId, userId, email } = parsed;
+    const accountId = String(parsed.accountId || userId || '');
+    if (!planId || !PLAN_PRICES[planId]) return sendJson(res, 400, { error: 'invalid_plan' }, headers);
+    if (cloudPaymentsUnavailable()) return sendJson(res, 500, { error: 'cloudpayments_not_configured' }, headers);
+    if (!accountId) return sendJson(res, 400, { error: 'accountId required' }, headers);
+
+    const amountRub = PLAN_PRICES[planId] / 100;
+    const isSubscription = SUBSCRIPTION_PLANS.has(planId);
+    const description = isSubscription
+      ? `Подписка на ${planId.replace('_', ' ')} (${new Date().toLocaleDateString('ru-RU')})`
+      : `Дополнительная опция ${planId.replace('_', ' ')}`;
+
+    return sendJson(res, 200, {
+      widget: true,
+      amount: Number(amountRub.toFixed(2)),
+      currency: 'RUB',
+      description,
+      planId,
+      accountId,
+      invoiceId: `cp_${planId}`,
+      isSubscription,
+      email: email || ''
+    }, headers);
+  } catch (err) {
+    return sendJson(res, 500, { error: err?.message || 'cloudpayments_error' }, headers);
+  }
+}
+
+// Отмена автоподписки в CloudPayments + деактивация в Supabase.
+// Только владелец аккаунта (Bearer-токен), чтобы нельзя было отменить чужую подписку.
+async function handleCloudPaymentsCancel(req, res) {
+  const headers = corsHeaders();
+  const user = authUser(req);
+  if (!user) return sendJson(res, 401, { error: 'unauthorized' }, headers);
+  try {
+    const body = await readBody(req);
+    const parsed = JSON.parse(body || '{}');
+    const requestAccountId = String(parsed.accountId || parsed.userId || user.id || user.email || '');
+    if (user.id && requestAccountId && requestAccountId !== user.id && requestAccountId !== user.email) {
+      return sendJson(res, 403, { error: 'not_owner' }, headers);
+    }
+    const accountId = user.id || user.email;
+    let subscriptionId = String(parsed.subscriptionId || '');
+    if (!accountId && !subscriptionId) return sendJson(res, 400, { error: 'userId or subscriptionId required' }, headers);
+    if (cloudPaymentsUnavailable()) return sendJson(res, 500, { error: 'cloudpayments_not_configured' }, headers);
+
+    const supabaseUrl = process.env.SUPABASE_URL || 'https://mdabznllmqnhddgwontq.supabase.co';
+    const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || '';
+
+    let cpSubId = subscriptionId;
+    if (!cpSubId) {
+      const resp = await fetch(
+        `${supabaseUrl}/rest/v1/subscriptions?user_id=eq.${encodeURIComponent(accountId)}&provider=eq.cloudpayments&status=eq.active&order=expires_at.desc&limit=1`,
+        { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
+      );
+      const rows = await resp.json();
+      if (Array.isArray(rows) && rows[0]?.subscription_id) cpSubId = rows[0].subscription_id;
+    }
+
+    if (cpSubId) {
+      try {
+        await cpApiPost('/subscriptions/cancel', { Id: cpSubId });
+      } catch { /* ignore */ }
+    }
+
+    const query = accountId
+      ? `user_id=eq.${encodeURIComponent(accountId)}`
+      : `subscription_id=eq.${encodeURIComponent(cpSubId || '')}`;
+    if (query.includes('eq.') && !query.endsWith('eq.')) {
+      await fetch(`${supabaseUrl}/rest/v1/subscriptions?${query}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`
+        },
+        body: JSON.stringify({ status: 'unsubscribed' })
+      });
+    }
+    return sendJson(res, 200, { ok: true }, headers);
+  } catch (err) {
+    return sendJson(res, 500, { error: err?.message || 'cloudpayments_cancel_error' }, headers);
   }
 }
 
@@ -1245,10 +2423,23 @@ export default async function handler(req, res) {
   if (url.pathname === '/api/loc' && req.method === 'POST') return handleLoc(req, res);
   if (url.pathname === '/api/nearby' && req.method === 'GET') return handleNearby(req, res, url);
   if (url.pathname === '/api/plans') return handlePlans(req, res, url);
-  if (req.method === 'POST' && url.pathname === '/api/yookassa/create-payment') return handleYooKassaCreatePayment(req, res);
-  if (req.method === 'POST' && url.pathname === '/api/yookassa/webhook') return handleYooKassaWebhook(req, res);
-  if (req.method === 'GET' && url.pathname === '/api/yookassa/status') return handleYooKassaStatus(req, res, url);
+  if (req.method === 'GET' && url.pathname === '/api/cloudpayments/config') return handleCloudPaymentsConfig(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/cloudpayments/webhook') return handleCloudPaymentsWebhook(req, res);
+  if (req.method === 'GET' && url.pathname === '/api/cloudpayments/status') return handleCloudPaymentsStatus(req, res, url);
+  if (req.method === 'POST' && url.pathname === '/api/cloudpayments/charge') return handleCloudPaymentsCharge(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/cloudpayments/cancel') return handleCloudPaymentsCancel(req, res);
   if (url.pathname === '/api/consent') return handleConsent(req, res);
   if (url.pathname === '/api/consent/check') return handleConsentCheck(req, res);
+  if (req.method === 'GET' && url.pathname === '/api/reports/my') return handleReportStatus(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/report') return handleReport(req, res);
+  if (req.method === 'GET' && url.pathname === '/api/moderation/review') return handleModerationReview(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/moderation/resolve') return handleModerationResolve(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/moderate') return handleModerate(req, res);
+  if (req.method === 'GET' && url.pathname === '/api/audit') return handleAuditLog(req, res);
+  if (req.method === 'GET' && url.pathname === '/api/data/export') return handleDataExport(req, res);
+  if (req.method === 'DELETE' && url.pathname === '/api/account') return handleAccountDelete(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/validate-photo') return handleValidatePhoto(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/photo/analyze') return handlePhotoAnalyze(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/message') return handleMessage(req, res);
   return sendJson(res, 404, { error: 'not_found' }, corsHeaders());
 }
