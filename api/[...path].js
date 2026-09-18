@@ -457,7 +457,7 @@ function sendJson(res, status, obj, extraHeaders = {}) {
 }
 
 const PROFANITY_WORDS = ['хуй','хуи','пизд','бля','бляд','блять','ебат','ёб','еба','сука','сук','нахуй','нахер','пидор','пидар','говно','дерьмо','жопа','гондон','уёб','уеб','мудак','козёл'];
-const EXTREMISM_WORDS = ['хайль','фашист','нацист','нацик','свастик','арийск','призываю к экстремизму','призыв к экстремизму','экстремистскую деятельность','оправдываю экстремизм','уничтожим иноземцев'];
+const EXTREMISM_WORDS = ['хайль','фашист','нацист','нацизм','нацик','свастик','арийск','гитлер','призываю к экстремизму','призыв к экстремизму','экстремистскую деятельность','оправдываю экстремизм','уничтожим иноземцев'];
 const HATE_WORDS = ['хачи','хач','жиды','жид','чурок','чурк','чучмеки','чучмек','черножоп','понаех','вон из города'];
 const RELIGIOUS_INSULT_WORDS = ['оскорбл','богохул','богохульств','богоубийц','святотатств','кощунств'];
 const TERRORISM_WORDS = ['террори','джихад','смертник','взрывать','захват заложник','исламское государство','игил','даиш','халифат','оправдани терроризм'];
@@ -467,14 +467,14 @@ const CP_WORDS = ['child porn','детское порно','child sex','педо
 const SUICIDE_WORDS = ['удавис','повесся','повесис','убей себя','убить себя','сделай это с собой','сделай с собой это','реж вены','уничтожь себя'];
 const COERCION_WORDS = ['заставлю тебя переспать','заставлю тебя со мной','понужд к сексу','развратн действие','развратн действий','развратн действи','принужд к сексу','не по своему желанию секс','изнасилую'];
 const MINOR_SEX_WORDS = ['пересплю с','встречусь с летней','встречусь с леткой','с 15-летней','с 14-леткой','с 16-летн','с 13-летн','с 17-летн','с пятнадцатилетн','с четырнадцатилетн','с шестнадцатилетн','с тринадцатилетн'];
-const PROSTITUTION_WORDS = ['сниму проститутк','снять проститутк','эскорт','интим за ','секс за деньги','за деньги сниму'];
+const PROSTITUTION_WORDS = ['сниму проститутк','снять проститутк','проститутк','путан','шлюх','эскорт','интим за ','секс за деньги','за деньги сниму'];
 const NSFW_WORDS = [
   // === Порнография и площадки ===
-  'порно','порнх','porn','porno','xxx','ххх','тройство','анал','анальн','вагина','вагин','вульв','penis','pussy','dick','cock','ass','fuck','fucking','сайт порно','порно са','порносайт','порнух','порнограф','pornhub','xnxx','xvideo','эротик','эротич','еротик','эротк',
+  'порно','порнх','porn','porno','xxx','ххх','тройство','вагина','вагин','вульв','penis','pussy','dick','cock','ass','fuck','fucking','сайт порно','порно са','порносайт','порнух','порнограф','pornhub','xnxx','xvideo','эротик','эротич','еротик','эротк',
   // === Вульгарные обозначения половых органов и тела ===
   'писюн','писюх','песька','вагин','клитор','клitor','клитty','половой орган','полов орган','мужское достоинств','мужской половой','сиськ','сисек','сиськи','титьк','титк','сосок','соски','сосочк','грудь голая','голая грудь','задниц','ягодиц',
   // === Вульгарные сексуальные действия ===
-  'отсос','отсас','отсоси','минет','минетт','минтить','куни','кунил','кyни','дроч','мастурб','онанизм','игрушки для секса','секс игрушк','анал для','щет мастурб','секс для друг','разврат','развратн','порно видео','секс видео','сексуальный контент','половой акт','совокуплен','заняться сексом','занялись сексом',
+  'отсос','отсас','отсоси','минет','минетт','минтить','куни','кунил','кyни','дроч','мастурб','онанизм','игрушки для секса','секс игрушк','щет мастурб','секс для друг','разврат','развратн','порно видео','секс видео','сексуальный контент','половой акт','совокуплен','заняться сексом','занялись сексом',
   // === Продажа интим-услуг ===
   'интим услу','интим предлож','интим в подарок','массаж с продолжением','массаж продолжение','эротический массаж','эротич массаж','вип эскорт','vip эскорт','эскорт услуги','эскорт услуг','снять девушку на ночь','сниму девушк на ночь','ночь за ','за ночь с','работаю за ','работа за ','девушк за деньги','парн за деньги','свидание за деньги','спутниц','спутницу','сопровождени','досуг для почтенн','досуг почтенн','интим досуг','интимный досуг','интимного досуга','интимн досуг','мальчик по вызову','девочка по вызову','девушка по вызову','мужчина по вызову','вызвать проститу','вызывать проститутку',
   // === Другое явно непристойное ===
@@ -496,6 +496,28 @@ function normalizeForMatch(text) {
 
 function translitOf(text) {
   return String(text || '').toLowerCase().replace(/ё/g, 'е').split('').map((c) => CYR_TO_LAT[c] ?? c).join('');
+}
+
+// Диакритика latin-языков (немецкий, французский, испанский и т.п.) → базовые буквы,
+// чтобы «Gotteslästerung», «blasphème», «esvástica» матчились как latin-фразы.
+const ACCENT_MAP = { 'á':'a','à':'a','â':'a','ä':'a','ã':'a','å':'a','ą':'a','é':'e','è':'e','ê':'e','ë':'e','ę':'e','í':'i','ì':'i','î':'i','ï':'i','ó':'o','ò':'o','ô':'o','ö':'o','õ':'o','ú':'u','ù':'u','û':'u','ü':'u','ñ':'n','ç':'c','ć':'c','š':'s','ž':'z','ß':'ss' };
+function latinOf(text) {
+  return String(text || '').toLowerCase().split('').map((c) => ACCENT_MAP[c] ?? c).join('')
+    .replace(/ё/g, 'e').split('').map((c) => CYR_TO_LAT[c] ?? c).join('')
+    .replace(/[^a-z0-9'\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+// Поиск целых latin-слов/фраз (multi-word ок) с границами слов — защита от ложных
+// срабатываний типа «analysis → anal», «grape → rape», «specific → spic».
+function containsLatinPhrases(text, phrases) {
+  const t = ` ${latinOf(text)} `;
+  return phrases.some((p) => t.includes(` ${p.toLowerCase()} `));
+}
+// Стем-поиск по началу токена ТОЛЬКО для длинных/однозначных корней (>=5 букв):
+// «swastik*», «porn*» безопасны, а короткие («anal», «spic», «meth») — нет,
+// т.к. дают «analysis», «spice», «method».
+function containsLatinStems(text, stems) {
+  const tokens = latinOf(text).split(/\s+/);
+  return stems.some((st) => tokens.some((t) => t.length >= st.length && t.startsWith(st)));
 }
 
 function containsProfanity(text) {
@@ -525,6 +547,12 @@ function containsExtremism(text) {
   }
   if (translitOf(text.toLowerCase()).includes('nazi')) return true;
   if (translitOf(text.toLowerCase()).includes('faschist')) return true;
+  // Нацистская символика и коды в latin (немецкий, английский и др.), включая homoglyph-обходы.
+  // Стемы (≥5 букв, без ложных префиксов) покрывают формы: swastika/swastikas, svastica, hitlers…
+  if (containsLatinStems(text, ['swastik','esvastik','svastik','esvastic','svastic','hakenkreuz','hitler','neonazi','supremac'])) return true;
+  if (containsLatinPhrases(text, ['sieg heil','heil hitler','white power','zyklon b','ss zeichen'])) return true;
+  // Числовой неонацистский код 14/88 (и разделительные варианты: 14-88, 14 88, 1-4-8-8).
+  if (stripBrush(translitOf(text.toLowerCase())).includes('1488')) return true;
   return false;
 }
 
@@ -533,6 +561,12 @@ function containsReligiousInsult(text) {
   for (const word of RELIGIOUS_INSULT_WORDS) {
     if (lower.includes(word)) return true;
   }
+  // Русские формы «хула на Бога/плюю на крест» и центральные «религия мертва».
+  // Русские формы «хула на Бога/плюю на крест» и «религия мертва». (JS \b — только латиница, поэтому граница вручную.)
+  if (/(?:^|[^а-яёa-z])хул[а-яё]* на бог/iu.test(lower)) return true;
+  // Мультиязычные религиозные инсульты (стемы ≥5 букв): blasphemy, sacrilege, profanation…
+  if (containsLatinStems(text, ['blasphe','blasfem','sacrile','desecrat','gotteslas','profanac','blasphemi'])) return true;
+  if (containsLatinPhrases(text, ['kufr','god is dead','religion is a lie'])) return true;
   return false;
 }
 
@@ -544,6 +578,10 @@ function containsTerrorism(text) {
   }
   if (translitOf(text.toLowerCase()).includes('terror')) return true;
   if (translitOf(text.toLowerCase()).includes('dzhihad')) return true;
+  if (containsLatinStems(text, ['terroris'])) return true;
+  if (containsLatinPhrases(text, [
+    'terrorism','jihad','islamic state','isis','isil','igil','al qaeda','alqaeda','taliban','bomb the','explosive vest','suicide bomb','suicide bomber'
+  ])) return true;
   return false;
 }
 
@@ -562,6 +600,9 @@ function containsDrugs(text) {
   }
   const t = translitOf(text.toLowerCase());
   if (t.includes('drug') || t.includes('cocaine') || t.includes('heroin') || t.includes('marihuana') || t.includes('gashish') || t.includes('amfetamin')) return true;
+  if (containsLatinPhrases(text, [
+    'drugs','cocaine','heroin','marijuana','hashish','methamphetamine','meth','metaamfetamin','ecstasy','mdma','lsd','lysergic','fentanyl','crystal meth','amphetamine','opiate','opioid'
+  ])) return true;
   return false;
 }
 
@@ -572,6 +613,10 @@ function containsCP(text) {
   }
   if (translitOf(text.toLowerCase()).includes('child porn')) return true;
   if (translitOf(text.toLowerCase()).includes('pedophil')) return true;
+  if (containsLatinStems(text, ['pedophil','paedophil','preteen'])) return true;
+  if (containsLatinPhrases(text, [
+    'child porn','child pornography','child sex','child abuse','underage sex','underage porn','teen porn','minor porn','cp materials','lolita'
+  ])) return true;
   return false;
 }
 
@@ -597,6 +642,13 @@ function containsHate(text) {
     if (!word) continue;
     if (lower.includes(word)) return true;
   }
+  // Расовая/национальная/религиозная вражда в latin. Стемы для длинных слов,
+  // короткие («spic», «chink») — только целыми словами, чтобы не задеть «spice», «specific».
+  if (containsLatinStems(text, ['nigger','nigga','faggot','kike'])) return true;
+  if (containsLatinPhrases(text, [
+    'fag','fags','kikes','spic','spics','chink','chinks','wetback','wetbacks','coon','coons','jews',
+    'heeb','white trash','porch monkey','kill all jews','dirty jew','juden raus','go back to your country'
+  ])) return true;
   return false;
 }
 
@@ -610,6 +662,9 @@ function containsSuicide(text) {
     if (!word) continue;
     if (lower.includes(word)) return true;
   }
+  if (containsLatinPhrases(text, [
+    'kill yourself','killing myself','kill myself','commit suicide','committing suicide','end my life','ending my life','end it all','suicidal','do not want to live','want to die'
+  ])) return true;
   return false;
 }
 
@@ -623,6 +678,10 @@ function containsCoercion(text) {
   if (/понужд[а-яёa-z]* к секс/i.test(lower)) return true;
   if (/(?:развратн|развратн[а-яёa-z]+) действи/i.test(lower)) return true;
   if (/принужд[а-яёa-z]* к секс/i.test(lower)) return true;
+  // Изнасилование/принуждение в latin (границы слов: 'grape', 'scrape' и 'tap' — не триггеры).
+  if (containsLatinPhrases(text, [
+    'rape','raped','raping','rapist','rapists','sexually assault','sexual assault','nonconsensual','non-consensual','force you to have sex','drugged me','roofied'
+  ])) return true;
   return false;
 }
 
@@ -650,11 +709,27 @@ function containsNsfw(text) {
     if (!word) continue;
     if (lower.includes(word)) return true;
   }
+  // RU «анал*»: ловить «анал секс/анальная», но НЕ «анализ/аналог/аналитик/анализ*».
+  const ruTokens = String(lower).split(/[^а-яёa-z]+/);
+  for (const t of ruTokens) {
+    if (t.startsWith('анал') && !/^анал(?:ог|из|ит)/.test(t)) return true;
+  }
   // Латинское написание и homoglyph-обходы для базовых непристойных корней.
   // Только целые слова (word boundaries), чтобы 'rasskazhi' не матчилось как 'ass'.
   const translit = ` ${translitOf(text.toLowerCase())} `;
   if (/(?:[^a-z](?:fuck|fucking|porn|pornhub|xnxx|xvideos|nude|naked|cock|dick|pussy|penis|ass|boobs|tits|escort|nudes|webcam)[^a-z])/.test(translit)) return true;
   if (/\b(?:sex tape|sex video|sex cam|adult content)\b/.test(translit)) return true;
+  // Мультиязычные длинные стемы (porn*/nackt*/obscen* и др.) — начальные совпадения токенов.
+  if (containsLatinStems(text, ['porn','nackt','obscen','erotic','pornograph','masturbat','erotisation'])) return true;
+  // Расширенный multi-язычный список (границы целых слов).
+  if (containsLatinPhrases(text, [
+    'anal','anal sex','analsex','blowjob','blow job','handjob','hand job','oral sex','rimjob',
+    'cumshot','creampie','threesome','foursome','gangbang','cuckold','hentai','futanari',
+    'lolicon','shotacon','incest','milf','cougar','bdsm','domination','dildo','vibrator','sex toy',
+    'striptease','strip club','camgirl','camming','pornstar','porn star',
+    'shemale','tranny','escort service','call girl','conteudo adulto','contenido adulto','contenu adulte',
+    'video erotico','video x gratis','nackdfotos'
+  ])) return true;
   return false;
 }
 

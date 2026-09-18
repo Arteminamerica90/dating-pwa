@@ -309,9 +309,9 @@ const COMM_FORMATS = [
 ];
 
 const VALUES = [
-  { id: 'just', label: 'Просто познакомиться' },
+  { id: 'just', label: 'Просто пообщаться' },
   { id: 'family', label: 'Семейные ценности' },
-  { id: 'online', label: 'Онлайн знакомства' },
+  { id: 'online', label: 'Онлайн-общение' },
   { id: 'goout', label: 'Вместе сходить куда-нибудь' }
 ];
 
@@ -320,7 +320,7 @@ const VALUES_ADULT = [
 
 const MEETING_INTENTS = [
   { id: 'serious', label: 'Серьезные отношения' },
-  { id: 'acquaintance', label: 'Знакомство' },
+  { id: 'acquaintance', label: 'Новое общение' },
   { id: 'friend', label: 'Дружеское общение' },
   { id: 'love', label: 'Любовь' },
   { id: 'business', label: 'Бизнес' },
@@ -1383,8 +1383,8 @@ function wireSettings() {
 
   $('#btnShareColleague')?.addEventListener('click', async () => {
     const shareData = {
-      title: 'xystar — знакомства для прогулок',
-      text: 'Попробуй xystar — приложение для знакомств с прогулками и свиданиями',
+      title: 'xystar — досуг и общение по интересам',
+      text: 'Попробуй xystar — платформа для общения с единомышленниками, прогулок и совместного досуга',
       url: 'https://xystar.ru'
     };
     try {
@@ -2030,7 +2030,7 @@ function renderSubscriptionContent(highlightFeature) {
     const descriptions = {
       standard: 'Базовые фильтры и безлимитные лайки для поиска партнёров',
       premium: 'Полный доступ к анкетам и продвижение в выдаче для активного поиска',
-      vip: 'Ваш профиль показывается в приоритетном порядке партнёрам с доходом от 1М ₽. Идеально для тех, кто ищет стабильное качество знакомств',
+      vip: 'Ваш профиль показывается в приоритетном порядке партнёрам с доходом от 1М ₽. Идеально для тех, кто ценит стабильное качество общения',
       exclusive: 'Максимальная видимость: ваш профиль рекомендуется партнёрам с доходом от 5М ₽. Приоритет в алгоритме подбора и персональный рекомендательный движок'
     };
     const desc = descriptions[pid] || '';
@@ -2096,7 +2096,7 @@ function renderSubscriptionContent(highlightFeature) {
   $('#btnSubShareBottom')?.addEventListener('click', async () => {
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'xystar', text: 'Попробуй xystar — знакомства с прогулками', url: 'https://xystar.ru' });
+        await navigator.share({ title: 'xystar', text: 'Попробуй xystar — досуг и общение по интересам', url: 'https://xystar.ru' });
       } else {
         await navigator.clipboard.writeText('https://xystar.ru');
         toast('Ссылка скопирована');
@@ -3682,7 +3682,7 @@ function renderEvents() {
   const venues = cityKey ? VENUES.filter((v) => v.city === cityKey) : VENUES;
   const venuesBody = venues.length
     ? `<div class="card">
-        <div class="card-title">Записаться на свидание/досуг</div>
+        <div class="card-title">Записаться на прогулку/досуг</div>
         <div class="muted">Рестораны, кафе, кино, спортзалы, СПА и парки — выберите место, укажите бюджет, и аукцион предложит лучшую цену.</div>
         <div class="venues-grid">
           ${venues
@@ -4796,7 +4796,7 @@ function renderCircle() {
   $('#view-circle').innerHTML = `
     <div class="grid circle-layout">
       <div class="card">
-        <div class="card-title">Круг знакомств</div>
+        <div class="card-title">Круг доверия</div>
         <div class="row-inline" style="margin-top:10px">
           <span class="pill ${selfSummary.tone === 'good' ? 'status-pill good' : selfSummary.tone === 'bad' ? 'status-pill bad' : 'status-pill warn'}">${selfSummary.label}</span>
           ${selfHighlights.values.length ? `<span class="pill status-pill good">${escapeHtml(selfHighlights.values[0])}</span>` : ''}
