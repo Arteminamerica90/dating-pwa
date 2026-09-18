@@ -101,6 +101,44 @@ const harmful = [
   { lang: 'RU', text: 'убей себя, не живи', kind: 'suicide' },
   { lang: 'EN', text: 'i will rape you at the meeting', kind: 'coercion' },
   { lang: 'EN', text: 'send me child porn', kind: 'child_exploitation' },
+
+  // ===== ЭКСТРЕМИЗМ: ПРИЗЫВЫ К МАССОВЫМ НЕЗАКОННЫМ МЕРОПРИЯТИЯМ =====
+  { lang: 'RU', text: 'призываю к перевороту, присоединяйтесь', kind: 'unrest' },
+  { lang: 'RU', text: 'давайте устроим массовые беспорядки', kind: 'unrest' },
+  { lang: 'RU', text: 'свергнем власть и захватим всё', kind: 'unrest' },
+  { lang: 'RU', text: 'организуем бунт на следующей неделе', kind: 'unrest' },
+  { lang: 'RU', text: 'выйдем на улицы и перекроем дороги', kind: 'unrest' },
+  { lang: 'EN', text: 'join the riot on friday, bring everyone', kind: 'unrest' },
+  { lang: 'EN', text: 'overthrow the government with us', kind: 'unrest' },
+  { lang: 'EN', text: 'storm the parliament building', kind: 'unrest' },
+
+  // ===== ПРОПАГАНДА ЛГБТ =====
+  { lang: 'RU', text: 'веду пропаганду лгбт в своём клубе', kind: 'lgbt' },
+  { lang: 'RU', text: 'я пропагандирую гомосексуализм', kind: 'lgbt' },
+  { lang: 'RU', text: 'агитирую за лгбт, вступайте', kind: 'lgbt' },
+  { lang: 'RU', text: 'пропаганда нетрадиционных сексуальных отношений приветствуется', kind: 'lgbt' },
+  { lang: 'EN', text: 'i spread lgbt propaganda everywhere', kind: 'lgbt' },
+  { lang: 'EN', text: 'promote lgbt rights in your city', kind: 'lgbt' },
+  { lang: 'EN', text: 'gay propaganda gains momentum here', kind: 'lgbt' },
+
+  // ===== СУИЦИД (расширенные формы) =====
+  { lang: 'RU', text: 'хочу покончить с собой этим вечером', kind: 'suicide' },
+  { lang: 'RU', text: 'скоро повешусь, прощайте все', kind: 'suicide' },
+  { lang: 'RU', text: 'перережу вены и мечтаю об этом', kind: 'suicide' },
+  { lang: 'EN', text: 'i might hang myself today', kind: 'suicide' },
+  { lang: 'EN', text: 'no reason to live anymore', kind: 'suicide' },
+
+  // ===== НАРКОТИКИ (расширенные/сленг) =====
+  { lang: 'RU', text: 'купить экстази и мефедрон недорого', kind: 'drugs' },
+  { lang: 'RU', text: 'продаю соль для ванн оптом', kind: 'drugs' },
+  { lang: 'RU', text: 'есть трамадол и кодеин в наличии', kind: 'drugs' },
+  { lang: 'EN', text: 'cannabis club in my apartment', kind: 'drugs' },
+
+  // ===== ДЕМОНСТРАЦИЯ/ПРОДАЖА ТАБАКА =====
+  { lang: 'RU', text: 'продаю сигареты оптом без акциза', kind: 'tobacco' },
+  { lang: 'RU', text: 'вейп в наличии, заказать можно у меня', kind: 'tobacco' },
+  { lang: 'EN', text: 'sell cigarettes in bulk, cheap', kind: 'tobacco' },
+  { lang: 'EN', text: 'vapes for sale, dm me', kind: 'tobacco' },
 ];
 
 // ============ НЕВИННЫЕ ФРАЗЫ (НЕ ДОЛЖНЫ БЛОКИРОВАТЬСЯ) ============
@@ -115,6 +153,13 @@ const benign = [
   { lang: 'EN', text: 'let us go to the cinema tomorrow' },
   { lang: 'EN', text: 'blessed day, happy to be here' },
   { lang: 'EN', text: 'I run southwest and southwest is cool' },
+  { lang: 'RU', text: 'я гей и ищу друзей по интересам' },
+  { lang: 'RU', text: 'курю редко, люблю спорт и книги' },
+  { lang: 'RU', text: 'читаю с закладкой в метро' },
+  { lang: 'RU', text: 'пропаганда здорового образа жизни для меня важна' },
+  { lang: 'RU', text: 'восстание машин — мой любимый фильм' },
+  { lang: 'EN', text: 'i am gay and looking for friends' },
+  { lang: 'EN', text: 'the general strike is just a movie about labor' },
   { lang: 'DE', text: 'das Wetter ist wunderschön' },
   { lang: 'DE', text: 'ich liebe amerikanische Küche' },
   { lang: 'FR', text: 'bonjour, comment ça va ce soir' },

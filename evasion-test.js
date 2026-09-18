@@ -34,6 +34,10 @@ function moderateTextProto(text) {
     ['extremist_material', ctx.containsExtremistMaterial(text)],
     ['prostitution', ctx.containsProstitution(text)],
     ['nsfw', ctx.containsNsfw(text)],
+    ['suicide', ctx.containsSuicide(text)],
+    ['unrest', ctx.containsUnrest(text)],
+    ['lgbt_propaganda', ctx.containsLgbtPropaganda(text)],
+    ['tobacco', ctx.containsTobacco(text)],
   ];
   const blocked = checks.filter(([, v]) => v).map(([k]) => k);
   if (blocked.length) return { allowed: false, blocked: true, action: 'block', blockedReasons: blocked };
@@ -117,6 +121,43 @@ const testCases = [
   { action: 'block', input: 'взрослый контент', note: 'взрослый контент' },
   { action: 'block', input: 'мастурбация', note: 'мастурбац' },
 
+  // ===== МАССОВЫЕ БЕСПОРЯДКИ/ПЕРЕВОРОТ (должен БЛОКИРОВАТЬ) =====
+  { action: 'block', input: 'призываю к перевороту', note: 'unrest base' },
+  { action: 'block', input: 'свергнем власть', note: 'unrest' },
+  { action: 'block', input: 'устроим массовые беспорядки', note: 'unrest' },
+  { action: 'block', input: 'организуем бунт', note: 'unrest бунт' },
+  { action: 'block', input: 'join the riot', note: 'unrest латиница' },
+  { action: 'block', input: 'overthrow the government', note: 'unrest латиница' },
+  { action: 'block', input: 'storm the parliament', note: 'unrest латиница' },
+  { action: 'block', input: 'захватим власть', note: 'unrest захват' },
+
+  // ===== ПРОПАГАНДА ЛГБТ (должен БЛОКИРОВАТЬ) =====
+  { action: 'block', input: 'веду пропаганду лгбт', note: 'lgbt base' },
+  { action: 'block', input: 'пропагандирую гомосексуализм', note: 'lgbt гомо' },
+  { action: 'block', input: 'агитирую за лгбт', note: 'lgbt агитация' },
+  { action: 'block', input: 'spread lgbt propaganda', note: 'lgbt латиница' },
+  { action: 'block', input: 'promote lgbt rights', note: 'lgbt латиница' },
+  { action: 'block', input: 'gay propaganda', note: 'lgbt латиница gay' },
+
+  // ===== ПРОДАЖА/РЕКЛАМА ТАБАКА (должен БЛОКИРОВАТЬ) =====
+  { action: 'block', input: 'продаю сигареты оптом', note: 'tobacco сигареты' },
+  { action: 'block', input: 'вейп в наличии у меня', note: 'tobacco вейп' },
+  { action: 'block', input: 'sell cigarettes cheap', note: 'tobacco латиница' },
+  { action: 'block', input: 'vapes for sale', note: 'tobacco латиница vape' },
+
+  // ===== НАРКОТИКИ: СЛЕНГ/РАСШИРЕНИЯ (должен БЛОКИРОВАТЬ) =====
+  { action: 'block', input: 'купить экстази', note: 'drugs экстази' },
+  { action: 'block', input: 'продаю соль для ванн', note: 'drugs соль для ванн' },
+  { action: 'block', input: 'есть трамадол', note: 'drugs трамадол' },
+  { action: 'block', input: 'мефедрон на складе', note: 'drugs мефедрон' },
+  { action: 'block', input: 'cannabis club', note: 'drugs латиница' },
+
+  // ===== СУИЦИД: РАСШИРЕННЫЕ ФОРМЫ (должен БЛОКИРОВАТЬ) =====
+  { action: 'block', input: 'хочу покончить с собой', note: 'suicide' },
+  { action: 'block', input: 'повешусь скоро', note: 'suicide' },
+  { action: 'block', input: 'no reason to live', note: 'suicide латиница' },
+  { action: 'block', input: 'hang myself', note: 'suicide латиница' },
+
   // ===== ФАЛЬШИВКИ (должны ПРОПУСКАТЬСЯ) =====
   { action: 'allow', input: 'я люблю кухню', note: 'кухня ≠ хуй: нет подстроки' },
   { action: 'allow', input: 'сегодня хорошая погода', note: 'нейтральный текст' },
@@ -124,6 +165,11 @@ const testCases = [
   { action: 'allow', input: 'грудь мира нет', note: 'грудь без сиськи — не NSFW' },
   { action: 'allow', input: 'пойдем в кино', note: 'нейтрально' },
   { action: 'allow', input: 'люблю готовить ужин', note: 'нейтрально' },
+  { action: 'allow', input: 'я гей и ищу друзей', note: 'самоидентификация ≠ пропаганда' },
+  { action: 'allow', input: 'курю редко', note: 'не реклама табака' },
+  { action: 'allow', input: 'восстание машин — фильм', note: 'не призыв к перевороту' },
+  { action: 'allow', input: 'пропаганда здорового образа жизни', note: 'нет лгбт-строк' },
+  { action: 'allow', input: 'i am gay looking for friends', note: 'самоидентификация латиницей' },
 ];
 
 let pass = 0, fail = 0;

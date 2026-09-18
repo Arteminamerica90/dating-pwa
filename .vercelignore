@@ -1,0 +1,9 @@
+.vercel
+.git
+.github
+*-test.js
+moderation-test.mjs
+server/
+supabase-schema.sql
+README.md
+legal-entity.html

@@ -61,7 +61,7 @@ window.__xystarModuleLoaded = true;
 const COOKIE_NECESSARY = ['walkdate_state', 'walkdate_encryption_key'];
 const COOKIE_CONSENT_KEY = 'xystar_cookie_consent_v2';
 const COOKIE_CONSENT_EXPIRY_DAYS = 365;
-const PROFANITY_LIST = ['хуй','пизд','бляд','блять','ебат','ёб','еба','сука','сук','нахуй','нахер','пидор','пидар','говно','дерьмо','жопа','гондон','уёб','уеб','мудак','козёл','террори','джихад','смертник','взрывать','халифат','игил','даиш','наркотик','наркоту','наркота','марихуан','гашиш','кокаин','амфетамин','героин','фентанил','спайс','детское порно','педофил','иностранный агент','иностранного агента','иностранные агенты','иностранных агентов','иноагент','иноагента','foreign agent','хайль','фашист','нацист','свастик','богохул','кощунств','порно','porn','порнх','pornhub','анальн','вагин','вульв','penis','pussy','dick','cock','fuck','fucking','отсос','минет','куни','дроч','мастурб','онанизм','эскорт','sex video','sex tape','nude','naked','nudes','нюдс','вебкам','webcam','голые фото','фото голой','обнаженн','обнажённ','интим услу','интим за ','эротич','эротик','секс видео','секс игрушк','adult content','взросл контент','проститутк','девочка по вызову','девушка по вызову','мужчина по вызову','интим досуг','массаж с продолжением'];
+const PROFANITY_LIST = ['хуй','пизд','бляд','блять','ебат','ёб','еба','сука','сук','нахуй','нахер','пидор','пидар','говно','дерьмо','жопа','гондон','уёб','уеб','мудак','козёл','террори','джихад','смертник','взрывать','халифат','игил','даиш','наркотик','наркоту','наркота','марихуан','гашиш','кокаин','амфетамин','героин','фентанил','спайс','детское порно','педофил','иностранный агент','иностранного агента','иностранные агенты','иностранных агентов','иноагент','иноагента','foreign agent','хайль','фашист','нацист','свастик','богохул','кощунств','порно','porn','порнх','pornhub','анальн','вагин','вульв','penis','pussy','dick','cock','fuck','fucking','отсос','минет','куни','дроч','мастурб','онанизм','эскорт','sex video','sex tape','nude','naked','nudes','нюдс','вебкам','webcam','голые фото','фото голой','обнаженн','обнажённ','интим услу','интим за ','эротич','эротик','секс видео','секс игрушк','adult content','взросл контент','проститутк','девочка по вызову','девушка по вызову','мужчина по вызову','интим досуг','массаж с продолжением','призыв к переворот','устроим переворот','государственн переворот','свержен власти','свергни власть','свергнем власть','устроим бунт','устроим мятеж','массов беспорядк','массовые беспорядки','призыв к заворушен','заворушен','захват власти','захватим власть','штурм кремл','устроим погром','пропаганда лгбт','пропаганду лгбт','лгбт пропаганда','пропагандирую лгбт','пропаганда гомосексуализма','пропаганда нетрадиционных','пропаганда однополых','гей-пропаганда','агитирую за лгбт','покончу с собой','поконч с собой','покончить с собой','покончил с собой','повешусь','перережу вены','вскрою вены','сведу счёты с жизнью','шагну с крыши','выпрыгну из окна','экстази','мефедрон','крэк','трамадол','кодеин','метадон','соль для ванн'];
 
 function containsProfanity(text) {
   const lower = String(text || '').toLowerCase().replace(/[ъё]/g, (c) => c === 'ъ' ? '' : 'е');
@@ -2334,7 +2334,8 @@ async function addProfilePhotoFromUrl(url) {
 async function addProfilePhotoFromFile(file) {
   syncProfileFormFields();
   const dataUrl = await readImageAsDataUrl(file, 1024);
-  const analysis = await analyzePhotoNsfw(dataUrl);
+  const analysis = await analyzePhotoNsfw(dataUrl, detectPhotoCategories(dataUrl));
+  if (analysis.categories?.length && analysis.verdict === 'ok') { analysis.verdict = 'review'; analysis.risk = 'high'; }
   if (analysis.verdict === 'reject') {
     toast('Фото не прошло модерацию (признаки откровенного контента)');
     haptic('error');
@@ -2359,7 +2360,19 @@ async function addProfilePhotoFromFile(file) {
   toast('Фото добавлено');
 }
 
-function analyzePhotoNsfw(dataUrl) {
+// Отслеживаемые категории изображений. Точка встройки vision/OCR и эвристик:
+// на сегодня сценная детекция (табак/курение, массовые беспорядки, ЛГБТ-пропаганда,
+// наркотики) по пикселям недоступна без нейромодели, поэтому показов списка пустой.
+// Сервер принимает эти флаги через /api/photo/analyze (см. PHOTO_TRACKED_CATEGORIES).
+function detectPhotoCategories(dataUrl) {
+  try {
+    // TODO: заменить на реальный vision-классификатор (свастики, табак, сцены беспорядков).
+    const hints = window.__photoCategoryHints || [];
+    return Array.isArray(hints) ? hints : [];
+  } catch { return []; }
+}
+
+function analyzePhotoNsfw(dataUrl, categories = []) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -2389,12 +2402,12 @@ function analyzePhotoNsfw(dataUrl) {
         let risk = 'low';
         if (skinRatio >= 0.45) { verdict = 'reject'; risk = 'high'; }
         else if (skinRatio >= 0.28) { verdict = 'review'; risk = 'medium'; }
-        resolve({ verdict, risk, skinRatio: Math.round(skinRatio * 1000) / 1000, dims: { width: img.width, height: img.height } });
+        resolve({ verdict, risk, skinRatio: Math.round(skinRatio * 1000) / 1000, dims: { width: img.width, height: img.height }, categories });
       } catch {
-        resolve({ verdict: 'review', risk: 'unknown', skinRatio: 0, dims: null });
+        resolve({ verdict: 'review', risk: 'unknown', skinRatio: 0, dims: null, categories });
       }
     };
-    img.onerror = () => resolve({ verdict: 'review', risk: 'unknown', skinRatio: 0, dims: null });
+    img.onerror = () => resolve({ verdict: 'review', risk: 'unknown', skinRatio: 0, dims: null, categories });
     img.src = dataUrl;
   });
 }
@@ -4385,7 +4398,6 @@ function openMatchChat(matchId) {
 function renderStats() {
   const name = state.profile?.name || '';
   const description = state.profile?.description || '';
-  const gender = String(state.profile?.gender || '');
   const interests = state.profile?.interests || [];
   const interestsText = interests.join(', ');
   const zodiac = state.profile?.zodiac || '';
@@ -4451,7 +4463,7 @@ function renderStats() {
       </div>
 
       <div class="profile-editor">
-        <div class="muted">Имя и пол: ${escapeHtml(name || 'Не указано')} • ${gender === 'male' ? 'Мужчина' : gender === 'female' ? 'Женщина' : 'Не указано'}</div>
+        <div class="muted">Имя: ${escapeHtml(name || 'Не указано')}</div>
         <div class="muted">От этого зависят формулировки вопросов и варианты ответов в анкете.</div>
         <div class="profile-field">
           <label class="label">Описание</label>

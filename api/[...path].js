@@ -462,9 +462,9 @@ const HATE_WORDS = ['хачи','хач','жиды','жид','чурок','чур
 const RELIGIOUS_INSULT_WORDS = ['оскорбл','богохул','богохульств','богоубийц','святотатств','кощунств'];
 const TERRORISM_WORDS = ['террори','джихад','смертник','взрывать','захват заложник','исламское государство','игил','даиш','халифат','оправдани терроризм'];
 const SEPARATISM_WORDS = ['сепарати','отделени кавказ','отделени сибир','отделени кра','отделени республ','отделение кавказ','отделения кавказ','отделение кра','отделения кра','отделение республ','независимости кавказ','независимость кавказ','независимости сибир','независимость сибир','независимости чечн','независимы кавказ','независимы сибир','отделен от росси','отделение от росси'];
-const DRUG_WORDS = ['наркотик','наркоту','наркота','марихуан','гашиш','кокаин','кокс','травк','амфетамин','метамфетамин','героин','фентанил','спайс','склоняю к наркотикам','давай покурим'];
+const DRUG_WORDS = ['наркотик','наркоту','наркота','марихуан','гашиш','кокаин','кокс','травк','амфетамин','метамфетамин','героин','фентанил','спайс','экстази','мефедрон','крэк','трамадол','кодеин','метадон','соль для ванн','склоняю к наркотикам','давай покурим'];
 const CP_WORDS = ['child porn','детское порно','child sex','педофил','child abuse','непристойные действия','ср материалы','малолетк','несовершеннолетн для интим','несовершеннолетнюю для интим','несовершеннолетней для интим'];
-const SUICIDE_WORDS = ['удавис','повесся','повесис','убей себя','убить себя','сделай это с собой','сделай с собой это','реж вены','уничтожь себя'];
+const SUICIDE_WORDS = ['удавис','повесся','повесис','повешусь','покончу с собой','поконч с собой','покончить с собой','покончил с собой','покончила с собой','покончу с жизнью','покончить с жизнью','покончил с жизнью','убей себя','убить себя','сделай это с собой','сделай с собой это','реж вены','вскрою вены','перережу вены','сведу счёты с жизнью','свести счёты с жизнью','шагну с крыши','выпрыгну из окна','кинусь под','отравится таблетк','отравиться таблет','уничтожь себя'];
 const COERCION_WORDS = ['заставлю тебя переспать','заставлю тебя со мной','понужд к сексу','развратн действие','развратн действий','развратн действи','принужд к сексу','не по своему желанию секс','изнасилую'];
 const MINOR_SEX_WORDS = ['пересплю с','встречусь с летней','встречусь с леткой','с 15-летней','с 14-леткой','с 16-летн','с 13-летн','с 17-летн','с пятнадцатилетн','с четырнадцатилетн','с шестнадцатилетн','с тринадцатилетн'];
 const PROSTITUTION_WORDS = ['сниму проститутк','снять проститутк','проститутк','путан','шлюх','эскорт','интим за ','секс за деньги','за деньги сниму'];
@@ -482,6 +482,15 @@ const NSFW_WORDS = [
 ];
 const FOREIGN_AGENT_WORDS = ['иностранный агент','иностранного агента','иностранному агенту','иностранным агентом','иностранные агенты','иностранных агентов','иностранными агентами','иностранном агенте','иностранных агентах','иностраных агент','иностраный агент','иностраного агента','иностраная агитаци','иностраного агентства','иноагент','иноагента','иноагенты','иноагентов','иностранное влияние','иностранного влияния','иностранным влиянием','foreign agent','foreign agents'];
 const EXTREMIST_MATERIAL_WORDS = ['экстремистск','запрещённая информация','единый реестр запрещён'];
+const UNREST_WORDS = [
+  // ст. 212 УК: массовые беспорядки / призывы к незаконным массовым мероприятиям (RU)
+  'призыв к переворот','призываю к переворот','устроим переворот','государственн переворот','свержен власти','свергни власть','свергнем власть','свержение правительств',
+  'устроим бунт','организуем бунт','призыв к бунт','призываю к бунт','устроим мятеж','организуем мятеж','вооруженный мятеж','вооружённый мятеж',
+  'массов беспорядк','массовые беспорядки','устроим беспорядки','призыв к заворушен','заворушен',
+  'захват власти','захватим власть','штурм кремл','штурм правительствен','штурмовать здание','идти на штурм органов',
+  'устроим погром','организуем погром','погром магазин','агитируй за бунт','выйдем на улицы и перекро'
+];
+const QUEERWORDS_ROOT = 'лгбт';  // якорь для связанных групп (см. containsLgbtPropaganda)
 
 const LAT_TO_CYR = { 'a':'а','e':'е','o':'о','p':'р','c':'с','x':'х','y':'у','h':'н','k':'к','m':'м','t':'т','b':'в' };
 const CYR_TO_LAT = { 'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'j','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'h','ц':'ts','ч':'ch','ш':'sh','щ':'sch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya' };
@@ -601,7 +610,7 @@ function containsDrugs(text) {
   const t = translitOf(text.toLowerCase());
   if (t.includes('drug') || t.includes('cocaine') || t.includes('heroin') || t.includes('marihuana') || t.includes('gashish') || t.includes('amfetamin')) return true;
   if (containsLatinPhrases(text, [
-    'drugs','cocaine','heroin','marijuana','hashish','methamphetamine','meth','metaamfetamin','ecstasy','mdma','lsd','lysergic','fentanyl','crystal meth','amphetamine','opiate','opioid'
+    'drugs','cocaine','heroin','marijuana','hashish','methamphetamine','meth','metaamfetamin','ecstasy','mdma','lsd','lysergic','fentanyl','crystal meth','amphetamine','opiate','opioid','mephedrone','cannabis','opium'
   ])) return true;
   return false;
 }
@@ -663,7 +672,7 @@ function containsSuicide(text) {
     if (lower.includes(word)) return true;
   }
   if (containsLatinPhrases(text, [
-    'kill yourself','killing myself','kill myself','commit suicide','committing suicide','end my life','ending my life','end it all','suicidal','do not want to live','want to die'
+    'kill yourself','killing myself','kill myself','commit suicide','committing suicide','end my life','ending my life','end it all','suicidal','do not want to live','want to die','hang myself','no reason to live','better off dead'
   ])) return true;
   return false;
 }
@@ -733,7 +742,56 @@ function containsNsfw(text) {
   return false;
 }
 
-const BLOCK_REASONS = new Set(['extremism', 'religious_insult', 'terrorism', 'separatism', 'drugs', 'child_exploitation', 'foreign_agent', 'extremist_material', 'hate', 'suicide', 'coercion', 'minor_sex', 'prostitution', 'nsfw']);
+function containsUnrest(text) {
+  const lower = normalizeForMatch(text);
+  for (const word of UNREST_WORDS) {
+    if (!word) continue;
+    if (lower.includes(word)) return true;
+  }
+  // Призывы к массовым незаконным мероприятиям в latin (целые фразы, без ложных «riot! матч», «general strike»).
+  if (containsLatinPhrases(text, [
+    'riot','riots','mass riot','sedition','insurrection','overthrow the','storm the government','storm the parliament','violent uprising','call to arms','barricade the'
+  ])) return true;
+  return false;
+}
+
+function containsLgbtPropaganda(text) {
+  const lower = normalizeForMatch(text).replace(/\s+/g, ' ');
+  const phrases = [
+    'пропаганда лгбт','пропаганду лгбт','пропаганды лгбт','пропагандой лгбт','лгбт пропаганда','лгбт пропаганд',
+    'пропагандирую лгбт','пропагандируем лгбт','пропаганда лгбт-',
+    'пропаганда гомосексуализма','пропаганда гомосексуальных','пропаганда нетрадиционных сексуальных','пропаганда нетрадиционных отношений','пропаганда однополых','пропаганда гомо','пропагандирую гомосексуализм',
+    'пропаганда гей','гей-пропаганда','гей пропаганда',
+    'агитирую за лгбт','агитирую за гомо','агитирую за нетрадиционн','вербую в лгбт','пропаганда аморальности'
+  ];
+  for (const p of phrases) {
+    if (lower.includes(p)) return true;
+  }
+  if (containsLatinPhrases(text, [
+    'lgbt propaganda','propaganda lgbt','gay propaganda','propaganda gay','promote lgbt','promoting lgbt','spread lgbt','lgbt activism calls','lgbt agitation'
+  ])) return true;
+  return false;
+}
+
+function containsTobacco(text) {
+  const lower = normalizeForMatch(text).replace(/\s+/g, ' ');
+  const phrases = [
+    'продам сигарет','продаю сигарет','продажа сигарет','сигарет оптом','реализ сигарет','реализация сигарет',
+    'продам таба','продаю таба','табак оптом','оптовы поставки сигарет','сигарет в наличии',
+    'продам вейп','продаю вейп','продам снюс','продаю снюс','снюс в наличии','реклама вейпа','вейп оптом','вейп в наличии',
+    'заказать сигареты','заказать вейп','подписка на сигареты'
+  ];
+  for (const p of phrases) {
+    if (lower.includes(p)) return true;
+  }
+  if (containsLatinPhrases(text, [
+    'sell cigarettes','selling cigarettes','cigarettes for sale','cigarettes wholesale','cigarette sales',
+    'tobacco wholesale','selling tobacco','tobacco for sale','vape shop','sell vapes','selling vapes','vapes for sale','vape wholesale','snus for sale','selling snus'
+  ])) return true;
+  return false;
+}
+
+const BLOCK_REASONS = new Set(['extremism', 'religious_insult', 'terrorism', 'separatism', 'drugs', 'child_exploitation', 'foreign_agent', 'extremist_material', 'hate', 'suicide', 'coercion', 'minor_sex', 'prostitution', 'nsfw', 'unrest', 'lgbt_propaganda', 'tobacco']);
 const CENSOR_REASONS = new Set(['profanity']);
 
 function normalizeCyrWord(w) {
@@ -782,6 +840,9 @@ function moderateText(text) {
   const reasons = [];
   if (containsProfanity(text)) reasons.push('profanity');
   if (containsExtremism(text)) reasons.push('extremism');
+  if (containsUnrest(text)) reasons.push('unrest');
+  if (containsLgbtPropaganda(text)) reasons.push('lgbt_propaganda');
+  if (containsTobacco(text)) reasons.push('tobacco');
   if (containsHate(text)) reasons.push('hate');
   if (containsReligiousInsult(text)) reasons.push('religious_insult');
   if (containsTerrorism(text)) reasons.push('terrorism');
@@ -1219,8 +1280,10 @@ function checkImageFilename(filename) {
 
 const NSFW_SKIN_HARD_LIMIT = 0.45;
 const NSFW_SKIN_REVIEW_LIMIT = 0.28;
+// Категории, которые могут быть присланы при анализе изображения (vision/OCR/экспертные флаги).
+const PHOTO_TRACKED_CATEGORIES = ['nsfw', 'unrest', 'lgbt_propaganda', 'tobacco', 'drugs'];
 
-function photoAnalysisVerdict({ skinRatio, dims }) {
+function photoAnalysisVerdict({ skinRatio, dims, categories }) {
   let verdict = 'ok';
   let risk = 'low';
   const ratio = Math.min(1, Math.max(0, Number(skinRatio) || 0));
@@ -1231,7 +1294,15 @@ function photoAnalysisVerdict({ skinRatio, dims }) {
     verdict = 'review';
     risk = 'medium';
   }
-  return { verdict, risk, skinRatio: Math.round(ratio * 1000) / 1000, dims: dims || null };
+  // Дополнительные отслеживаемые категории изображения: любое совпадение → модерация (review/reject).
+  const flagged = Array.isArray(categories)
+    ? categories.filter((c) => PHOTO_TRACKED_CATEGORIES.includes(String(c)))
+    : [];
+  if (flagged.length) {
+    verdict = verdict === 'reject' ? 'reject' : 'review';
+    risk = 'high';
+  }
+  return { verdict, risk, skinRatio: Math.round(ratio * 1000) / 1000, dims: dims || null, categories: flagged };
 }
 
 async function handlePhotoAnalyze(req, res) {
@@ -1239,8 +1310,8 @@ async function handlePhotoAnalyze(req, res) {
   if (!user) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
   try {
     const body = await readJson(req);
-    const { skinRatio, dims, filename } = body;
-    const result = photoAnalysisVerdict({ skinRatio, dims });
+    const { skinRatio, dims, filename, categories } = body;
+    const result = photoAnalysisVerdict({ skinRatio, dims, categories });
     auditAction(user.id || user.email, 'photo_analyze', { ...result, filename }, { ip: String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '') });
     if (result.verdict !== 'ok') {
       const report = {
@@ -1249,7 +1320,7 @@ async function handlePhotoAnalyze(req, res) {
         targetId: user.id || user.email,
         targetType: 'photo',
         reason: `nsfw_${result.verdict}`,
-        details: `skin_ratio=${result.skinRatio}`,
+        details: `skin_ratio=${result.skinRatio};categories=${(result.categories || []).join(',') || 'none'}`,
         status: 'pending',
         createdAt: new Date().toISOString()
       };
