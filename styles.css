@@ -1182,16 +1182,37 @@ a { color: inherit; }
   }
 }
 
+.photo-hero-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .photo-hero {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
+.photo-name {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 2;
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.15;
+  color: #fff;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
 .photo-hero-main {
   appearance: none;
   padding: 0;
   cursor: pointer;
+  position: relative;
   width: 100%;
   aspect-ratio: 4 / 5;
   max-height: 520px;
@@ -1540,6 +1561,99 @@ a { color: inherit; }
 .tinder-badges { isolation: isolate; }
 .tinder-about { color: rgba(17, 24, 39, 0.88); line-height: 1.35; }
 .tinder-actions { display: flex; gap: 12px; justify-content: center; margin-top: 12px; }
+
+/* Фото на карточке: фоновый снимок + градиент-подложка и имя поверх */
+.tinder-photo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center 18%;
+  background-color: rgba(15, 23, 42, 0.12);
+}
+.tinder-photo.nophoto {
+  background-color: transparent;
+}
+.tinder-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.58) 0%, rgba(15, 23, 42, 0.10) 28%, rgba(15, 23, 42, 0.04) 52%, rgba(15, 23, 42, 0.62) 100%);
+}
+.tinder-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 18px 18px 10px;
+}
+.tinder-name {
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.15;
+  color: #fff;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+  letter-spacing: 0.2px;
+}
+.tinder-top .tinder-sub { color: #e2e8f0; }
+.tinder-top .match-badge {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.55);
+  color: #fff;
+}
+.tinder-foot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  max-height: 66%;
+  overflow-y: auto;
+  border-top: 1px solid rgba(15, 23, 42, 0.10);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.98));
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+}
+.tinder-foot .pad,
+.tinder-card .tinder-foot .pad {
+  display: grid;
+  gap: 12px;
+  height: auto;
+  padding: 14px 18px 18px;
+  grid-auto-rows: min-content;
+}
+.tinder-card .tinder-foot .tinder-about { color: rgba(17, 24, 39, 0.88); }
+
+/* Пустая лента: карточка-приглашение в том же стиле */
+.tinder-empty {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background:
+    radial-gradient(900px 520px at 25% 15%, rgba(167, 139, 250, 0.22), transparent 55%),
+    radial-gradient(700px 520px at 80% 20%, rgba(34, 211, 238, 0.18), transparent 55%),
+    rgba(15, 23, 42, 0.05);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 26px;
+  box-shadow: 0 22px 70px rgba(15, 23, 42, 0.12);
+}
+.tinder-empty .tinder-empty-text {
+  max-width: 320px;
+  font-size: 15px;
+  color: rgba(17, 24, 39, 0.75);
+  line-height: 1.5;
+}
 .tbtn {
   width: 56px;
   height: 56px;
@@ -1558,6 +1672,7 @@ a { color: inherit; }
   position: absolute;
   top: 18px;
   left: 18px;
+  z-index: 3;
   padding: 10px 12px;
   border-radius: var(--radius-md);
   font-weight: 950;

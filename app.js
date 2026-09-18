@@ -597,6 +597,7 @@ function toDatingProfile(p) {
     education: p.education || '',
     budget: p.budget || '',
     about: p.about || p.description || '',
+    questionnaireAnswers: p.questionnaireAnswers || {},
     persona: p.persona || {},
     factual: p.factual || {}
   };
@@ -1995,20 +1996,24 @@ function renderSubscriptionContent(highlightFeature) {
   }
 
   // Управление активной подпиской: отмена автопродления (CloudPayments).
+  // Кнопка всегда видна, но неактивна, пока не подключён ни один из планов.
   const manageEl = $('#subManage');
   if (manageEl) {
-    if (current.id !== 'free' && ['standard', 'premium', 'vip', 'exclusive'].includes(String(current.id))) {
-      manageEl.innerHTML = `
-        <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 16px">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-            <div class="muted" style="font-size:12px">Автопродление вашей подписки активно. Отмените в любой момент — преимущества сохранятся до конца оплаченного периода.</div>
-            <button class="btn ghost" id="btnCancelSub" type="button" style="font-size:12px;color:#f43f5e">Отменить подписку</button>
-          </div>
-        </div>`;
-      $('#btnCancelSub')?.addEventListener('click', () => cancelSubscription());
-    } else {
-      manageEl.innerHTML = '';
-    }
+    const onPaidPlan = ['standard', 'premium', 'vip', 'exclusive'].includes(String(current.id));
+    const manageHint = onPaidPlan
+      ? 'Автопродление вашей подписки активно. Отмените в любой момент — преимущества сохранятся до конца оплаченного периода.'
+      : 'Управление подпиской — после подключения одного из планов (Стандарт, Премиум, VIP, Эксклюзив).';
+    const manageBtn = onPaidPlan
+      ? `<button class="btn ghost" id="btnCancelSub" type="button" style="font-size:12px;color:#f43f5e">Отменить подписку</button>`
+      : `<button class="btn ghost" id="btnCancelSub" type="button" disabled style="font-size:12px;color:#f43f5e;opacity:0.45;cursor:not-allowed" title="Отмена доступна после подключения плана">Отменить подписку</button>`;
+    manageEl.innerHTML = `
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div class="muted" style="font-size:12px">${manageHint}</div>
+          ${manageBtn}
+        </div>
+      </div>`;
+    $('#btnCancelSub')?.addEventListener('click', () => cancelSubscription());
   }
 
   const plansEl = $('#subPlans');
@@ -4062,6 +4067,82 @@ function treeMatchCompatibility(userProfile = state.profile, candidate = {}) {
   return { known, match, conflicts, pct, compatible, enabled, conflictsEnabled, threshold };
 }
 
+// Подсчёт совпадений по полной анкете (282 вопроса). Если у кандидата есть полные
+// ответы — сравниваем их попарно; иначе — по агрегированному портрету (persona/factual).
+// Возвращает { total, matched }: total — сколько вопросов удалось сопоставить, matched — совпавших.
+function countQuestionnaireMatches(userProfile = state.profile, candidate = {}) {
+  const candAnswers = getQuestionnaireAnswers(candidate);
+  if (Object.keys(candAnswers).length > 0) {
+    const userAnswers = getQuestionnaireAnswers(userProfile);
+    let total = 0;
+    let matched = 0;
+    for (const q of ALL_QUESTIONS) {
+      const myId = userAnswers[q.id];
+      const theirId = candAnswers[q.id];
+      if (!myId || !theirId) continue;
+      const myNum = numericAnswerValue(myId);
+      const mySearch = searchAnswerValue(myId);
+      if (myNum != null) {
+        const theirNum = numericAnswerValue(theirId);
+        if (theirNum == null) continue;
+        total += 1;
+        const myBucket = numericBucket(q, myNum);
+        if (myBucket != null && myBucket === numericBucket(q, theirNum)) matched += 1;
+        continue;
+      }
+      if (mySearch != null) {
+        const theirSearch = searchAnswerValue(theirId);
+        if (theirSearch == null) continue;
+        total += 1;
+        const myCat = (q.searchMap || {})[mySearch];
+        const theirCat = (q.searchMap || {})[theirSearch];
+        if (myCat && myCat === theirCat) matched += 1;
+        continue;
+      }
+      const mine = q.multi ? multiAnswerList(myId) : [myId];
+      const theirs = q.multi ? multiAnswerList(theirId) : [theirId];
+      total += 1;
+      if (mine.some((x) => theirs.includes(x))) matched += 1;
+    }
+    return { total, matched };
+  }
+
+  // Fallback: кандидат без полной анкеты — сверяем по агрегированному портрету.
+  const answers = getQuestionnaireAnswers(userProfile);
+  const cand = { persona: candidate.persona || {}, factual: candidate.factual || {} };
+  let total = 0;
+  let matched = 0;
+  for (const q of ALL_QUESTIONS) {
+    const answerId = answers[q.id];
+    if (!answerId) continue;
+    const num = numericAnswerValue(answerId);
+    const searched = searchAnswerValue(answerId);
+    const traitsList = num != null
+      ? (() => {
+          const bucket = numericBucket(q, num);
+          return bucket ? [{ [q.category]: bucket }] : [];
+        })()
+      : searched != null
+        ? (() => {
+            const cat = (q.searchMap || {})[searched] || '';
+            return cat ? [{ [q.category]: cat }] : [];
+          })()
+        : multiAnswerList(answerId).map((oid) => {
+            const opt = questionOptions(q).find((x) => x.id === oid);
+            return opt ? getOptionTraits(q, opt) : null;
+          }).filter(Boolean);
+    if (!traitsList.length) continue;
+    total += 1;
+    const hit = traitsList.some((traits) => {
+      const entries = Object.entries(traits);
+      if (!entries.length) return false;
+      return entries.every(([dim, val]) => cand.persona[dim] === val || cand.factual[dim] === val);
+    });
+    if (hit) matched += 1;
+  }
+  return { total, matched };
+}
+
 function renderDating() {
   syncReportStatuses().catch(() => {});
   const cityKey = currentCityKey();
@@ -4211,7 +4292,9 @@ function renderDating() {
 
       <div class="card">
         <div class="card-title">Анкета</div>
-        ${visible.length ? `<div class="tinder-wrap" id="tinderWrap"></div>` : `<div class="muted">Новых анкет нет.</div>`}
+        ${visible.length
+          ? `<div class="tinder-wrap" id="tinderWrap"></div>`
+          : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div></div></div>`}
         ${visible.length ? `<div class="tinder-actions"><button class="tbtn nope" type="button" data-tinder="nope">✕</button><button class="tbtn like" type="button" data-tinder="like">❤</button></div>` : ``}
       </div>
     </div>
@@ -4422,10 +4505,12 @@ function renderStats() {
     <div class="grid">
       <div class="card profile-editor">
         <div class="card-title">Анкета</div>
-        <div class="photo-hero">
+        <div class="photo-hero-wrap">
           <button class="photo-hero-main ${photos[0] ? '' : 'empty'}" type="button" data-action="pickPhoto" ${photos.length >= 3 ? 'disabled' : ''}>
             ${photos[0] ? `<img alt="profile photo" src="${photos[0]}" />` : `<div class="photo-empty">Фото профиля</div>`}
+            ${photos[0] ? `<span class="photo-name">${escapeHtml(name || '')}</span>` : ''}
           </button>
+        </div>
           <div class="photo-hero-actions">
             <button class="btn" type="button" data-action="pickPhoto" ${photos.length >= 3 ? 'disabled' : ''}>Загрузить фото</button>
             <input id="profilePhotoInput" type="file" accept="image/*" hidden />
@@ -5921,29 +6006,43 @@ function renderTinderInner(p) {
   const reportStatus = reportRec
     ? `<div class="pill muted-pill" data-report-status="${reportRec.status}">Жалоба: ${reportStatusLabel(reportRec.status)}</div>`
     : '';
+  const photo = (p.photos && p.photos[0]) || '';
+  const photoCss = photo ? `background-image:url('${String(photo).replaceAll("'", '%27').replaceAll('"', '%22')}')` : '';
+  const qm = countQuestionnaireMatches(state.profile, p);
+  const qmHasSignal = qm.total > 0 || Object.keys(p.questionnaireAnswers || {}).length || Object.keys(p.persona || {}).length || Object.keys(p.factual || {}).length;
+  const qmBadge = qm.total > 0
+    ? `<span class="pill status-pill good match-badge">${qm.matched} из ${qm.total} вопросов анкеты совпало</span>`
+    : qmHasSignal
+      ? `<span class="pill muted-pill">анкета: данные ещё формируются</span>`
+      : '';
   return `
     <div class="tinder-stamp like">LIKE</div>
     <div class="tinder-stamp nope">NOPE</div>
-    <div class="pad">
-      <div>
-        <div class="tinder-title">${escapeHtml(p.name)}, ${p.age}</div>
-        <div class="tinder-sub"><span class="verdict ${compat.tone || 'warn'}">${verdictEmoji(compat.tone || 'warn')}</span> ${escapeHtml(compat.label)}</div>
-      </div>
-      <div class="tinder-about">${escapeHtml(p.about)}</div>
-      <div class="tinder-badges">${tags}</div>
-      <div class="tinder-badges">${comm}</div>
-      <div class="tinder-badges">${vals}</div>
-      <div class="tinder-badges">${zodiac} ${job} ${edu}</div>
-      <div class="tinder-badges"><span class="pill status-pill ${circle.tone === 'good' ? 'good' : circle.tone === 'bad' ? 'bad' : circle.tone === 'warn' ? 'warn' : 'muted'}">${circle.label}</span></div>
-      ${circleHighlights.values.length ? `<div class="tinder-badges">${circleHighlights.values.slice(0, 2).map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ')}</div>` : ''}
-      <div class="tinder-badges">${treeBadge}</div>
-      ${shared ? `<div class="tinder-badges">${shared}</div>` : ''}
-      ${diff ? `<div class="tinder-badges">${diff}</div>` : ''}
-      ${neutral ? `<div class="tinder-badges">${neutral}</div>` : ''}
-      ${reportStatus}
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto">
-        <div class="muted">Свайп вправо — лайк, влево — пропуск</div>
-        <button class="link-btn" type="button" data-report="${escapeHtml(pid)}" style="font-size:11px;color:#e11d48">${reportRec ? 'Изменить жалобу' : '⚠ Пожаловаться'}</button>
+    <div class="tinder-photo ${photo ? '' : 'nophoto'}" style="${photoCss}"></div>
+    <div class="tinder-scrim"></div>
+    <div class="tinder-top">
+      <div class="tinder-name">${escapeHtml(p.name)}${p.age ? `, ${p.age}` : ''}</div>
+      <div class="tinder-sub"><span class="verdict ${compat.tone || 'warn'}">${verdictEmoji(compat.tone || 'warn')}</span> ${escapeHtml(compat.label)}</div>
+      ${qmBadge}
+    </div>
+    <div class="tinder-foot">
+      <div class="pad">
+        <div class="tinder-about">${escapeHtml(p.about)}</div>
+        <div class="tinder-badges">${tags}</div>
+        <div class="tinder-badges">${comm}</div>
+        <div class="tinder-badges">${vals}</div>
+        <div class="tinder-badges">${zodiac} ${job} ${edu}</div>
+        <div class="tinder-badges"><span class="pill status-pill ${circle.tone === 'good' ? 'good' : circle.tone === 'bad' ? 'bad' : circle.tone === 'warn' ? 'warn' : 'muted'}">${circle.label}</span></div>
+        ${circleHighlights.values.length ? `<div class="tinder-badges">${circleHighlights.values.slice(0, 2).map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ')}</div>` : ''}
+        <div class="tinder-badges">${treeBadge}</div>
+        ${shared ? `<div class="tinder-badges">${shared}</div>` : ''}
+        ${diff ? `<div class="tinder-badges">${diff}</div>` : ''}
+        ${neutral ? `<div class="tinder-badges">${neutral}</div>` : ''}
+        ${reportStatus}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto">
+          <div class="muted">Свайп вправо — лайк, влево — пропуск</div>
+          <button class="link-btn" type="button" data-report="${escapeHtml(pid)}" style="font-size:11px;color:#e11d48">${reportRec ? 'Изменить жалобу' : '⚠ Пожаловаться'}</button>
+        </div>
       </div>
     </div>
   `;
