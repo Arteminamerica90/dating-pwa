@@ -4509,6 +4509,7 @@ function renderStats() {
           <button class="photo-hero-main ${photos[0] ? '' : 'empty'}" type="button" data-action="pickPhoto" ${photos.length >= 3 ? 'disabled' : ''}>
             ${photos[0] ? `<img alt="profile photo" src="${photos[0]}" />` : `<div class="photo-empty">Фото профиля</div>`}
             ${photos[0] ? `<span class="photo-name">${escapeHtml(name || '')}</span>` : ''}
+            ${photos[0] && interests.length ? `<span class="photo-tags">${interests.slice(0, 5).map((t) => `<span class="pill">${interestLabel(t)}</span>`).join('')}</span>` : ''}
           </button>
         </div>
           <div class="photo-hero-actions">
@@ -4549,7 +4550,6 @@ function renderStats() {
 
       <div class="profile-editor">
         <div class="muted">Имя: ${escapeHtml(name || 'Не указано')}</div>
-        <div class="muted">От этого зависят формулировки вопросов и варианты ответов в анкете.</div>
         <div class="profile-field">
           <label class="label">Описание</label>
           <textarea id="profileDescription" class="input" maxlength="2000" placeholder="Расскажите о себе (до 2000 символов)">${escapeHtml(description)}</textarea>
@@ -6022,13 +6022,13 @@ function renderTinderInner(p) {
     <div class="tinder-scrim"></div>
     <div class="tinder-top">
       <div class="tinder-name">${escapeHtml(p.name)}${p.age ? `, ${p.age}` : ''}</div>
-      <div class="tinder-sub"><span class="verdict ${compat.tone || 'warn'}">${verdictEmoji(compat.tone || 'warn')}</span> ${escapeHtml(compat.label)}</div>
-      ${qmBadge}
+      ${tags ? `<div class="tinder-tags">${tags}</div>` : ''}
     </div>
     <div class="tinder-foot">
       <div class="pad">
+        <div class="tinder-sub"><span class="verdict ${compat.tone || 'warn'}">${verdictEmoji(compat.tone || 'warn')}</span> ${escapeHtml(compat.label)}</div>
+        ${qmBadge}
         <div class="tinder-about">${escapeHtml(p.about)}</div>
-        <div class="tinder-badges">${tags}</div>
         <div class="tinder-badges">${comm}</div>
         <div class="tinder-badges">${vals}</div>
         <div class="tinder-badges">${zodiac} ${job} ${edu}</div>
