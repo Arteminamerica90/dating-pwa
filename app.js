@@ -4156,7 +4156,7 @@ function renderDating() {
   const filters = state.dating.filters || {};
   const selectedIntents = new Set(filters.meetingIntent || []);
   const selectedPlaces = new Set(filters.meetingPlaces || []);
-  const radiusKm = Number.isFinite(Number(filters.distanceKm)) ? Number(filters.distanceKm) : 500;
+  const radiusKm = Number.isFinite(Number(filters.distanceKm)) ? Number(filters.distanceKm) : 3000;
   const stepsBucket = String(filters.stepsBucket || '');
   const geoActive = !!(state.consent?.geo && state.lastKnown);
   const distanceMatters = filters.distanceMatters !== false;
@@ -4237,8 +4237,8 @@ function renderDating() {
   const feedReason = !visible.length
     ? liveMode
       ? (liveProfiles.length
-          ? 'Анкеты скрыты текущими фильтрами (пол, дальность, дерево, доход, шаги). Уберите фильтры или увеличьте дальность.'
-          : 'Публичные анкеты других участников пока не найдены. Зайдите под вторым аккаунтом и ответьте на вопросы анкеты, затем обновите ленту.')
+          ? 'Анкеты скрыты текущими фильтрами (пол, дерево, доход, шаги, лайки). Уберите лишние фильтры.'
+          : 'Публичные анкеты других участников пока не найдены. Зарегистрируйтесь под вторым аккаунтом и создайте анкету, либо подождите новых участников.')
       : 'Войдите в аккаунт, чтобы видеть анкеты реальных участников. Сейчас лента пуста.'
     : '';
   const demoNote = !liveMode && visible.length
