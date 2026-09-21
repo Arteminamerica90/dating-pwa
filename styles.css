@@ -1536,6 +1536,54 @@ a { color: inherit; }
   .tinder-wrap { height: min(58vh, 460px); }
 }
 
+/* Гейт регистрации: матчи/чаты/анкеты заблюрены до входа в аккаунт */
+.locked-wrap {
+  position: relative;
+}
+.locked-wrap .card,
+.locked-wrap .matches-strip,
+.locked-wrap .messages-list {
+  filter: blur(3px);
+  pointer-events: none;
+  user-select: none;
+}
+.locked-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  padding: 22px;
+  border-radius: var(--radius-xl);
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.locked-badge {
+  font-size: 34px;
+  line-height: 1;
+}
+.locked-text {
+  max-width: 300px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+}
+.chat-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  padding: 40px 22px;
+}
+
 .tinder-card {
   position: relative;
   width: 100%;

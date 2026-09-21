@@ -3249,6 +3249,28 @@ function renderChatScreen(profileId) {
   const messages = thread?.messages || [];
   const secured = isRealChat(profileId);
   const mutual = getMutualMatches().includes(profileId);
+  if (!accountInfo?.id) {
+    return `
+      <div class="card chat-screen">
+        <div class="chat-screen-head">
+          <button class="btn ghost chat-back" type="button" data-chat-back>← Назад</button>
+          <div class="chat-thread-user">
+            <img class="chat-thread-avatar" src="${profile.photos?.[0] || './assets/profile/avatar-square.jpg'}" alt="${escapeHtml(profile.name)}" />
+            <div>
+              <div class="chat-thread-name">${escapeHtml(profile.name)}, ${profile.age}</div>
+            </div>
+          </div>
+        </div>
+        <div class="chat-thread-body">
+          <div class="chat-locked">
+            <div class="locked-badge">🔒</div>
+            <div class="locked-text">Анкета и переписка доступны только зарегистрированным пользователям.</div>
+            <button class="btn" type="button" data-open-tab="account">Зарегистрироваться</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
   return `
     <div class="card chat-screen">
       <div class="chat-screen-head">
@@ -3330,7 +3352,12 @@ function renderHomeMessagesHtml() {
         .join('')
     : `<div class="muted">Пока нет чатов. Поставьте лайк — диалог появится при взаимном лайке.</div>`;
 
-  return `
+  const gateNeeded = !accountInfo?.id;
+  const chatBody = threadIds.length
+    ? `<div class="messages-list">${list}</div>`
+    : `<div class="muted">Пока нет чатов. Поставьте лайк — диалог появится при взаимном лайке.</div>`;
+
+  const cards = `
     <div class="card">
       <div class="card-title">Матчи</div>
       ${matchesStrip}
@@ -3338,9 +3365,24 @@ function renderHomeMessagesHtml() {
 
     <div class="card">
       <div class="card-title">Чаты</div>
-      <div class="messages-list">${list}</div>
+      ${chatBody}
     </div>
   `;
+
+  if (gateNeeded) {
+    return `
+      <div class="locked-wrap">
+        ${cards}
+        <div class="locked-overlay">
+          <div class="locked-badge">🔒</div>
+          <div class="locked-text">Матчи, анкеты участников и переписка доступны только зарегистрированным пользователям.</div>
+          <button class="btn" type="button" data-open-tab="account">Зарегистрироваться</button>
+        </div>
+      </div>
+    `;
+  }
+
+  return cards;
 }
 
 function wireHomeContentHandlers(rootSelector) {
@@ -3391,6 +3433,11 @@ function wireHomeContentHandlers(rootSelector) {
   });
   root.querySelectorAll('[data-chat-id]').forEach((b) => {
     b.addEventListener('click', () => {
+      if (!accountInfo?.id) {
+        toast('Зарегистрируйтесь, чтобы открыть переписку');
+        switchTab('account');
+        return;
+      }
       const chatId = b.dataset.chatId;
       state.messages = state.messages || { activeThreadId: null, threads: {} };
       state.messages.activeThreadId = chatId;
@@ -3417,6 +3464,11 @@ function wireHomeContentHandlers(rootSelector) {
     el.addEventListener('click', () => {
       const matchId = el.dataset.matchId;
       if (!matchId) return;
+      if (!accountInfo?.id) {
+        toast('Зарегистрируйтесь, чтобы открыть переписку');
+        switchTab('account');
+        return;
+      }
       state.dating.seenMatches = state.dating.seenMatches || {};
       state.dating.seenMatches[matchId] = true;
       state.messages = state.messages || { activeThreadId: null, threads: {} };
@@ -3433,6 +3485,11 @@ function wireHomeContentHandlers(rootSelector) {
     if (!text) return;
     const activeId = state.messages?.activeThreadId;
     if (!activeId) return;
+    if (!accountInfo?.id) {
+      toast('Зарегистрируйтесь, чтобы писать сообщения');
+      switchTab('account');
+      return;
+    }
     if (text.length > 300) {
       toast('Сообщение слишком длинное (максимум 300 символов)');
       haptic('error');
