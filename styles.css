@@ -1683,6 +1683,14 @@ a { color: inherit; }
   color: rgba(17, 24, 39, 0.75);
   line-height: 1.5;
 }
+
+.tinder-empty .tinder-empty-reason {
+  max-width: 320px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: rgba(17, 24, 39, 0.55);
+  line-height: 1.4;
+}
 .tbtn {
   width: 56px;
   height: 56px;
