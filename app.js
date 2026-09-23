@@ -4300,11 +4300,11 @@ function renderDating() {
   $('#view-dating').innerHTML = `
     <div class="grid">
       <div class="card">
-        <button class="accordion-head" type="button" data-filter-toggle aria-expanded="${state.ui?.filtersOpen !== false ? 'true' : 'false'}">
+        <button class="accordion-head" type="button" data-filter-toggle aria-expanded="${state.ui?.filtersOpen === true ? 'true' : 'false'}">
           <span class="accordion-title">Фильтры</span>
           <span class="chevron" aria-hidden="true"></span>
         </button>
-        <div class="accordion-body" ${state.ui?.filtersOpen !== false ? '' : 'hidden'}>
+        <div class="accordion-body" ${state.ui?.filtersOpen === true ? '' : 'hidden'}>
           <div class="filters-grid">
             <div class="filter-group">
               <div class="label">Характер встречи</div>
