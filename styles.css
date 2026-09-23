@@ -1553,33 +1553,53 @@ a { color: inherit; }
   z-index: 3;
   display: flex;
   flex-direction: column;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   text-align: center;
-  padding: 22px;
+  padding: 22px 24px;
   border-radius: var(--radius-xl);
   background: rgba(15, 23, 42, 0.55);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
+.locked-overlay .locked-text,
+.locked-overlay .btn,
+.chat-locked .btn {
+  flex-shrink: 0;
+}
 .locked-badge {
   font-size: 34px;
   line-height: 1;
+  flex-shrink: 0;
 }
 .locked-text {
-  max-width: 300px;
+  max-width: 340px;
   font-size: 14px;
   line-height: 1.45;
   color: #fff;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
 }
+.locked-overlay .btn,
+.chat-locked .btn {
+  margin-top: 6px;
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #fff;
+}
+.locked-overlay .btn:hover,
+.chat-locked .btn:hover {
+  opacity: 0.9;
+  background: var(--ok);
+}
 .chat-locked {
   display: flex;
   flex-direction: column;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   text-align: center;
   padding: 40px 22px;
 }
