@@ -3319,39 +3319,12 @@ function renderHomeMessagesHtml() {
 
   const gateNeeded = !accountInfo?.id;
 
-  const ghostMatchCards = () =>
-    [0, 1, 2]
-      .map((i) => `
-        <div class="match-card new">
-          <div class="match-photo-wrap"><img class="match-photo" alt="" src="./assets/profile/avatar-square.jpg" /></div>
-          <div class="match-name">Анкета ${26 + i}</div>
-          <div class="match-meta">—</div>
-        </div>`)
-      .join('');
-
-  const ghostChatItems = () =>
-    [0, 1, 2]
-      .map((i) => `
-        <button class="chat-item" type="button">
-          <div class="chat-avatar-wrap"><img class="chat-avatar" alt="" src="./assets/profile/avatar-square.jpg" /></div>
-          <div class="chat-main">
-            <div class="chat-topline">
-              <div class="chat-name">Анкета ${26 + i}</div>
-              <div class="chat-time">•</div>
-            </div>
-            <div class="chat-preview">••••••••••</div>
-          </div>
-        </button>`)
-      .join('');
-
   const seenMatches = state.dating.seenMatches || {};
   const matchesStrip = matches.length
     ? `<div class="matches-strip">${matches
         .map((id) => renderMatchCard(id, { seen: !!seenMatches[id] }))
         .join('')}</div>`
-    : gateNeeded
-      ? `<div class="matches-strip">${ghostMatchCards()}</div>`
-      : `<div class="muted">У вас ещё нет метчей. Матч появляется, когда вы оба поставите друг другу лайк.</div>`;
+    : `<div class="muted">У вас ещё нет метчей. Матч появляется, когда вы оба поставите друг другу лайк.</div>`;
 
   const list = threadIds.length
     ? threadIds
@@ -3383,9 +3356,7 @@ function renderHomeMessagesHtml() {
 
   const chatBody = threadIds.length
     ? `<div class="messages-list">${list}</div>`
-    : gateNeeded
-      ? `<div class="messages-list">${ghostChatItems()}</div>`
-      : `<div class="muted">Пока нет чатов. Поставьте лайк — диалог появится при взаимном лайке.</div>`;
+    : `<div class="muted">Пока нет чатов. Поставьте лайк — диалог появится при взаимном лайке.</div>`;
 
   const cards = `
     <div class="card">
@@ -5910,6 +5881,10 @@ function formatEventDate(iso) {
 }
 
 function switchTab(tab) {
+  if (tab === 'account') {
+    openRegisterDialog();
+    return;
+  }
   const btn = document.querySelector(`.tab[data-tab="${tab}"]`);
   if (btn) btn.click();
 }
