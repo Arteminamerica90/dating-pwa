@@ -606,8 +606,8 @@ function toDatingProfile(p) {
 async function loadLiveProfiles() {
   liveProfilesLoaded = true;
   try {
-    if (!accountInfo?.id || !isSupabaseConfigured()) return;
-    const list = await supabaseListPublicProfiles({ excludeUserId: accountInfo.id });
+    if (!isSupabaseConfigured()) return;
+    const list = await supabaseListPublicProfiles({ excludeUserId: accountInfo?.id });
     liveProfiles = list.map(toDatingProfile);
     await syncLikesFromSupabase();
     renderAll();
@@ -3317,12 +3317,41 @@ function renderHomeMessagesHtml() {
     state.messages.activeThreadId = threadIds[0] || null;
   }
 
+  const gateNeeded = !accountInfo?.id;
+
+  const ghostMatchCards = () =>
+    [0, 1, 2]
+      .map((i) => `
+        <div class="match-card new">
+          <div class="match-photo-wrap"><img class="match-photo" alt="" src="./assets/profile/avatar-square.jpg" /></div>
+          <div class="match-name">Анкета ${26 + i}</div>
+          <div class="match-meta">—</div>
+        </div>`)
+      .join('');
+
+  const ghostChatItems = () =>
+    [0, 1, 2]
+      .map((i) => `
+        <button class="chat-item" type="button">
+          <div class="chat-avatar-wrap"><img class="chat-avatar" alt="" src="./assets/profile/avatar-square.jpg" /></div>
+          <div class="chat-main">
+            <div class="chat-topline">
+              <div class="chat-name">Анкета ${26 + i}</div>
+              <div class="chat-time">•</div>
+            </div>
+            <div class="chat-preview">••••••••••</div>
+          </div>
+        </button>`)
+      .join('');
+
   const seenMatches = state.dating.seenMatches || {};
   const matchesStrip = matches.length
     ? `<div class="matches-strip">${matches
         .map((id) => renderMatchCard(id, { seen: !!seenMatches[id] }))
         .join('')}</div>`
-    : `<div class="muted">У вас ещё нет метчей. Матч появляется, когда вы оба поставите друг другу лайк.</div>`;
+    : gateNeeded
+      ? `<div class="matches-strip">${ghostMatchCards()}</div>`
+      : `<div class="muted">У вас ещё нет метчей. Матч появляется, когда вы оба поставите друг другу лайк.</div>`;
 
   const list = threadIds.length
     ? threadIds
@@ -3352,10 +3381,11 @@ function renderHomeMessagesHtml() {
         .join('')
     : `<div class="muted">Пока нет чатов. Поставьте лайк — диалог появится при взаимном лайке.</div>`;
 
-  const gateNeeded = !accountInfo?.id;
   const chatBody = threadIds.length
     ? `<div class="messages-list">${list}</div>`
-    : `<div class="muted">Пока нет чатов. Поставьте лайк — диалог появится при взаимном лайке.</div>`;
+    : gateNeeded
+      ? `<div class="messages-list">${ghostChatItems()}</div>`
+      : `<div class="muted">Пока нет чатов. Поставьте лайк — диалог появится при взаимном лайке.</div>`;
 
   const cards = `
     <div class="card">
@@ -4222,11 +4252,11 @@ function renderDating() {
   const treeConflicts = filters.treeConflicts !== false;
   const treeThresholdPct = Number.isFinite(Number(filters.treeThreshold)) ? Number(filters.treeThreshold) : Math.round(TREE_MATCH_THRESHOLD * 100);
 
-  if (!liveProfilesLoaded && accountInfo?.id && isSupabaseConfigured()) {
+  if (!liveProfilesLoaded && isSupabaseConfigured()) {
     loadLiveProfiles();
   }
 
-  const liveMode = !!accountInfo?.id && isSupabaseConfigured();
+  const liveMode = isSupabaseConfigured();
   const myGender = String(state.profile?.gender || '');
   const myName = normText(state.profile?.name || '');
   const candidatePool = liveProfiles.length ? liveProfiles : [];
@@ -4293,8 +4323,8 @@ function renderDating() {
     ? liveMode
       ? (liveProfiles.length
           ? 'Анкеты скрыты текущими фильтрами (пол, дерево, доход, шаги, лайки). Уберите лишние фильтры.'
-          : 'Публичные анкеты других участников пока не найдены. Зарегистрируйтесь под вторым аккаунтом и создайте анкету, либо подождите новых участников.')
-      : 'Войдите в аккаунт, чтобы видеть анкеты реальных участников. Сейчас лента пуста.'
+          : 'Публичные анкеты других участников пока не найдены. Пригласите друзей в сервис — новые анкеты появятся по мере регистрации участников.')
+      : ''
     : '';
 
   $('#view-dating').innerHTML = `
