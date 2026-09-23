@@ -4229,9 +4229,7 @@ function renderDating() {
   const liveMode = !!accountInfo?.id && isSupabaseConfigured();
   const myGender = String(state.profile?.gender || '');
   const myName = normText(state.profile?.name || '');
-  const candidatePool = liveProfiles.length
-    ? liveProfiles
-    : (liveMode ? [] : DATING_PROFILES);
+  const candidatePool = liveProfiles.length ? liveProfiles : [];
   const maxIncome = maxIncomeForPlan(mySubscription);
   const baseMatch = (p) => {
     if (myGender) {
@@ -4298,9 +4296,6 @@ function renderDating() {
           : 'Публичные анкеты других участников пока не найдены. Зарегистрируйтесь под вторым аккаунтом и создайте анкету, либо подождите новых участников.')
       : 'Войдите в аккаунт, чтобы видеть анкеты реальных участников. Сейчас лента пуста.'
     : '';
-  const demoNote = !liveMode && visible.length
-    ? '<div class="muted" style="margin-top:8px;font-size:12px">Демонстрационные анкеты для теста — зарегистрируйтесь или войдите, чтобы видеть реальных участников.</div>'
-    : '';
 
   $('#view-dating').innerHTML = `
     <div class="grid">
@@ -4362,7 +4357,6 @@ function renderDating() {
 
       <div class="card">
         <div class="card-title">Анкета</div>
-        ${demoNote}
         ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
