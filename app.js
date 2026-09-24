@@ -4671,6 +4671,15 @@ function renderStats() {
         </div>
       </div>
 
+      <div class="card" style="margin-top:12px">
+        <button id="btnOpenSubscription" class="btn" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block">${renderPlanBadge(mySubscription)} ⭐ Подписка</button>
+        <div class="muted" style="text-align:center;margin-top:6px;font-size:12px">Безлимитные лайки, фильтры, суперлайки</div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <button id="btnShareColleague" class="btn" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block;font-size:13px">📨 Поделиться с коллегой</button>
+      </div>
+
       <div class="card" id="accountCard" ${state.ui?.accountExpanded === false ? '' : ''}>
         <button class="accordion-head" type="button" data-toggle-account aria-expanded="${state.ui?.accountExpanded !== false ? 'true' : 'false'}">
           <span class="accordion-title">Аккаунт</span>
@@ -4726,15 +4735,6 @@ function renderStats() {
           </form>
           <div class="muted" id="accountHint">Не можете войти по своему паролю? Нажмите «Забыли пароль?» — на почту придёт ссылка для смены пароля.</div>`}
         </div>
-      </div>
-
-      <div class="card" style="margin-top:12px">
-        <button id="btnOpenSubscription" class="btn" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block">${renderPlanBadge(mySubscription)} ⭐ Подписка</button>
-        <div class="muted" style="text-align:center;margin-top:6px;font-size:12px">Безлимитные лайки, фильтры, суперлайки</div>
-      </div>
-
-      <div class="card" style="margin-top:12px">
-        <button id="btnShareColleague" class="btn" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block;font-size:13px">📨 Поделиться с коллегой</button>
       </div>
 
       <div class="card" id="legalConsentCard" ${allLegalConsentsAccepted && state.ui?.legalConsentExpanded !== true ? 'hidden' : ''}>
