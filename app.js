@@ -4646,7 +4646,7 @@ function renderStats() {
       <div class="card">
         <div class="card-title">Анкета совместимости</div>
         ${renderQuestionnaireSummary(state.profile)}
-        <button class="accordion-head" type="button" data-tree-toggle aria-expanded="${state.ui?.treeOpen ? 'true' : 'false'}">
+        <button class="accordion-head narrow" type="button" data-tree-toggle aria-expanded="${state.ui?.treeOpen ? 'true' : 'false'}">
           <span class="accordion-title">Вопросы</span>
           <span class="pill">${catsProgress.done}/${CATEGORY_ORDER.length}</span>
           <span class="chevron" aria-hidden="true"></span>
@@ -4681,7 +4681,7 @@ function renderStats() {
       </div>
 
       <div class="card" id="accountCard" ${state.ui?.accountExpanded === false ? '' : ''}>
-        <button class="accordion-head" type="button" data-toggle-account aria-expanded="${state.ui?.accountExpanded !== false ? 'true' : 'false'}">
+        <button class="accordion-head narrow" type="button" data-toggle-account aria-expanded="${state.ui?.accountExpanded !== false ? 'true' : 'false'}">
           <span class="accordion-title">Аккаунт</span>
           <span class="chevron" aria-hidden="true"></span>
         </button>
@@ -4738,7 +4738,7 @@ function renderStats() {
       </div>
 
       <div class="card" id="legalConsentCard" ${allLegalConsentsAccepted && state.ui?.legalConsentExpanded !== true ? 'hidden' : ''}>
-        <button class="accordion-head" type="button" data-toggle-legal-consent aria-expanded="${state.ui?.legalConsentExpanded ? 'true' : 'false'}">
+        <button class="accordion-head narrow" type="button" data-toggle-legal-consent aria-expanded="${state.ui?.legalConsentExpanded ? 'true' : 'false'}">
           <span class="accordion-title">Согласия</span>
           <span class="chevron" aria-hidden="true"></span>
         </button>

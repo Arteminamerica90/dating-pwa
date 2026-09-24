@@ -1009,6 +1009,18 @@ a { color: inherit; }
 
 .accordion-head { margin-top: 12px; }
 
+.accordion-head.narrow {
+  width: 100%;
+  max-width: 360px;
+  margin-left: auto;
+  margin-right: auto;
+  justify-content: center;
+}
+.accordion-head.narrow .accordion-title {
+  flex: 0 0 auto;
+}
+.accordion-head.narrow .chevron { margin-top: 3px; }
+
 .accordion-title,
 .tree-filter-cat-head > span:first-child {
   flex: 1;
