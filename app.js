@@ -1268,6 +1268,33 @@ function wireSwipes() {
   main.addEventListener('pointercancel', onUp, { passive: true });
 }
 
+function friendlyAuthError(err) {
+  const msg = String(err?.message || '');
+  if (!msg || /failed to fetch|networkerror|network error|typeerror|load failed|net::|socket|timed out|timeout/i.test(msg)) {
+    return 'Не удалось связаться с сервером. Проверьте интернет-соединение и повторите попытку.';
+  }
+  return msg;
+}
+
+function showAuthErrorMessage(msg) {
+  let el = document.querySelector('#authError');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'authError';
+    el.className = 'auth-error';
+    document.querySelector('#authForm')?.appendChild(el);
+  }
+  if (el) {
+    el.textContent = msg;
+    el.hidden = false;
+  }
+}
+
+function hideAuthErrorMessage() {
+  const el = document.querySelector('#authError');
+  if (el) el.hidden = true;
+}
+
 function wireSettings() {
   $('#authForm')?.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1309,13 +1336,16 @@ function wireSettings() {
         state.cloud.enabled = true;
         save();
         accountInfo = reg.user;
+        hideAuthErrorMessage();
         renderAll();
         toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
         haptic('light');
         syncProfileAfterAuth().catch(() => {});
         setTimeout(() => openSubscriptionDialog(), 1500);
       } catch (err) {
-        toast(err?.message || 'Ошибка регистрации');
+        const msg = friendlyAuthError(err);
+        showAuthErrorMessage(msg);
+        toast(msg);
       }
     });
   });
@@ -1332,6 +1362,7 @@ function wireSettings() {
         state.cloud.email = email;
         state.cloud.enabled = true;
         save();
+        hideAuthErrorMessage();
         renderAll();
         toast('Вход выполнен');
         haptic('light');
@@ -1344,9 +1375,13 @@ function wireSettings() {
       } catch (err) {
         const msg = String(err?.message || '');
         if (/invalid/i.test(msg)) {
-          toast('Неверный email или пароль. Если аккаунт создавался ранее — нажмите «Регистрация»: оно отправит письмо подтверждения.');
+          const friendly = 'Неверный email или пароль. Если аккаунт создавался ранее — нажмите «Регистрация»: оно отправит письмо подтверждения.';
+          showAuthErrorMessage(friendly);
+          toast(friendly);
         } else {
-          toast(msg || 'Ошибка входа');
+          const friendly = friendlyAuthError(err);
+          showAuthErrorMessage(friendly);
+          toast(friendly);
         }
       }
     });
@@ -1359,9 +1394,12 @@ function wireSettings() {
       if (!email) return toast('Введите email в поле выше');
       try {
         await supabaseResetPassword(email);
+        hideAuthErrorMessage();
         toast('Письмо для сброса пароля отправлено на ' + email);
       } catch (err) {
-        toast(err?.message || 'Не удалось отправить письмо');
+        const friendly = friendlyAuthError(err);
+        showAuthErrorMessage(friendly);
+        toast(friendly);
       }
     });
   });
@@ -1373,9 +1411,12 @@ function wireSettings() {
       if (!email) return toast('Введите email в поле выше');
       try {
         await supabaseResendConfirmation(email);
+        hideAuthErrorMessage();
         toast('Письмо подтверждения отправлено. Проверьте почту.');
       } catch (err) {
-        toast(err?.message || 'Не удалось отправить письмо');
+        const friendly = friendlyAuthError(err);
+        showAuthErrorMessage(friendly);
+        toast(friendly);
       }
     });
   });
@@ -1940,7 +1981,7 @@ function openRegisterDialog() {
       syncProfileAfterAuth().catch(() => {});
       setTimeout(() => openSubscriptionDialog(), 1500);
     } catch (err) {
-      toast(err?.message || 'Ошибка регистрации');
+      toast(friendlyAuthError(err) || 'Ошибка регистрации');
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = 'Зарегистрироваться';
@@ -2265,7 +2306,7 @@ function openLoginDialog() {
       if (/invalid/i.test(msg)) {
         toast('Неверный email или пароль');
       } else {
-        toast(msg || 'Ошибка входа');
+        toast(friendlyAuthError(err) || 'Ошибка входа');
       }
     } finally {
       submitBtn.disabled = false;
@@ -4680,6 +4721,7 @@ function renderStats() {
               <button id="btnForgotPassword" class="link-btn" type="button">Забыли пароль?</button>
               <button id="btnResendConfirm" class="link-btn" type="button">Повторить письмо</button>
             </div>
+            <div id="authError" class="auth-error" hidden></div>
           </form>
           <div class="muted" id="accountHint">Не можете войти по своему паролю? Нажмите «Забыли пароль?» — на почту придёт ссылка для смены пароля.</div>`}
         </div>
