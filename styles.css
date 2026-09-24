@@ -2105,6 +2105,13 @@ textarea.input {
   text-align: center;
 }
 
+/* Центрируем чекбоксы и текст согласий */
+.consent-inline { text-align: center; }
+.consent-inline label { justify-content: center; }
+.consent-inline label span { text-align: center; }
+.auth-form label { justify-content: center; }
+.auth-form label span { text-align: center; }
+
 .questionnaire-grid {
   justify-items: center;
 }
