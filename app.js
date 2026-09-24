@@ -4628,9 +4628,10 @@ function renderStats() {
             ${photos.length
               ? photos
                   .slice(0, 3)
-                  .map((src, idx) => `<button class="photo-thumb" type="button" data-photo-index="${idx}"><img alt="photo ${idx + 1}" src="${src}" /></button>`)
+                  .map((src, idx) => `<button class="photo-thumb ${idx === 0 ? 'main' : ''}" type="button" data-photo-index="${idx}" title="${idx === 0 ? 'Главное фото' : 'Сделать главным (нажмите)'}"><img alt="photo ${idx + 1}" src="${src}" /></button>`)
                   .join('')
               : ''}
+            ${photos.length ? '<div class="muted photo-hint" style="text-align:center;font-size:10px">Нажмите на фото, чтобы сделать его главным</div>' : ''}
             ${photos.length < 3 ? '<div class="muted photo-hint" style="text-align:center;font-size:10px">Можно загрузить до 3 фото</div>' : ''}
             ${photosPending.length
               ? `<div class="photo-pending-strip">
@@ -4811,6 +4812,23 @@ function renderStats() {
     pushPublicProfileNow().catch(() => {});
     toast('Фото удалены');
     renderAll();
+  });
+
+  $('#view-stats').querySelectorAll('[data-photo-index]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.photoIndex);
+      const photos = Array.isArray(state.profile?.photos) ? state.profile.photos.slice() : [];
+      if (!photos[idx] || idx === 0) return;
+      const [moved] = photos.splice(idx, 1);
+      photos.unshift(moved);
+      state.profile.photos = photos.slice(0, 3);
+      syncProfileFormFields();
+      save();
+      pushPublicProfileNow().catch(() => {});
+      toast('Фото сделано главным');
+      haptic('light');
+      renderAll();
+    });
   });
 
   $('#view-stats').querySelectorAll('[data-pending-index]').forEach((btn) => {

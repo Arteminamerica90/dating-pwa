@@ -1301,6 +1301,7 @@ a { color: inherit; }
 }
 
 .photo-thumb {
+  position: relative;
   width: 72px;
   height: 72px;
   padding: 0;
@@ -1309,6 +1310,31 @@ a { color: inherit; }
   overflow: hidden;
   background: rgba(15, 23, 42, 0.05);
   cursor: pointer;
+}
+
+.photo-thumb.main {
+  border: 2px solid var(--brand);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.25);
+}
+.photo-thumb.main::after {
+  content: '✓';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--brand);
+  border-radius: 50%;
+  z-index: 2;
+}
+.photo-thumb:not(.main):hover {
+  border-color: var(--brand);
 }
 
 .photo-thumb img {
