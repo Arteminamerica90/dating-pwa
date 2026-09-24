@@ -4644,10 +4644,9 @@ function renderStats() {
         </div>
 
       <div class="card">
-        <div class="card-title">Анкета совместимости</div>
         ${renderQuestionnaireSummary(state.profile)}
         <button class="accordion-head narrow" type="button" data-tree-toggle aria-expanded="${state.ui?.treeOpen ? 'true' : 'false'}">
-          <span class="accordion-title">Вопросы</span>
+          <span class="accordion-title">Анкета совместимости</span>
           <span class="pill">${catsProgress.done}/${CATEGORY_ORDER.length}</span>
           <span class="chevron" aria-hidden="true"></span>
         </button>
@@ -4657,7 +4656,6 @@ function renderStats() {
       </div>
 
       <div class="profile-editor">
-        <div class="muted">Имя: ${escapeHtml(name || 'Не указано')}</div>
         <div class="profile-field">
           <label class="label">Описание</label>
           <textarea id="profileDescription" class="input" maxlength="2000" placeholder="Расскажите о себе (до 2000 символов)">${escapeHtml(description)}</textarea>
