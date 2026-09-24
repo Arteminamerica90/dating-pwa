@@ -2156,3 +2156,36 @@ textarea.input {
 #cookieBanner .btn:hover {
   opacity: 0.85;
 }
+
+/* Единое скругление: все кнопки, фильтры, поля и карточки — radius-md.
+   Круги (аватары, фото, tbtn, badge/пилюли слайдера) остаются круглыми. */
+.btn,
+.input,
+.select,
+.filter-select,
+.chip,
+.accordion-head,
+.tree-filter-cat-head,
+.seg,
+.events-switch,
+.qn-search-input,
+.qn-search-item,
+.qn-opt,
+.qn-opt-letter,
+.questionnaire-chip,
+.cat-progress-item,
+.sub-plan,
+.sub-current,
+.kpi,
+.item,
+.event-tile,
+.event-tile-art,
+.question-block,
+.venue-card,
+.bk-offer,
+.photo-thumb,
+.plan-tile,
+.friend-row,
+.chat-bubble {
+  border-radius: var(--radius-md);
+}

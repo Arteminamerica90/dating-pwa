@@ -1107,6 +1107,23 @@ function scheduleCloudSync() {
   }, 4000);
 }
 
+async function supabaseSyncConsents(userId) {
+  try {
+    await supabaseSaveConsentsBulk(userId, {
+      agreement: !!state.consent?.agreement,
+      personalData: !!state.consent?.personalData,
+      newsletters: !!state.consent?.newsletters,
+      cookies: !!state.consent?.cookies,
+      thirdPartyData: !!state.consent?.thirdPartyData,
+      specialCategories: !!state.consent?.specialCategories,
+      profiling: state.consent?.profiling !== false,
+      geo: !!state.consent?.geo
+    });
+  } catch (err) {
+    console.warn('consent sync', err?.message);
+  }
+}
+
 async function supabasePushProfile() {
   try {
     const user = await supabaseCurrentUser();
@@ -1161,6 +1178,23 @@ async function syncProfileAfterAuth() {
         state.consent.thirdPartyData = !!payload.consent.thirdPartyData;
       }
     }
+    const consentRow = await supabaseGetConsents(user.id);
+    if (consentRow) {
+      const remoteConsent = {
+        agreement: consentRow.agreement,
+        personalData: consentRow.personal_data,
+        newsletters: consentRow.newsletters,
+        cookies: consentRow.cookies,
+        thirdPartyData: consentRow.third_party_data,
+        specialCategories: consentRow.special_categories,
+        profiling: consentRow.profiling,
+        geo: consentRow.geo
+      };
+      for (const [key, value] of Object.entries(remoteConsent)) {
+        if (typeof value === 'boolean') state.consent[key] = value;
+      }
+    }
+    await supabaseSyncConsents(user.id);
     await supabasePushProfile();
     await syncLikesFromSupabase();
     renderAll();
