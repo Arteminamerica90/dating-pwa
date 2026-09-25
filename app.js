@@ -979,9 +979,11 @@ function renderAccountBadge() {
     return;
   }
   if (accountInfo?.email) {
+    el.className = 'account-badge signed';
     el.innerHTML = `
       <span class="account-badge-info"><b>${escapeHtml(accountInfo.email)}</b></span>`;
   } else {
+    el.className = 'account-badge';
     el.innerHTML = `
       <span class="muted">Вход не выполнен</span>`;
   }
@@ -4741,11 +4743,11 @@ function renderStats() {
           <div class="muted" style="margin-top:8px"></div>`
           : `
           <form class="auth-form" id="authForm" autocomplete="on">
-            <div class="row" style="margin-top:10px">
+            <div class="row auth-field" style="margin-top:10px">
               <label class="label" for="accountEmail">Email</label>
               <input id="accountEmail" name="email" class="input" type="email" inputmode="email" autocomplete="email" required placeholder="name@example.com" value="${escapeHtml(state.cloud?.email || '')}" />
             </div>
-            <div class="row">
+            <div class="row auth-field">
               <label class="label" for="accountPassword">Пароль</label>
               <input id="accountPassword" name="password" class="input" type="password" autocomplete="current-password" placeholder="минимум 6 символов" />
             </div>
