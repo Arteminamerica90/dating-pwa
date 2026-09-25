@@ -693,7 +693,16 @@ a { color: inherit; }
 .auth-form { display: flex; flex-direction: column; gap: 6px; align-items: center; }
 .auth-form .row { margin-top: 4px; }
 .auth-form .row-inline { flex-wrap: wrap; justify-content: center; }
-.auth-form .input { max-width: 360px; width: 100%; border: 1px solid rgba(167, 139, 250, 0.55); background:
+.auth-form .row:has(.input) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+  max-width: 360px;
+  justify-content: flex-start;
+}
+.auth-form .row:has(.input) .label { margin: 0; }
+.auth-form .input { max-width: 360px; width: 100%; flex: 1 1 auto; border: 1px solid rgba(167, 139, 250, 0.55); background:
     radial-gradient(circle at 20% 20%, rgba(167, 139, 250, 0.22), transparent 45%),
     radial-gradient(circle at 80% 20%, rgba(34, 211, 238, 0.18), transparent 42%),
     rgba(15, 23, 42, 0.04); }
