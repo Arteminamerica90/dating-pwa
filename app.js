@@ -4376,7 +4376,7 @@ function renderDating() {
   $('#view-dating').innerHTML = `
     <div class="grid">
       <div class="card">
-        <button class="accordion-head" type="button" data-filter-toggle aria-expanded="${state.ui?.filtersOpen === true ? 'true' : 'false'}">
+        <button class="accordion-head narrow" type="button" data-filter-toggle aria-expanded="${state.ui?.filtersOpen === true ? 'true' : 'false'}">
           <span class="accordion-title">Фильтры</span>
           <span class="chevron" aria-hidden="true"></span>
         </button>
