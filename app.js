@@ -3447,7 +3447,7 @@ function renderHomeMessagesHtml() {
 
   if (gateNeeded) {
     return `
-      <div class="locked-wrap">
+      <div class="locked-wrap locked">
         ${cards}
         <div class="locked-overlay">
           <div class="locked-badge">🔒</div>

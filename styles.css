@@ -1614,6 +1614,11 @@ a { color: inherit; }
 .locked-wrap {
   position: relative;
 }
+.locked-wrap.locked .card,
+.locked-wrap.locked .matches-strip,
+.locked-wrap.locked .messages-list {
+  visibility: hidden;
+}
 .locked-wrap .card,
 .locked-wrap .matches-strip,
 .locked-wrap .messages-list {
