@@ -1644,8 +1644,16 @@ a { color: inherit; }
 
 .tinder-wrap {
   position: relative;
-  display: flex;
-  justify-content: center;
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+/* Карточка в пропорции 9:16: высота задаётся подложкой ::before,
+   чтобы не зависеть от поддержки aspect-ratio */
+.tinder-wrap::before {
+  content: '';
+  display: block;
+  padding-top: 177.777%;
 }
 
 /* Гейт регистрации: матчи/чаты/анкеты заблюрены до входа в аккаунт */
@@ -1717,12 +1725,10 @@ a { color: inherit; }
 }
 
 .tinder-card {
-  position: relative;
+  position: absolute;
+  inset: 0;
   width: 100%;
-  max-width: 440px;
   margin: 0 auto;
-  aspect-ratio: 9 / 16;
-  min-height: 560px;
   border-radius: var(--radius-xl);
   overflow: hidden;
   background:
