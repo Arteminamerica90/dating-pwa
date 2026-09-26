@@ -1720,8 +1720,9 @@ a { color: inherit; }
   position: relative;
   width: 100%;
   max-width: 440px;
-  height: auto;
+  margin: 0 auto;
   aspect-ratio: 9 / 16;
+  min-height: 560px;
   border-radius: var(--radius-xl);
   overflow: hidden;
   background:
