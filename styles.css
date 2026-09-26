@@ -1267,6 +1267,8 @@ a { color: inherit; }
   display: flex;
   flex-direction: column;
   gap: 14px;
+  width: 100%;
+  min-width: 360px;
 }
 
 .photo-hero {
