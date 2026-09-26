@@ -2040,6 +2040,18 @@ function openRegisterDialog() {
     openLoginDialog();
   });
 
+  const forgotBtn = $('#btnRegForgot');
+  forgotBtn?.addEventListener('click', async () => {
+    const email = String(emailInput?.value || '').trim().toLowerCase();
+    if (!email) return toast('Введите email в поле выше');
+    try {
+      await supabaseResetPassword(email);
+      toast('Письмо для сброса пароля отправлено на ' + email);
+    } catch (err) {
+      toast(friendlyAuthError(err) || 'Не удалось отправить письмо');
+    }
+  });
+
   $('#btnRegClose')?.addEventListener('click', () => {
     dlg.close();
   });
