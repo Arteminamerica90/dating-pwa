@@ -575,6 +575,7 @@ const DATING_PROFILES = [
 
 let liveProfiles = [];
 let liveProfilesLoaded = false;
+let loadingLiveProfiles = false;
 let lastPushedMatchIds = [];
 
 function toDatingProfile(p) {
@@ -604,15 +605,25 @@ function toDatingProfile(p) {
 }
 
 async function loadLiveProfiles() {
-  liveProfilesLoaded = true;
+  if (loadingLiveProfiles || liveProfilesLoaded) return;
+  loadingLiveProfiles = true;
   try {
     if (!isSupabaseConfigured()) return;
     const list = await supabaseListPublicProfiles({ excludeUserId: accountInfo?.id });
     liveProfiles = list.map(toDatingProfile);
+    liveProfilesLoaded = true;
     await syncLikesFromSupabase();
-    renderAll();
   } catch (err) {
     console.warn('live profiles', err?.message);
+  } finally {
+    loadingLiveProfiles = false;
+  }
+  renderAll();
+  if (!liveProfilesLoaded) {
+    // Supabase был недоступен (например, проект заморожен) — пробуем снова позже.
+    setTimeout(() => {
+      if (!liveProfilesLoaded) loadLiveProfiles();
+    }, 5000);
   }
 }
 
