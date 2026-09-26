@@ -1316,8 +1316,9 @@ a { color: inherit; }
   padding: 0;
   cursor: pointer;
   position: relative;
-  width: 360px;
-  height: 640px;
+  width: 100%;
+  max-width: 440px;
+  height: auto;
   aspect-ratio: 9 / 16;
   border-radius: var(--radius-xl);
   overflow: hidden;
@@ -1717,8 +1718,9 @@ a { color: inherit; }
 
 .tinder-card {
   position: relative;
-  width: 360px;
-  height: 640px;
+  width: 100%;
+  max-width: 440px;
+  height: auto;
   aspect-ratio: 9 / 16;
   border-radius: var(--radius-xl);
   overflow: hidden;
@@ -2233,15 +2235,6 @@ textarea.input {
 
 #cookieBanner .btn:hover {
   opacity: 0.85;
-}
-
-/* На очень узких экранах карточки 9:16 вписываются по ширине */
-@media (max-width: 379px) {
-  .tinder-card,
-  .photo-hero-main {
-    width: 100%;
-    height: auto;
-  }
 }
 
 /* Единое скругление: все кнопки, фильтры, поля и карточки — radius-md.
