@@ -331,6 +331,15 @@ const MEETING_INTENTS = [
   { id: 'startup', label: 'Стартап' }
 ];
 
+function cityName(key) {
+  const map = { Moscow: 'Москва', 'Saint Petersburg': 'Санкт-Петербург', Kazan: 'Казань', Novosibirsk: 'Новосибирск' };
+  return map[key] || '';
+}
+
+function goalLabel(id) {
+  return MEETING_INTENTS.find((x) => x.id === id)?.label ?? '';
+}
+
 const MEETING_PLACES = [
   { id: 'all', label: 'Все места' },
   { id: 'cafe', label: 'Кофейни' },
@@ -4401,10 +4410,13 @@ function renderDating() {
   $('#view-dating').innerHTML = `
     <div class="grid">
       <div class="card">
-        <button class="accordion-head narrow" type="button" data-filter-toggle aria-expanded="${state.ui?.filtersOpen === true ? 'true' : 'false'}">
-          <span class="accordion-title">Фильтры</span>
-          <span class="chevron" aria-hidden="true"></span>
-        </button>
+        <div class="dating-topbar">
+          <button class="accordion-head narrow" type="button" data-filter-toggle aria-expanded="${state.ui?.filtersOpen === true ? 'true' : 'false'}">
+            <span class="accordion-title">Фильтры</span>
+            <span class="chevron" aria-hidden="true"></span>
+          </button>
+          <button class="btn ok" type="button" data-open-subscription>Подписка</button>
+        </div>
         <div class="accordion-body" ${state.ui?.filtersOpen === true ? '' : 'hidden'}>
           <div class="filters-grid">
             <div class="filter-group">
@@ -4478,6 +4490,8 @@ function renderDating() {
     renderAll();
     haptic('light');
   });
+
+  $('#view-dating').querySelector('[data-open-subscription]')?.addEventListener('click', () => openSubscriptionDialog());
 
   $('#view-dating').querySelectorAll('[data-filter-chip]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -6084,6 +6098,7 @@ function mountTinder(profiles) {
     if (state.__locked) return;
     if (e.pointerType === 'mouse') return;
     if (e.button != null && e.button !== 0) return;
+    if (e.target.closest('button, a')) return;
     e.stopPropagation();
     dragging = true;
     pointerId = e.pointerId;
@@ -6094,6 +6109,42 @@ function mountTinder(profiles) {
     dy = 0;
     top.style.transition = 'none';
   };
+
+  const closeMenus = () => {
+    top.querySelectorAll('.tinder-menu').forEach((m) => {
+      m.hidden = true;
+    });
+  };
+
+  const blockProfile = (cardPid) => {
+    state.moderation = state.moderation || { reports: {}, hidden: [] };
+    if (cardPid && !state.moderation.hidden.includes(cardPid)) state.moderation.hidden.push(cardPid);
+    save();
+    toast('Анкета скрыта');
+    closeMenus();
+    renderDating();
+  };
+
+  top.addEventListener('click', (e) => {
+    const dots = e.target.closest('[data-tinder-menu]');
+    if (dots) {
+      const menu = dots.closest('.tinder-menu-wrap')?.querySelector('.tinder-menu');
+      if (menu) menu.hidden = !menu.hidden;
+      e.stopPropagation();
+      return;
+    }
+    const block = e.target.closest('[data-tinder-block]');
+    if (block) {
+      blockProfile(block.dataset.tinderBlock);
+      e.stopPropagation();
+      return;
+    }
+    if (e.target.closest('[data-report]')) {
+      closeMenus();
+      return;
+    }
+    closeMenus();
+  });
 
   const onMove = (e) => {
     if (!dragging || e.pointerId !== pointerId) return;
@@ -6202,12 +6253,33 @@ function renderTinderInner(p) {
     : qmHasSignal
       ? `<span class="pill muted-pill">анкета: данные ещё формируются</span>`
       : '';
+  const myCityKey = currentCityKey();
+  const cityStr = cityName(p.city);
+  const distKm = myCityKey && p.city ? cityDistanceKm(myCityKey, p.city) : null;
+  const locParts = [];
+  if (cityStr) locParts.push(cityStr);
+  if (distKm != null) locParts.push(Math.round(distKm) + ' км');
+  const locText = locParts.join(' · ');
+  const goal = (p.meetingIntent || [])[0] ? goalLabel((p.meetingIntent || [])[0]) : '';
   return `
     <div class="tinder-stamp like">LIKE</div>
     <div class="tinder-stamp nope">NOPE</div>
     <div class="tinder-photo ${photo ? '' : 'nophoto'}" style="${photoCss}"></div>
     <div class="tinder-scrim"></div>
     <div class="tinder-top">
+      ${locText ? `<div class="tinder-loc"><span class="tinder-loc-ico" aria-hidden="true">🏙</span><span>${escapeHtml(locText)}</span></div>` : '<span></span>'}
+      <div class="tinder-top-right">
+        ${goal ? `<span class="tinder-goal">🎯 ${escapeHtml(goal)}</span>` : ''}
+        <div class="tinder-menu-wrap">
+          <button class="tinder-dots" type="button" data-tinder-menu aria-label="Ещё">&#8942;</button>
+          <div class="tinder-menu" hidden>
+            <button type="button" data-tinder-block="${escapeHtml(pid)}">Заблокировать</button>
+            <button type="button" data-report="${escapeHtml(pid)}">Пожаловаться</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tinder-meta">
       <div class="tinder-name">${escapeHtml(p.name)}${p.age ? `, ${p.age}` : ''}</div>
       ${tags ? `<div class="tinder-tags">${tags}</div>` : ''}
     </div>
@@ -6226,10 +6298,7 @@ function renderTinderInner(p) {
         ${diff ? `<div class="tinder-badges">${diff}</div>` : ''}
         ${neutral ? `<div class="tinder-badges">${neutral}</div>` : ''}
         ${reportStatus}
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto">
-          <div class="muted">Свайп вправо — лайк, влево — пропуск</div>
-          <button class="link-btn" type="button" data-report="${escapeHtml(pid)}" style="font-size:11px;color:#e11d48">${reportRec ? 'Изменить жалобу' : '⚠ Пожаловаться'}</button>
-        </div>
+        <div class="muted" style="text-align:center;margin-top:4px">Свайп вправо — лайк, влево — пропуск</div>
       </div>
     </div>
   `;
