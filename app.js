@@ -4411,9 +4411,8 @@ function renderDating() {
     <div class="grid">
       <div class="card">
         <div class="dating-topbar">
-          <button class="accordion-head narrow" type="button" data-filter-toggle aria-expanded="${state.ui?.filtersOpen === true ? 'true' : 'false'}">
-            <span class="accordion-title">Фильтры</span>
-            <span class="chevron" aria-hidden="true"></span>
+          <button class="btn icon-only filter" type="button" data-filter-toggle aria-expanded="${state.ui?.filtersOpen === true ? 'true' : 'false'}" aria-label="Фильтры" title="Фильтры">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg>
           </button>
           <button class="btn icon-only" type="button" data-open-subscription aria-label="Подписка" title="Подписка">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
@@ -6118,6 +6117,14 @@ function mountTinder(profiles) {
     });
   };
 
+  if (!window.__tinderMenuGlobal) {
+    window.__tinderMenuGlobal = true;
+    document.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.tinder-menu, [data-tinder-menu]')) return;
+      document.querySelectorAll('.tinder-menu').forEach((m) => { m.hidden = true; });
+    });
+  }
+
   const blockProfile = (cardPid) => {
     state.moderation = state.moderation || { reports: {}, hidden: [] };
     if (cardPid && !state.moderation.hidden.includes(cardPid)) state.moderation.hidden.push(cardPid);
@@ -6273,7 +6280,7 @@ function renderTinderInner(p) {
       <div class="tinder-top-right">
         ${goal ? `<span class="tinder-goal">🎯 ${escapeHtml(goal)}</span>` : ''}
         <div class="tinder-menu-wrap">
-          <button class="tinder-dots" type="button" data-tinder-menu aria-label="Ещё">&#8942;</button>
+          <button class="tinder-dots" type="button" data-tinder-menu aria-label="Ещё">&#8943;</button>
           <div class="tinder-menu" hidden>
             <button type="button" data-tinder-block="${escapeHtml(pid)}">Заблокировать</button>
             <button type="button" data-report="${escapeHtml(pid)}">Пожаловаться</button>
