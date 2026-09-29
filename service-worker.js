@@ -1,4 +1,4 @@
-const CACHE_NAME = 'walkdate-v150';
+const CACHE_NAME = 'walkdate-v151';
 const CORE = [
   './',
   './index.html',
@@ -58,17 +58,30 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Everything else: cache-first.
+  // Everything else: cache-first. On miss, fetch and store (also under the
+  // un-versioned base URL). If the fetch fails, fall back to any cached copy
+  // (base or the exact URL) so the app always boots.
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
       return fetch(req)
         .then((res) => {
+          if (!res || res.status !== 200) return res;
           const copy = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+          const base = new URL(req.url);
+          base.search = '';
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(req, copy);
+            if (base.href !== req.url) cache.put(base.href, copy.clone());
+          });
           return res;
         })
-        .catch(() => cached);
+        .catch(() => {
+          if (cached) return cached;
+          const base = new URL(req.url);
+          base.search = '';
+          return caches.match(base.href);
+        })
     })
   );
 });
