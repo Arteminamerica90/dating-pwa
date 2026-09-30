@@ -1043,6 +1043,11 @@ function boot() {
     if (event === 'SIGNED_IN' || (event === 'INITIAL_SESSION' && isSupabaseConfigured())) {
       refreshAccountInfo();
       syncProfileAfterAuth();
+    } else if (event === 'PASSWORD_RECOVERY') {
+      refreshAccountInfo();
+      syncProfileAfterAuth();
+      setTimeout(() => openChangePasswordDialog(), 350);
+      toast('Введите новый пароль');
     } else if (event === 'SIGNED_OUT') {
       accountInfo = null;
       renderAccountBadge();
@@ -2066,6 +2071,46 @@ function openRegisterDialog() {
   });
 
   setTimeout(() => emailInput?.focus(), 120);
+}
+
+function openChangePasswordDialog() {
+  const dlg = $('#dlgChangePassword');
+  if (!dlg) return;
+  if (!window.__cpBound) {
+    window.__cpBound = true;
+    $('#btnCpSave')?.addEventListener('click', async () => {
+      const p1 = String($('#cpPassword')?.value || '');
+      const p2 = String($('#cpPassword2')?.value || '');
+      const errEl = $('#cpError');
+      const resetErr = () => { if (errEl) errEl.hidden = true; };
+      if (p1.length < 6) {
+        if (errEl) { errEl.hidden = false; errEl.textContent = 'Пароль должен быть от 6 символов'; }
+        return;
+      }
+      if (p1 !== p2) {
+        if (errEl) { errEl.hidden = false; errEl.textContent = 'Пароли не совпадают'; }
+        return;
+      }
+      const btn = $('#btnCpSave');
+      if (btn) { btn.disabled = true; btn.textContent = 'Сохраняю…'; }
+      try {
+        await supabaseChangePassword(p1);
+        dlg.close();
+        toast('Пароль обновлён');
+        renderAll();
+      } catch (err) {
+        if (errEl) { errEl.hidden = false; errEl.textContent = friendlyAuthError(err) || 'Не удалось обновить пароль'; }
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Сохранить пароль'; }
+      }
+    });
+    dlg.addEventListener('close', () => {
+      $('#cpPassword') && ($('#cpPassword').value = '');
+      $('#cpPassword2') && ($('#cpPassword2').value = '');
+    });
+  }
+  dlg.showModal();
+  setTimeout(() => $('#cpPassword')?.focus(), 120);
 }
 
 function openSubscriptionDialog(highlightFeature) {
@@ -4493,7 +4538,7 @@ function renderDating() {
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
         ${visible.length ? `<div class="tinder-actions"><button class="tbtn nope" type="button" data-tinder="nope">✕</button><button class="tbtn like" type="button" data-tinder="like">❤</button></div>` : ``}
       </div>
-      <div class="muted app-version">v155</div>
+      <div class="muted app-version">v156</div>
     </div>
   `;
 

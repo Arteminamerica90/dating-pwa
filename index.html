@@ -9,7 +9,7 @@
     <title>xystar</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=155" />
+    <link rel="stylesheet" href="./styles.css?v=156" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script defer src="https://widget.cloudpayments.ru/bundles/cloudpayments.js"></script>
@@ -188,6 +188,27 @@
       </div>
     </dialog>
 
+    <dialog id="dlgChangePassword" class="dialog">
+      <div class="dialog-card questionnaire-dialog">
+        <div class="dialog-head" style="justify-content:center">
+          <div class="dialog-title">Смена пароля</div>
+        </div>
+        <div class="muted" style="text-align:center;margin:6px 0 14px;font-size:13px">Введите новый пароль для своего аккаунта</div>
+        <div class="row auth-field">
+          <label class="label" for="cpPassword">Новый пароль</label>
+          <input id="cpPassword" name="password" class="input" type="password" autocomplete="new-password" placeholder="минимум 6 символов" style="width:100%;max-width:360px" />
+        </div>
+        <div class="row auth-field">
+          <label class="label" for="cpPassword2">Повторите пароль</label>
+          <input id="cpPassword2" class="input" type="password" autocomplete="new-password" placeholder="повторите пароль" style="width:100%;max-width:360px" />
+        </div>
+        <div class="row" style="justify-content:center;margin-top:10px">
+          <button id="btnCpSave" class="btn" type="button">Сохранить пароль</button>
+        </div>
+        <div id="cpError" class="auth-error" hidden></div>
+      </div>
+    </dialog>
+
     <dialog id="dlgSubscription" class="dialog">
       <div class="dialog-card questionnaire-dialog" style="max-height:90vh;overflow-y:auto">
         <div class="dialog-head" style="justify-content:space-between">
@@ -334,7 +355,7 @@
 
       window.__xystarImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=155')
+      import('./app.js?v=156')
         .then(() => {
           window.__xystarImportOk = true;
         })
