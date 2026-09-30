@@ -4395,7 +4395,24 @@ function renderDating() {
   const pool = (withinRadius.length >= 2 || !canMeasure ? withinRadius : candidatePool.filter((p) => baseMatch(p))).map(scored).sort(sorter);
   const candidates = pool;
 
-  const visible = candidates.filter((p) => !state.dating.likes[p.id] && !(state.moderation?.hidden || []).includes(p.id)).slice(0, 6);
+  const ownFeedId = accountInfo?.id;
+  const blockedIds = new Set(state.moderation?.hidden || []);
+  const matchedIds = new Set(state.dating.matches || []);
+  const feedEligible = (p) =>
+    !blockedIds.has(p.id) &&
+    !(ownFeedId && p.id === ownFeedId) &&
+    !matchedIds.has(p.id);
+  let visible = candidates
+    .filter((p) => feedEligible(p) && !state.dating.likes[p.id])
+    .slice(0, 6);
+  if (visible.length < 3 && candidates.length) {
+    // Новых мало — смешиваем подходящие анкеты: возвращаем лайкнутые
+    // (но не матчи и не скрытые), чтобы лента не пустела.
+    const recycled = candidates
+      .filter((p) => feedEligible(p) && state.dating.likes[p.id])
+      .slice(0, Math.min(6 - visible.length, 6));
+    visible = [...visible, ...recycled].slice(0, 6);
+  }
   const matches = getMutualMatches();
   const seenMatches = state.dating.seenMatches || {};
 
@@ -4476,7 +4493,7 @@ function renderDating() {
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
         ${visible.length ? `<div class="tinder-actions"><button class="tbtn nope" type="button" data-tinder="nope">✕</button><button class="tbtn like" type="button" data-tinder="like">❤</button></div>` : ``}
       </div>
-      <div class="muted app-version">v152</div>
+      <div class="muted app-version">v153</div>
     </div>
   `;
 
