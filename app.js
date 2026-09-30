@@ -4476,7 +4476,7 @@ function renderDating() {
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
         ${visible.length ? `<div class="tinder-actions"><button class="tbtn nope" type="button" data-tinder="nope">✕</button><button class="tbtn like" type="button" data-tinder="like">❤</button></div>` : ``}
       </div>
-      <div class="muted app-version">v151</div>
+      <div class="muted app-version">v152</div>
     </div>
   `;
 
@@ -6308,7 +6308,6 @@ function renderTinderInner(p) {
         ${diff ? `<div class="tinder-badges">${diff}</div>` : ''}
         ${neutral ? `<div class="tinder-badges">${neutral}</div>` : ''}
         ${reportStatus}
-        <div class="muted" style="text-align:center;margin-top:4px">Свайп вправо — лайк, влево — пропуск</div>
       </div>
     </div>
   `;
