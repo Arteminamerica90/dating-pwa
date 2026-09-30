@@ -4493,7 +4493,7 @@ function renderDating() {
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
         ${visible.length ? `<div class="tinder-actions"><button class="tbtn nope" type="button" data-tinder="nope">✕</button><button class="tbtn like" type="button" data-tinder="like">❤</button></div>` : ``}
       </div>
-      <div class="muted app-version">v154</div>
+      <div class="muted app-version">v155</div>
     </div>
   `;
 
@@ -6294,7 +6294,6 @@ function renderTinderInner(p) {
   if (cityStr) locParts.push(cityStr);
   if (distKm != null) locParts.push(Math.round(distKm) + ' км');
   const locText = locParts.join(' · ');
-  const goal = (p.meetingIntent || [])[0] ? goalLabel((p.meetingIntent || [])[0]) : '';
   return `
     <div class="tinder-stamp like">LIKE</div>
     <div class="tinder-stamp nope">NOPE</div>
