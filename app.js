@@ -4493,7 +4493,7 @@ function renderDating() {
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
         ${visible.length ? `<div class="tinder-actions"><button class="tbtn nope" type="button" data-tinder="nope">✕</button><button class="tbtn like" type="button" data-tinder="like">❤</button></div>` : ``}
       </div>
-      <div class="muted app-version">v153</div>
+      <div class="muted app-version">v154</div>
     </div>
   `;
 
@@ -6273,6 +6273,13 @@ function renderTinderInner(p) {
     : '';
   const photo = (p.photos && p.photos[0]) || '';
   const photoCss = photo ? `background-image:url('${String(photo).replaceAll("'", '%27').replaceAll('"', '%22')}')` : '';
+  const rawIntent = (p.meetingIntent || [])[0];
+  const goal = rawIntent ? goalLabel(rawIntent) : 'Знакомство';
+  let interestTags = tags;
+  if (!interestTags) {
+    const sharedTraits = Array.isArray(compat.shared) && compat.shared.length ? compat.shared.slice(0, 3) : [];
+    interestTags = sharedTraits.map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ');
+  }
   const qm = countQuestionnaireMatches(state.profile, p);
   const qmHasSignal = qm.total > 0 || Object.keys(p.questionnaireAnswers || {}).length || Object.keys(p.persona || {}).length || Object.keys(p.factual || {}).length;
   const qmBadge = qm.total > 0
@@ -6296,7 +6303,7 @@ function renderTinderInner(p) {
     <div class="tinder-top">
       ${locText ? `<div class="tinder-loc"><span class="tinder-loc-ico" aria-hidden="true">🏙</span><span>${escapeHtml(locText)}</span></div>` : '<span></span>'}
       <div class="tinder-top-right">
-        ${goal ? `<span class="tinder-goal">🎯 ${escapeHtml(goal)}</span>` : ''}
+        <span class="tinder-goal">🎯 ${escapeHtml(goal)}</span>
         <div class="tinder-menu-wrap">
           <button class="tinder-dots" type="button" data-tinder-menu aria-label="Ещё">&#8943;</button>
           <div class="tinder-menu" hidden>
@@ -6308,7 +6315,7 @@ function renderTinderInner(p) {
     </div>
     <div class="tinder-meta">
       <div class="tinder-name">${escapeHtml(p.name)}${p.age ? `, ${p.age}` : ''}</div>
-      ${tags ? `<div class="tinder-tags">${tags}</div>` : ''}
+      ${interestTags ? `<div class="tinder-tags">${interestTags}</div>` : ''}
     </div>
     <div class="tinder-foot">
       <div class="pad">
