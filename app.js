@@ -951,6 +951,9 @@ async function init() {
 }
 
 let accountInfo = null;
+
+// Ссылки восстановления пароля (PKCE и implicit) приходят с этими маркерами в URL.
+const URL_HAD_AUTH_CODE = /([?&#])(code|access_token)=/.test(location.href) || /([?&#])type=(recovery|magiclink)/.test(location.href);
 let mySubscription = { planId: 'free', likesThisMonth: 0, expiresAt: null, incomeAddons: [] };
 
 async function refreshAccountInfo() {
@@ -1044,6 +1047,8 @@ function boot() {
       refreshAccountInfo();
       syncProfileAfterAuth();
     } else if (event === 'PASSWORD_RECOVERY') {
+      state.cloud.pendingPasswordReset = false;
+      save();
       refreshAccountInfo();
       syncProfileAfterAuth();
       setTimeout(() => openChangePasswordDialog(), 350);
@@ -1054,6 +1059,8 @@ function boot() {
       renderAll();
     }
   });
+
+  checkPendingPasswordReset();
 
   // Гео-трекинг и датчики отключены (UI убран); город выбирается вручную в настройках.
   save();
@@ -1454,10 +1461,15 @@ function wireSettings() {
       const email = String($('#accountEmail').value || '').trim().toLowerCase();
       if (!email) return toast('Введите email в поле выше');
       try {
+        state.cloud.pendingPasswordReset = true;
+        state.cloud.email = email;
+        save();
         await supabaseResetPassword(email);
         hideAuthErrorMessage();
         toast('Письмо для сброса пароля отправлено на ' + email);
       } catch (err) {
+        state.cloud.pendingPasswordReset = false;
+        save();
         const friendly = friendlyAuthError(err);
         showAuthErrorMessage(friendly);
         toast(friendly);
@@ -2059,9 +2071,14 @@ function openRegisterDialog() {
     const email = String(emailInput?.value || '').trim().toLowerCase();
     if (!email) return toast('Введите email в поле выше');
     try {
+      state.cloud.pendingPasswordReset = true;
+      state.cloud.email = email;
+      save();
       await supabaseResetPassword(email);
       toast('Письмо для сброса пароля отправлено на ' + email);
     } catch (err) {
+      state.cloud.pendingPasswordReset = false;
+      save();
       toast(friendlyAuthError(err) || 'Не удалось отправить письмо');
     }
   });
@@ -2095,6 +2112,8 @@ function openChangePasswordDialog() {
       if (btn) { btn.disabled = true; btn.textContent = 'Сохраняю…'; }
       try {
         await supabaseChangePassword(p1);
+        state.cloud.pendingPasswordReset = false;
+        save();
         dlg.close();
         toast('Пароль обновлён');
         renderAll();
@@ -2111,6 +2130,36 @@ function openChangePasswordDialog() {
   }
   dlg.showModal();
   setTimeout(() => $('#cpPassword')?.focus(), 120);
+}
+
+// Дублирующий путь для восстановления пароля: если событие PASSWORD_RECOVERY
+// прилетело раньше, чем зарегистрирован обработчик, — ловим по флагу и коду в URL.
+async function checkPendingPasswordReset() {
+  if (state.cloud?.pendingPasswordReset !== true) return;
+  if (!URL_HAD_AUTH_CODE) {
+    state.cloud.pendingPasswordReset = false;
+    save();
+    return;
+  }
+  const deadline = Date.now() + 8000;
+  while (Date.now() < deadline) {
+    try {
+      if (accountInfo || await supabaseCurrentUser()) {
+        state.cloud.pendingPasswordReset = false;
+        save();
+        await refreshAccountInfo();
+        syncProfileAfterAuth();
+        openChangePasswordDialog();
+        toast('Введите новый пароль');
+        return;
+      }
+    } catch {
+      // ignore, пробуем ещё
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  state.cloud.pendingPasswordReset = false;
+  save();
 }
 
 function openSubscriptionDialog(highlightFeature) {
@@ -4538,7 +4587,7 @@ function renderDating() {
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
         ${visible.length ? `<div class="tinder-actions"><button class="tbtn nope" type="button" data-tinder="nope">✕</button><button class="tbtn like" type="button" data-tinder="like">❤</button></div>` : ``}
       </div>
-      <div class="muted app-version">v156</div>
+      <div class="muted app-version">v157</div>
     </div>
   `;
 
