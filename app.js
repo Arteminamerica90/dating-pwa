@@ -340,6 +340,17 @@ function goalLabel(id) {
   return MEETING_INTENTS.find((x) => x.id === id)?.label ?? '';
 }
 
+function ageFromBirthDate(birthDate) {
+  if (!birthDate) return null;
+  const birth = new Date(birthDate);
+  if (Number.isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age >= 0 ? age : null;
+}
+
 const MEETING_PLACES = [
   { id: 'all', label: 'Все места' },
   { id: 'cafe', label: 'Кофейни' },
@@ -594,6 +605,7 @@ function toDatingProfile(p) {
     name: p.name || 'Аноним',
     gender: p.gender || '',
     age: p.age,
+    birthDate: p.birthDate || '',
     city: p.cityOverride || p.city || '',
     stepCount: p.stepCount || 0,
     meetingIntent: p.meetingIntent || [],
@@ -4587,7 +4599,7 @@ function renderDating() {
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
         ${visible.length ? `<div class="tinder-actions"><button class="tbtn nope" type="button" data-tinder="nope">✕</button><button class="tbtn like" type="button" data-tinder="like">❤</button></div>` : ``}
       </div>
-      <div class="muted app-version">v158</div>
+      <div class="muted app-version">v159</div>
     </div>
   `;
 
@@ -4843,6 +4855,16 @@ function renderStats() {
 
       <div class="profile-editor">
         <div class="profile-field">
+          <label class="label">Имя</label>
+          <input id="profileNameInput" class="input" maxlength="60" value="${escapeHtml(state.profile?.name === 'Вы' ? '' : state.profile?.name || '')}" placeholder="Ваше имя" />
+          <div class="muted" style="font-size:12px;margin-top:4px">Имя показывается на вашей карточке во втором табе.</div>
+        </div>
+        <div class="profile-field">
+          <label class="label">Дата рождения</label>
+          <input id="profileBirthInput" class="input" type="date" value="${escapeHtml(state.profile?.birthDate || '')}" />
+          <div class="muted" style="font-size:12px;margin-top:4px">Возраст показывается на карточке во втором табе.</div>
+        </div>
+        <div class="profile-field">
           <label class="label">Описание</label>
           <textarea id="profileDescription" class="input" maxlength="2000" placeholder="Расскажите о себе (до 2000 символов)">${escapeHtml(description)}</textarea>
         </div>
@@ -5060,6 +5082,16 @@ function renderStats() {
   });
 
   $('#view-stats').querySelector('[data-action="saveProfileMini"]')?.addEventListener('click', () => {
+    const nextName = String($('#view-stats').querySelector('#profileNameInput')?.value || '').trim().slice(0, 60);
+    if (nextName) state.profile.name = nextName;
+    const nextBirth = String($('#view-stats').querySelector('#profileBirthInput')?.value || '').trim();
+    const nextAge = ageFromBirthDate(nextBirth);
+    if (nextBirth && nextAge == null) return toast('Укажите корректную дату рождения');
+    if (nextAge != null && nextAge < 18) return toast('Сервис доступен только для пользователей от 18 лет');
+    if (nextBirth) {
+      state.profile.birthDate = nextBirth;
+      state.profile.ageConfirmed = true;
+    }
     const nextDescription = String($('#view-stats').querySelector('#profileDescription')?.value || '').slice(0, 2000);
     const nextInterestsRaw = String($('#view-stats').querySelector('#profileInterestsText')?.value || '');
     const nextInterests = nextInterestsRaw
@@ -6412,7 +6444,11 @@ function renderTinderInner(p) {
       </div>
     </div>
     <div class="tinder-meta">
-      <div class="tinder-name">${escapeHtml(p.name)}${p.age ? `, ${p.age}` : ''}</div>
+      <div class="tinder-name">${escapeHtml(p.name)}${p.age != null
+        ? `, ${p.age}`
+        : p.birthDate
+          ? `, ${ageFromBirthDate(p.birthDate) ?? ''}`
+          : ''}</div>
       ${interestTags ? `<div class="tinder-tags">${interestTags}</div>` : ''}
     </div>
     <div class="tinder-foot">
