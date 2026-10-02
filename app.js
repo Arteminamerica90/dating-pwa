@@ -4587,7 +4587,7 @@ function renderDating() {
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
         ${visible.length ? `<div class="tinder-actions"><button class="tbtn nope" type="button" data-tinder="nope">✕</button><button class="tbtn like" type="button" data-tinder="like">❤</button></div>` : ``}
       </div>
-      <div class="muted app-version">v157</div>
+      <div class="muted app-version">v158</div>
     </div>
   `;
 
@@ -6368,7 +6368,12 @@ function renderTinderInner(p) {
   const photo = (p.photos && p.photos[0]) || '';
   const photoCss = photo ? `background-image:url('${String(photo).replaceAll("'", '%27').replaceAll('"', '%22')}')` : '';
   const rawIntent = (p.meetingIntent || [])[0];
-  const goal = rawIntent ? goalLabel(rawIntent) : 'Знакомство';
+  const selIntents = (state.dating?.filters?.meetingIntent || []).filter((x) => goalLabel(x));
+  const goal = rawIntent
+    ? goalLabel(rawIntent)
+    : selIntents.length
+      ? goalLabel(selIntents[0])
+      : 'Знакомство';
   let interestTags = tags;
   if (!interestTags) {
     const sharedTraits = Array.isArray(compat.shared) && compat.shared.length ? compat.shared.slice(0, 3) : [];
