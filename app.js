@@ -4593,13 +4593,12 @@ function renderDating() {
       </div>
 
       <div class="card">
-        <div class="card-title">Анкета</div>
         ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
         ${visible.length ? `<div class="tinder-actions"><button class="tbtn nope" type="button" data-tinder="nope">✕</button><button class="tbtn like" type="button" data-tinder="like">❤</button></div>` : ``}
       </div>
-      <div class="muted app-version">v159</div>
+      <div class="muted app-version">v160</div>
     </div>
   `;
 
@@ -6443,17 +6442,17 @@ function renderTinderInner(p) {
         </div>
       </div>
     </div>
-    <div class="tinder-meta">
-      <div class="tinder-name">${escapeHtml(p.name)}${p.age != null
-        ? `, ${p.age}`
-        : p.birthDate
-          ? `, ${ageFromBirthDate(p.birthDate) ?? ''}`
-          : ''}</div>
-      ${interestTags ? `<div class="tinder-tags">${interestTags}</div>` : ''}
-    </div>
     <div class="tinder-foot">
       <div class="pad">
-        <div class="tinder-sub"><span class="verdict ${compat.tone || 'warn'}">${verdictEmoji(compat.tone || 'warn')}</span> ${escapeHtml(compat.label)}</div>
+        <div class="tinder-meta">
+          <div class="tinder-name">${escapeHtml(p.name)}${p.age != null
+            ? `, ${p.age}`
+            : p.birthDate
+              ? `, ${ageFromBirthDate(p.birthDate) ?? ''}`
+              : ''}</div>
+          ${interestTags ? `<div class="tinder-tags">${interestTags}</div>` : ''}
+          <div class="tinder-sub"><span class="verdict ${compat.tone || 'warn'}">${verdictEmoji(compat.tone || 'warn')}</span> ${escapeHtml(compat.label)}</div>
+        </div>
         ${qmBadge}
         <div class="tinder-about">${escapeHtml(p.about)}</div>
         <div class="tinder-badges">${comm}</div>

@@ -1833,7 +1833,7 @@ a { color: inherit; }
   z-index: 0;
   background-size: cover;
   background-repeat: no-repeat;
-  background-position: center 18%;
+  background-position: center 8%;
   background-color: rgba(15, 23, 42, 0.12);
 }
 .tinder-photo.nophoto {
@@ -1975,18 +1975,15 @@ a { color: inherit; }
   color: #fca5a5;
 }
 
+/* Имя, возраст, интересы и вердикт — в прокручиваемом блоке карточки, по левому краю */
 .tinder-meta {
-  position: absolute;
-  right: 16px;
-  top: 54%;
-  transform: translateY(-50%);
+  position: static;
   z-index: 2;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-  max-width: 62%;
-  pointer-events: none;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 100%;
 }
 .tinder-name {
   font-weight: 900;
@@ -1996,10 +1993,11 @@ a { color: inherit; }
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
   letter-spacing: 0.2px;
 }
+.tinder-meta .tinder-sub { margin-top: 2px; }
 .tinder-tags {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 6px;
   max-width: 100%;
 }
@@ -2019,7 +2017,7 @@ a { color: inherit; }
   max-height: 58%;
   height: auto;
   overflow-y: auto;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.10) 0%, rgba(15, 23, 42, 0.62) 40%, rgba(15, 23, 42, 0.92) 100%);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.46) 0%, rgba(15, 23, 42, 0.66) 40%, rgba(15, 23, 42, 0.93) 100%);
   border-radius: 0 0 var(--radius-xl) var(--radius-xl);
 }
 .tinder-foot .pad,
