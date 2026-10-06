@@ -1791,9 +1791,16 @@ function syncSettingsUi() {
 }
 
 function wirePwa() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js').catch(() => {});
-  }
+  if (!('serviceWorker' in navigator)) return;
+  // Новая версия приложения вступает в силу автоматически: при смене активного
+  // service worker перезагружаем страницу один раз.
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloaded) return;
+    reloaded = true;
+    location.reload();
+  });
+  navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'none' }).catch(() => {});
 }
 
 async function startGeoIfNeeded() {
@@ -4705,7 +4712,7 @@ ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
         ${renderDatingOwnProfileNotice()}
-      <div class="muted app-version">v163</div>
+      <div class="muted app-version">v164</div>
     </div>
   `;
 
