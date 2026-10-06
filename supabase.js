@@ -137,24 +137,83 @@ export async function supabaseDeleteProfile(userId) {
   await supabase.auth.admin.deleteUser(userId).catch(() => {});
 }
 
+// Поля анкеты, которые нужны ленте. Важно: не выбирать payload целиком —
+// туда попадают 282 ответа анкеты на каждого участника, и запрос с полным
+// payload не отвечает десятки секунд (лента остаётся пустой).
+// Ответы анкеты и сводные ветки сюда не входят намеренно: их грузит
+// supabaseLoadProfileTreeData точечно, для показанных карточек.
+const PUBLIC_PROFILE_COLUMNS = [
+  'name',
+  'gender',
+  'age',
+  'birthDate',
+  'ageConfirmed',
+  'city',
+  'cityOverride',
+  'stepCount',
+  'meetingIntent',
+  'meetingPlaces',
+  'photos',
+  'interests',
+  'communication',
+  'values',
+  'zodiac',
+  'jobTitle',
+  'education',
+  'budget',
+  'about',
+  'description'
+];
+
 export async function supabaseListPublicProfiles({ excludeUserId, limit = 50 } = {}) {
   if (!isSupabaseConfigured()) return [];
   const supabase = await getSupabase();
   let q = supabase
     .from('profiles')
-    .select('id, payload, updated_at')
+    .select(['id', 'updated_at', ...PUBLIC_PROFILE_COLUMNS.map((c) => `payload->profile->${c}`)].join(', '))
     .order('updated_at', { ascending: false })
     .limit(limit);
   if (excludeUserId) q = q.neq('id', excludeUserId);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
-  return (data || [])
-    .filter((r) => r.payload && r.payload.profile)
-    .map((r) => ({
-      id: r.id,
-      ...(r.payload.profile || {}),
-      updatedAt: r.updated_at
-    }));
+  return (data || []).map((r) => {
+    const flat = { id: r.id, updatedAt: r.updated_at };
+    for (const c of PUBLIC_PROFILE_COLUMNS) {
+      if (c in r) flat[c] = r[c];
+    }
+    return flat;
+  });
+}
+
+// Ответы анкеты и сводные ветки одного участника — тяжёлые, грузим только для
+// показанных карточек. Выбирать их для всех анкет сразу нельзя: такой список
+// грузится десятки секунд вместо полутора.
+export async function supabaseLoadProfileTreeData(userId) {
+  if (!isSupabaseConfigured()) return {};
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('payload->profile->questionnaireAnswers,payload->profile->persona,payload->profile->factual')
+    .eq('id', userId)
+    .limit(1);
+  if (error) throw new Error(error.message);
+  const row = (data || [])[0];
+  if (!row) return {};
+  const field = (name) => {
+    const direct = row[name];
+    if (direct && typeof direct === 'object') return direct;
+    // PostgREST может вернуть выражение под служебным ключом — берём по размеру.
+    const values = Object.values(row).filter((v) => v && typeof v === 'object' && !Array.isArray(v));
+    if (name === 'questionnaireAnswers') {
+      return values.reduce((best, v) => (Object.keys(v).length > Object.keys(best || {}).length ? v : best), null) || {};
+    }
+    return {};
+  };
+  return {
+    questionnaireAnswers: field('questionnaireAnswers'),
+    persona: field('persona'),
+    factual: field('factual')
+  };
 }
 
 export async function supabaseSaveLike(fromUserId, toUserId, dir) {

@@ -28,6 +28,7 @@ import {
   supabaseGetMessages,
   supabaseListPublicProfiles,
   supabaseLoadProfile,
+  supabaseLoadProfileTreeData,
   supabaseMarkMatchSeen,
   supabaseOnAuth,
   supabaseChangePassword,
@@ -46,7 +47,7 @@ import {
   supabaseSaveConsent,
   supabaseSaveConsentsBulk,
   supabaseGetConsents
-} from './supabase.js?v=98';
+} from './supabase.js?v=102';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
@@ -621,8 +622,72 @@ function toDatingProfile(p) {
     about: p.about || p.description || '',
     questionnaireAnswers: p.questionnaireAnswers || {},
     persona: p.persona || {},
-    factual: p.factual || {}
+    factual: p.factual || {},
+    updatedAt: p.updated_at || p.updatedAt || ''
   };
+}
+
+// Один и тот же человек может попасть в базу дважды (например, после пересева
+// тестовых анкет). Схлопываем только полные копии — совпадают имя, пол и дата
+// рождения — и оставляем самую свежую версию.
+function dedupeProfilesByIdentity(profiles) {
+  const best = new Map();
+  for (const p of profiles || []) {
+    const key = `${normText(p.name || '')}|${String(p.gender || '')}|${p.birthDate || ''}`;
+    if (!key.replace(/\|/g, '')) continue;
+    const prev = best.get(key);
+    if (!prev) {
+      best.set(key, p);
+      continue;
+    }
+    if (String(p.updatedAt || '') > String(prev.updatedAt || '')) best.set(key, p);
+  }
+  return [...best.values()];
+}
+
+// Дерево решений кандидата: у кого-то в базе есть только persona-сводка,
+// а ответы анкеты лежат отдельно. Тогда ветки считаем прямо из ответов,
+// а сами ответы догружаем точечно — только для тех анкет, что попали в ленту.
+const candidateAnswersCache = new Map();
+
+function hasTreeData(p) {
+  if (!p) return false;
+  if (Object.keys(p.questionnaireAnswers || {}).length) return true;
+  return Object.keys(candidateTreeDims(p)).length > 0;
+}
+
+// Грузим ответы анкеты, если их ещё нет: без них не посчитать «N из M вопросов».
+// Ответы всегда пишем в каноническую анкету из liveProfiles по id: в ленту попадают
+// одноразовые копии (scored), которые следующий же render выбросит.
+async function hydrateCandidateTrees(profiles) {
+  const need = (profiles || [])
+    .filter((p) => p && p.id && !Object.keys(p.questionnaireAnswers || {}).length && !candidateAnswersCache.get(p.id)?.tried)
+    .slice(0, 6);
+  if (!need.length) return false;
+  let changed = false;
+  await Promise.all(need.map(async (p) => {
+    candidateAnswersCache.set(p.id, { tried: true });
+    try {
+      const tree = await supabaseLoadProfileTreeData(p.id);
+      const answers = tree?.questionnaireAnswers || {};
+      const persona = tree?.persona || {};
+      const factual = tree?.factual || {};
+      if (!Object.keys(answers).length && !Object.keys(persona).length && !Object.keys(factual).length) return;
+      const canonical = liveProfiles.find((x) => x.id === p.id) || p;
+      canonical.questionnaireAnswers = answers;
+      canonical.persona = persona;
+      canonical.factual = factual;
+      if (canonical !== p) {
+        p.questionnaireAnswers = answers;
+        p.persona = persona;
+        p.factual = factual;
+      }
+      changed = true;
+    } catch (err) {
+      // нет доступа или сеть — карточка просто останется без дерева
+    }
+  }));
+  return changed;
 }
 
 async function loadLiveProfiles() {
@@ -640,6 +705,9 @@ async function loadLiveProfiles() {
     loadingLiveProfiles = false;
   }
   renderAll();
+  // У кого-то в базе сохранена только сводка persona — догружаем ответы анкеты,
+  // иначе в карточке будет «дерево: нет данных».
+  if (await hydrateCandidateTrees(liveProfiles)) renderAll();
   if (!liveProfilesLoaded) {
     // Supabase был недоступен (например, проект заморожен) — пробуем снова позже.
     setTimeout(() => {
@@ -2674,20 +2742,27 @@ function getOptionTraits(q, opt) {
   return {};
 }
 
-function profileGender() {
-  const g = String(state.profile?.gender || '');
+function genderOf(profile) {
+  const g = String(profile?.gender || '');
   if (g === 'female' || g === 'f') return 'f';
   if (g === 'male' || g === 'm') return 'm';
   return '';
 }
 
-function questionOptions(q) {
-  const g = profileGender();
+function profileGender() {
+  return genderOf(state.profile);
+}
+
+function optionsForGender(q, g) {
   if (g === 'f' && Array.isArray(q.optionsF)) return q.optionsF;
   if (g === 'm' && Array.isArray(q.optionsM)) return q.optionsM;
   if (Array.isArray(q.optionsM)) return q.optionsM;
   if (Array.isArray(q.optionsF)) return q.optionsF;
   return q.options || [];
+}
+
+function questionOptions(q) {
+  return optionsForGender(q, profileGender());
 }
 
 function questionText(q) {
@@ -4269,13 +4344,20 @@ function matchesTreeFilters(p, treeFilter = {}) {
 
 // Категории дерева решений, где несовпадение значений критично для матча.
 const TREE_CRITICAL_CATEGORIES = ['family', 'habits', 'relationship', 'extra'];
+// Все категории большой анкеты: по ним ветки считаются фактическими.
+const QUESTIONNAIRE_CATEGORIES = new Set(ALL_QUESTIONS.map((q) => q.category).filter(Boolean));
 // Минимальная доля совпавших веток дерева для матча.
 const TREE_MATCH_THRESHOLD = 0.4;
 
-function buildUserTree(profile = state.profile) {
-  const answers = getQuestionnaireAnswers(profile);
-  const factual = {};
-  const persona = {};
+// Ветки анкеты: по каждой категории/признаку берём значение, которое выбрано чаще
+// всего (как в портрете), а не последний ответ — иначе 282 вопроса схлопываются
+// в случайное значение. Вопросы с категорией → factual, без → persona.
+function buildProfileTree(profile) {
+  const answers = profile?.questionnaireAnswers && typeof profile.questionnaireAnswers === 'object'
+    ? profile.questionnaireAnswers
+    : {};
+  const g = genderOf(profile);
+  const buckets = {};
   for (const q of ALL_QUESTIONS) {
     const answerId = answers[q.id];
     if (!answerId) continue;
@@ -4291,19 +4373,51 @@ function buildUserTree(profile = state.profile) {
     } else {
       traitsList = multiAnswerList(answerId)
         .map((oid) => {
-          const opt = questionOptions(q).find((x) => x.id === oid);
+          const opt = optionsForGender(q, g).find((x) => x.id === oid);
           return opt ? getOptionTraits(q, opt) : null;
         })
         .filter(Boolean);
     }
     for (const traits of traitsList) {
       for (const [dim, val] of Object.entries(traits)) {
-        if (q.category) factual[dim] = val;
-        else persona[dim] = val;
+        if (!buckets[dim]) buckets[dim] = {};
+        buckets[dim][val] = (buckets[dim][val] || 0) + 1;
       }
     }
   }
+  const factual = {};
+  const persona = {};
+  for (const [dim, bucket] of Object.entries(buckets)) {
+    const top = pickTopEntry(bucket);
+    if (!top) continue;
+    if (QUESTIONNAIRE_CATEGORIES.has(dim)) factual[dim] = top;
+    else persona[dim] = top;
+  }
   return { factual, persona };
+}
+
+// Ветки кандидата: если есть ответы анкеты — считаем из них, иначе берём сохранённые поля.
+function candidateTree(candidate) {
+  const answers = candidate?.questionnaireAnswers;
+  if (answers && typeof answers === 'object' && Object.keys(answers).length) {
+    return buildProfileTree(candidate);
+  }
+  return { factual: candidate?.factual || {}, persona: candidate?.persona || {} };
+}
+
+function buildUserTree(profile = state.profile) {
+  return buildProfileTree(profile);
+}
+
+// Все ветки анкеты в одной карте dim → значение. В buildProfileTree категоризованные
+// вопросы попадают в factual, остальные — в persona; в старых записях всё лежит
+// в persona, поэтому для сравнения ветки всегда сливаем в одну карту.
+function treeDims(tree) {
+  return { ...(tree?.persona || {}), ...(tree?.factual || {}) };
+}
+
+function candidateTreeDims(candidate) {
+  return treeDims(candidateTree(candidate));
 }
 
 // Совместимость по дереву решений: сравнивает ветки пользователя и кандидата.
@@ -4314,26 +4428,17 @@ function treeMatchCompatibility(userProfile = state.profile, candidate = {}) {
   const enabled = filters.treeEnabled !== false;
   const conflictsEnabled = filters.treeConflicts !== false;
   const threshold = Number.isFinite(Number(filters.treeThreshold)) ? Number(filters.treeThreshold) / 100 : TREE_MATCH_THRESHOLD;
-  const me = buildUserTree(userProfile);
-  const them = {
-    factual: candidate.factual || {},
-    persona: candidate.persona || {}
-  };
+  const me = treeDims(buildUserTree(userProfile));
+  const them = candidateTreeDims(candidate);
   const known = [];
   const match = [];
   const conflicts = [];
-  for (const [dim, myVal] of Object.entries(me.factual)) {
-    const theirVal = them.factual[dim];
+  for (const [dim, myVal] of Object.entries(me)) {
+    const theirVal = them[dim];
     if (!theirVal) continue;
     known.push(dim);
     if (myVal === theirVal) match.push(dim);
     else if (conflictsEnabled && TREE_CRITICAL_CATEGORIES.includes(dim)) conflicts.push({ dim, mine: myVal, theirs: theirVal });
-  }
-  for (const [dim, myVal] of Object.entries(me.persona)) {
-    const theirVal = them.persona[dim];
-    if (!theirVal) continue;
-    known.push(dim);
-    if (myVal === theirVal) match.push(dim);
   }
   const pct = known.length ? match.length / known.length : null;
   const compatible = !enabled || !known.length ? true : pct >= threshold && conflicts.length === 0;
@@ -4379,10 +4484,9 @@ function countQuestionnaireMatches(userProfile = state.profile, candidate = {}) 
     }
     return { total, matched };
   }
-
   // Fallback: кандидат без полной анкеты — сверяем по агрегированному портрету.
   const answers = getQuestionnaireAnswers(userProfile);
-  const cand = { persona: candidate.persona || {}, factual: candidate.factual || {} };
+  const cand = candidateTreeDims(candidate);
   let total = 0;
   let matched = 0;
   for (const q of ALL_QUESTIONS) {
@@ -4409,7 +4513,7 @@ function countQuestionnaireMatches(userProfile = state.profile, candidate = {}) 
     const hit = traitsList.some((traits) => {
       const entries = Object.entries(traits);
       if (!entries.length) return false;
-      return entries.every(([dim, val]) => cand.persona[dim] === val || cand.factual[dim] === val);
+      return entries.every(([dim, val]) => cand[dim] === val);
     });
     if (hit) matched += 1;
   }
@@ -4445,9 +4549,13 @@ function renderDating() {
   const liveMode = isSupabaseConfigured();
   const myGender = String(state.profile?.gender || '');
   const myName = normText(state.profile?.name || '');
-  const candidatePool = liveProfiles.length ? liveProfiles : [];
+  const candidatePool = dedupeProfilesByIdentity(liveProfiles);
   const maxIncome = maxIncomeForPlan(mySubscription);
   const baseMatch = (p) => {
+    // Незаполненные анкеты (тестовые аккаунты, записи без пола и фото) в ленте не показываем.
+    if (!p || !String(p.name || '').trim()) return false;
+    if (!String(p.gender || '').trim()) return false;
+    if (!(p.photos || []).length) return false;
     if (myGender) {
       const g = String(p.gender || '');
       if (g === myGender) return false;
@@ -4512,10 +4620,10 @@ function renderDating() {
     .filter((p) => feedEligible(p) && !state.dating.likes[p.id])
     .slice(0, 6);
   if (visible.length < 3 && candidates.length) {
-    // Новых мало — смешиваем подходящие анкеты: возвращаем лайкнутые
-    // (но не матчи и не скрытые), чтобы лента не пустела.
+    // Новых мало — возвращаем только те анкеты, которые уже лайкнули.
+    // Пропущенные не возвращаем: иначе верхняя карточка повторяется по кругу.
     const recycled = candidates
-      .filter((p) => feedEligible(p) && state.dating.likes[p.id])
+      .filter((p) => feedEligible(p) && state.dating.likes[p.id] === 'like')
       .slice(0, Math.min(6 - visible.length, 6));
     visible = [...visible, ...recycled].slice(0, 6);
   }
@@ -4593,18 +4701,21 @@ function renderDating() {
       </div>
 
       <div class="card">
-        ${visible.length
+${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        ${visible.length ? `<div class="tinder-actions"><button class="tbtn nope" type="button" data-tinder="nope">✕</button><button class="tbtn like" type="button" data-tinder="like">❤</button></div>` : ``}
-      </div>
-      <div class="muted app-version">v160</div>
+        ${renderDatingOwnProfileNotice()}
+      <div class="muted app-version">v163</div>
     </div>
   `;
 
 
   $('#view-dating').querySelectorAll('[data-open-tab]').forEach((b) => {
     b.addEventListener('click', () => switchTab(b.dataset.openTab));
+  });
+
+  $('#view-dating').querySelectorAll('[data-action="openQuestionnaire"]').forEach((b) => {
+    b.addEventListener('click', () => openQuestionnaire());
   });
 
   $('#view-dating').querySelector('[data-filter-toggle]')?.addEventListener('click', () => {
@@ -4746,6 +4857,11 @@ function renderDating() {
 
   if (visible.length) {
     mountTinder(visible);
+    // Ответы анкеты нужны для «N из M вопросов совпало» — догружаем их
+    // для первых карточек ленты (остальные подтянутся при свайпе).
+    hydrateCandidateTrees(visible.slice(0, 3)).then((changed) => {
+      if (changed) renderAll();
+    });
     $('#view-dating').querySelector('[data-tinder="like"]')?.addEventListener('click', () => tinder?.swipe('right'));
     $('#view-dating').querySelector('[data-tinder="nope"]')?.addEventListener('click', () => tinder?.swipe('left'));
     $('#view-dating').addEventListener('click', (e) => {
@@ -4782,6 +4898,104 @@ function openMatchChat(matchId) {
 }
 
 
+// Готовность собственной анкеты: обязательные поля + ответы на вопросы анкеты.
+// Пока анкета не заполнена, в ленте не считается совместимость и дерево решений.
+function profileCompletion(profile = state.profile) {
+  const p = profile || {};
+  const portrait = buildQuestionnairePortrait(p.questionnaireAnswers || {});
+  const total = portrait.total || ALL_QUESTIONS.length;
+  const answered = portrait.answered || 0;
+  const checks = [
+    { id: 'name', label: 'Имя', ok: !!String(p.name || '').trim() && String(p.name).trim() !== 'Вы' },
+    { id: 'gender', label: 'Пол', ok: !!genderOf(p) },
+    { id: 'birthDate', label: 'Дата рождения', ok: !!p.birthDate },
+    { id: 'photos', label: 'Фото', ok: (p.photos || []).length > 0 },
+    { id: 'interests', label: 'Интересы', ok: (p.interests || []).length > 0 },
+    { id: 'description', label: 'О себе', ok: !!String(p.description || '').trim() }
+  ];
+  const optional = [
+    { id: 'jobTitle', label: 'Профессия', ok: !!String(p.jobTitle || '').trim() },
+    { id: 'education', label: 'Образование', ok: !!String(p.education || '').trim() },
+    { id: 'budget', label: 'Бюджет', ok: !!String(p.budget || '').trim() },
+    { id: 'values', label: 'Ценности', ok: (p.values || []).length > 0 }
+  ];
+  const baseDone = checks.filter((c) => c.ok).length;
+  const baseRatio = checks.length ? baseDone / checks.length : 0;
+  const qnRatio = total ? answered / total : 0;
+  const pct = Math.round((baseRatio * 0.4 + qnRatio * 0.6) * 100);
+  const missing = checks.filter((c) => !c.ok);
+  return { pct, answered, total, checks, optional, baseDone, missing, qnRatio };
+}
+
+function plural(n, one, few, many) {
+  const abs = Math.abs(Number(n) || 0) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return many;
+  if (last > 1 && last < 5) return few;
+  if (last === 1) return one;
+  return many;
+}
+
+// Подсказка в ленте: что ещё не заполнено у пользователя и что это даст.
+function renderDatingOwnProfileNotice() {
+  const c = profileCompletion();
+  if (c.pct >= 100) return '';
+  const need = [];
+  if (!c.checks.find((x) => x.id === 'name')?.ok) need.push('имя');
+  if (!c.checks.find((x) => x.id === 'photos')?.ok) need.push('фото');
+  if (!c.checks.find((x) => x.id === 'birthDate')?.ok) need.push('дата рождения');
+  const qnLeft = c.total - c.answered;
+  return `
+    <div class="card own-profile-notice">
+      <div class="own-profile-notice-head">
+        <div>
+          <div class="card-title">Ваша анкета готова на ${c.pct}%</div>
+          <div class="muted">${qnLeft > 0
+            ? `Осталось ${qnLeft} ${plural(qnLeft, 'вопрос', 'вопроса', 'вопросов')} анкеты совместимости.`
+            : 'Ответы на вопросы заполнены.'}${need.length ? ` Не хватает: ${escapeHtml(need.join(', '))}.` : ''}</div>
+        </div>
+        <div class="own-profile-pct">${c.pct}%</div>
+      </div>
+      <div class="qn-progress" style="margin:10px 0"><div class="qn-progress-bar" style="width:${c.pct}%"></div></div>
+      <div class="row-inline">
+        <button class="btn" type="button" data-action="openQuestionnaire">Заполнить анкету</button>
+        <button class="btn ghost" type="button" data-open-tab="stats">В профиль</button>
+      </div>
+      <div class="muted" style="margin-top:8px">Без заполненной анкеты в карточках нет процента совместимости, вердикта и дерева решений.</div>
+    </div>
+  `;
+}
+
+function renderProfileStatus() {
+  const c = profileCompletion();
+  const done = c.checks.filter((x) => x.ok).length;
+  const doneOpt = c.optional.filter((x) => x.ok).length;
+  return `
+    <div class="card profile-status">
+      <div class="profile-status-head">
+        <div>
+          <div class="card-title">Готовность вашей анкеты</div>
+          <div class="muted">Заполнено ${done} из ${c.checks.length} · вопросов ${c.answered} из ${c.total}</div>
+        </div>
+        <div class="profile-status-pct">${c.pct}%</div>
+      </div>
+      <div class="qn-progress" style="margin:12px 0"><div class="qn-progress-bar" style="width:${c.pct}%"></div></div>
+      <ul class="check-list">
+        ${c.checks.map((x) => `<li class="${x.ok ? 'ok' : 'todo'}"><span class="check-ico">${x.ok ? '✓' : '•'}</span>${escapeHtml(x.label)}</li>`).join('')}
+        <li class="${c.qnRatio >= 1 ? 'ok' : c.answered > 0 ? 'part' : 'todo'}"><span class="check-ico">${c.qnRatio >= 1 ? '✓' : c.answered > 0 ? '…' : '•'}</span>Анкета совместимости — ${c.answered} из ${c.total}</li>
+      </ul>
+      <div class="muted" style="margin-top:10px">Без ответов на вопросы в ленте не показывается процент совместимости и дерево решений.</div>
+      <button class="btn" type="button" data-action="openQuestionnaire" style="margin-top:12px">Ответить на вопросы${c.answered > 0 && c.qnRatio < 1 ? ` (ещё ${c.total - c.answered})` : ''}</button>
+      <details class="profile-status-more">
+        <summary>Необязательно: ${doneOpt} из ${c.optional.length}</summary>
+        <ul class="check-list">
+          ${c.optional.map((x) => `<li class="${x.ok ? 'ok' : 'todo'}"><span class="check-ico">${x.ok ? '✓' : '•'}</span>${escapeHtml(x.label)}</li>`).join('')}
+        </ul>
+      </details>
+    </div>
+  `;
+}
+
 function renderStats() {
   const name = state.profile?.name || '';
   const description = state.profile?.description || '';
@@ -4807,6 +5021,7 @@ function renderStats() {
 
   $('#view-stats').innerHTML = `
     <div class="grid">
+      ${renderProfileStatus()}
       <div class="card profile-editor">
         <div class="card-title">Анкета</div>
         <div class="photo-hero-wrap">
@@ -5006,6 +5221,10 @@ function renderStats() {
       if (btn.disabled) return;
       $('#view-stats').querySelector('#profilePhotoInput')?.click();
     });
+  });
+
+  $('#view-stats').querySelectorAll('[data-action="openQuestionnaire"]').forEach((btn) => {
+    btn.addEventListener('click', () => openQuestionnaire());
   });
 
   $('#view-stats').querySelector('[data-action="clearPhotos"]')?.addEventListener('click', () => {
@@ -6386,11 +6605,14 @@ function renderTinderInner(p) {
   const diff = Array.isArray(compat.differences) && compat.differences.length ? compat.differences.slice(0, 2).map((x) => `<span class="pill muted-pill">${escapeHtml(x)}</span>`).join(' ') : '';
   const neutral = Array.isArray(compat.neutral) && compat.neutral.length ? compat.neutral.slice(0, 2).map((x) => `<span class="pill muted-pill">${escapeHtml(x)}</span>`).join(' ') : '';
   const tree = treeMatchCompatibility(state.profile, p);
+  const myTreeBranches = Object.keys(treeDims(buildUserTree(state.profile))).length;
   const treeBadge = !tree.enabled
     ? '<span class="pill muted-pill">дерево: отключено в фильтрах</span>'
-    : tree.known.length === 0
-      ? '<span class="pill muted-pill">дерево: нет данных</span>'
-      : `<span class="pill status-pill ${tree.compatible ? 'good' : 'bad'}">дерево: ${Math.round(tree.pct * 100)}% совпадений${tree.conflicts.length ? ` • ${tree.conflicts.length} конфликт` : ''}</span>`;
+    : myTreeBranches === 0
+      ? '<span class="pill muted-pill">дерево: вы ещё не ответили на вопросы анкеты</span>'
+      : tree.known.length === 0
+        ? '<span class="pill muted-pill">дерево: у анкеты нет веток для сравнения</span>'
+        : `<span class="pill status-pill ${tree.compatible ? 'good' : 'bad'}">дерево: ${Math.round(tree.pct * 100)}% совпадений${tree.conflicts.length ? ` • ${tree.conflicts.length} конфликт` : ''}</span>`;
   const pid = p.id || p.name || '';
   const reportRec = state.moderation?.reports?.[pid];
   const reportStatus = reportRec
@@ -6433,13 +6655,6 @@ function renderTinderInner(p) {
       ${locText ? `<div class="tinder-loc"><span class="tinder-loc-ico" aria-hidden="true">🏙</span><span>${escapeHtml(locText)}</span></div>` : '<span></span>'}
       <div class="tinder-top-right">
         <span class="tinder-goal">🎯 ${escapeHtml(goal)}</span>
-        <div class="tinder-menu-wrap">
-          <button class="tinder-dots" type="button" data-tinder-menu aria-label="Ещё">&#8943;</button>
-          <div class="tinder-menu" hidden>
-            <button type="button" data-tinder-block="${escapeHtml(pid)}">Заблокировать</button>
-            <button type="button" data-report="${escapeHtml(pid)}">Пожаловаться</button>
-          </div>
-        </div>
       </div>
     </div>
     <div class="tinder-foot">
@@ -6465,6 +6680,17 @@ function renderTinderInner(p) {
         ${diff ? `<div class="tinder-badges">${diff}</div>` : ''}
         ${neutral ? `<div class="tinder-badges">${neutral}</div>` : ''}
         ${reportStatus}
+      </div>
+    </div>
+    <div class="tinder-photo-actions">
+      <button class="tbtn nope" type="button" data-tinder="nope" aria-label="Не нравится">&#10005;</button>
+      <button class="tbtn like" type="button" data-tinder="like" aria-label="Нравится">&#10084;</button>
+    </div>
+    <div class="tinder-menu-wrap tinder-menu-bottom">
+      <button class="tinder-dots" type="button" data-tinder-menu aria-label="Ещё">&#8943;</button>
+      <div class="tinder-menu" hidden>
+        <button type="button" data-tinder-block="${escapeHtml(pid)}">Заблокировать</button>
+        <button type="button" data-report="${escapeHtml(pid)}">Пожаловаться</button>
       </div>
     </div>
   `;
@@ -6633,7 +6859,16 @@ function fmtNumeric(q, n) {
 // места для встреч (неограниченный список) и планы на сегодня.
 function buildPairCompatibility(user = {}, candidate = {}) {
   const portrait = buildQuestionnairePortrait(user.questionnaireAnswers || {});
-  const base = comparePortraits(portrait, candidate.persona || {});
+  // comparePortraits ждёт психо-поля на верхнем уровне и factual вложенным объектом.
+// Ветки сливаем в одну карту: у старых записей категории лежат в persona.
+  const dims = candidateTreeDims(candidate);
+  const factual = {};
+  const topDims = {};
+  for (const [dim, val] of Object.entries(dims)) {
+    if (QUESTIONNAIRE_CATEGORIES.has(dim)) factual[dim] = val;
+    else topDims[dim] = val;
+  }
+  const base = comparePortraits(portrait, { ...topDims, factual });
   const out = {
     ...base,
     shared: [...(base.shared || [])],

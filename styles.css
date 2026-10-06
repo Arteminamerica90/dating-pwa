@@ -1920,6 +1920,16 @@ a { color: inherit; }
 .tinder-menu-wrap {
   position: relative;
 }
+.tinder-menu-wrap.tinder-menu-bottom {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 5;
+}
+.tinder-menu-wrap.tinder-menu-bottom .tinder-menu {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
 .tinder-dots {
   width: 34px;
   height: 34px;
@@ -2025,7 +2035,7 @@ a { color: inherit; }
   display: grid;
   gap: 12px;
   height: auto;
-  padding: 14px 18px 18px;
+  padding: 14px 18px 58px;
   grid-auto-rows: min-content;
   color: #fff;
 }
@@ -2090,6 +2100,48 @@ a { color: inherit; }
 }
 .tbtn.like { border-color: rgba(52, 211, 153, 0.45); background: rgba(52, 211, 153, 0.08); }
 .tbtn.nope { border-color: rgba(251, 113, 133, 0.50); background: rgba(251, 113, 133, 0.06); }
+
+/* Кнопки «Не нравится»/«Нравится» — прямо на фото, перед информацией снизу.
+   Первым слоем: видно, что карточку можно дислайкнуть/лайкнуть свайпом. */
+.tinder-photo-actions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(58% + 18px);
+  z-index: 4;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 30px;
+  pointer-events: none;
+}
+.tinder-photo-actions .tbtn {
+  pointer-events: auto;
+  width: 62px;
+  height: 62px;
+  font-size: 26px;
+  font-weight: 900;
+  color: #fff;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  background: rgba(15, 23, 42, 0.35);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: transform 120ms ease, background 120ms ease;
+  touch-action: manipulation;
+}
+.tinder-photo-actions .tbtn:active {
+  transform: scale(0.9);
+}
+.tinder-photo-actions .tbtn.like {
+  border-color: rgba(52, 211, 153, 0.95);
+  background: rgba(16, 185, 129, 0.82);
+}
+.tinder-photo-actions .tbtn.nope {
+  border-color: rgba(251, 113, 133, 0.95);
+  background: rgba(225, 29, 72, 0.82);
+}
 
 .tinder-stamp {
   position: absolute;
@@ -2472,4 +2524,108 @@ textarea.input {
 .friend-row,
 .chat-bubble {
   border-radius: var(--radius-md);
+}
+
+/* Статус готовности собственной анкеты */
+.profile-status {
+  background: var(--card, rgba(255, 255, 255, 0.72));
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: var(--radius-lg, 20px);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.profile-status-head,
+.own-profile-notice-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.profile-status-head .card-title,
+.own-profile-notice-head .card-title {
+  margin-bottom: 2px;
+}
+.profile-status-pct,
+.own-profile-pct {
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1;
+  color: #2563eb;
+  flex: none;
+}
+.check-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.check-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  line-height: 1.3;
+}
+.check-list li .check-ico {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  background: rgba(15, 23, 42, 0.04);
+  color: var(--muted);
+}
+.check-list li.ok {
+  color: #0f766e;
+}
+.check-list li.ok .check-ico {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+  color: #047857;
+}
+.check-list li.part {
+  color: #b45309;
+}
+.check-list li.part .check-ico {
+  background: #fef3c7;
+  border-color: #fcd34d;
+  color: #b45309;
+}
+.check-list li.todo {
+  color: rgba(15, 23, 42, 0.72);
+}
+.profile-status-more {
+  margin-top: 10px;
+}
+.profile-status-more summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted);
+  list-style: none;
+}
+.profile-status-more summary::-webkit-details-marker {
+  display: none;
+}
+.profile-status-more summary::before {
+  content: '▸ ';
+}
+.profile-status-more[open] summary::before {
+  content: '▾ ';
+}
+.profile-status-more .check-list {
+  margin-top: 8px;
+}
+
+/* Подсказка в ленте */
+.own-profile-notice {
+  background: rgba(37, 99, 235, 0.07);
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-radius: var(--radius-lg, 20px);
+  padding: 14px;
+  margin-top: 12px;
 }
