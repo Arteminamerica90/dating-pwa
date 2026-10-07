@@ -69,8 +69,24 @@ export async function supabaseResetPassword(email) {
 
 export async function supabaseChangePassword(newPassword) {
   const supabase = await getSupabase();
-  const { error } = await supabase.auth.updateUser({ password: newPassword });
-  if (error) throw new Error(error.message);
+  let lastErr = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw new Error(error.message);
+      return;
+    } catch (err) {
+      const msg = String(err?.message || '');
+      // Транзитный сбой сети — повтор с паузой; остальные ошибки отдаём сразу.
+      if (attempt < 2 && /failed to fetch|networkerror|network error|load failed|net::|socket|timed out|timeout/i.test(msg)) {
+        lastErr = err;
+        await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw (lastErr instanceof Error ? lastErr : new Error('Не удалось обновить пароль'));
 }
 
 export async function supabaseResendConfirmation(email) {

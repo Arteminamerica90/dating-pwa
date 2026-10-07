@@ -48,7 +48,7 @@ import {
   supabaseSaveConsent,
   supabaseSaveConsentsBulk,
   supabaseGetConsents
-} from './supabase.js?v=104';
+} from './supabase.js?v=105';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
@@ -2178,7 +2178,19 @@ function openChangePasswordDialog() {
         toast('Пароль обновлён');
         renderAll();
       } catch (err) {
-        if (errEl) { errEl.hidden = false; errEl.textContent = friendlyAuthError(err) || 'Не удалось обновить пароль'; }
+        console.error('changePassword raw error:', err);
+        if (errEl) {
+          errEl.hidden = false;
+          errEl.textContent = friendlyAuthError(err) || 'Не удалось обновить пароль';
+          const raw = String(err?.message || err || '').trim().slice(0, 220);
+          if (raw) {
+            const detail = document.createElement('div');
+            detail.className = 'muted';
+            detail.style.cssText = 'font-size:12px;margin-top:6px;word-break:break-word';
+            detail.textContent = 'Тех. детали: ' + raw;
+            errEl.appendChild(detail);
+          }
+        }
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = 'Сохранить пароль'; }
       }
@@ -4629,7 +4641,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v174</div>
+        <div class="muted app-version">v175</div>
     </div>
   `;
 
