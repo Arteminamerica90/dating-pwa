@@ -20,6 +20,7 @@ import { partnerFilterText } from './partner-filter-text.js?v=70';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
+  supabaseLocalSession,
   supabaseEnsureMatch,
   supabaseGetMyLikes,
   supabaseGetMyMatches,
@@ -47,7 +48,7 @@ import {
   supabaseSaveConsent,
   supabaseSaveConsentsBulk,
   supabaseGetConsents
-} from './supabase.js?v=102';
+} from './supabase.js?v=104';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
@@ -2151,6 +2152,7 @@ function openLoginDialog() {
 function openChangePasswordDialog() {
   const dlg = $('#dlgChangePassword');
   if (!dlg) return;
+  if (dlg.open) return;
   if (!window.__cpBound) {
     window.__cpBound = true;
     $('#btnCpSave')?.addEventListener('click', async () => {
@@ -2200,12 +2202,16 @@ async function checkPendingPasswordReset() {
     return;
   }
   const deadline = Date.now() + 8000;
+  // Первый вызов инициализирует SDK и обрабатывает recovery-токен из URL-хэша.
+  // Дальше опрашиваем только локальную сессию из хранилища (без сети),
+  // чтобы диалог открывался сразу после обработки токена, а не через поллинг.
+  try { await supabaseCurrentUser(); } catch { /* ignore */ }
   while (Date.now() < deadline) {
     try {
-      if (accountInfo || await supabaseCurrentUser()) {
+      if (accountInfo || await supabaseLocalSession()) {
         state.cloud.pendingPasswordReset = false;
         save();
-        await refreshAccountInfo();
+        await refreshAccountInfo().catch(() => {});
         syncProfileAfterAuth();
         openChangePasswordDialog();
         toast('Введите новый пароль');
@@ -2214,7 +2220,7 @@ async function checkPendingPasswordReset() {
     } catch {
       // ignore, пробуем ещё
     }
-    await new Promise((r) => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 150));
   }
   state.cloud.pendingPasswordReset = false;
   save();
@@ -4623,7 +4629,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v172</div>
+        <div class="muted app-version">v174</div>
     </div>
   `;
 

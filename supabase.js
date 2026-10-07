@@ -2,23 +2,12 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL } from './supabase-config.js?v=46';
 
 let clientPromise = null;
 
-function withTimeout(promise, ms, label) {
-  let timer;
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error((label || 'Запрос') + ': превышено время ожидания')), ms);
-    })
-  ]).finally(() => clearTimeout(timer));
-}
-
+// SDK лежит локально в vendor/ — без зависимости от CDN (тормоза/таймауты
+// сети до jsdelivr раньше превращались в «Не удалось связаться с сервером»
+// при смене пароля). Сборка статическая, деплоится вместе с приложением.
 function createSupabaseClient() {
-  return withTimeout(
-    import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/+esm').then(({ createClient }) =>
-      createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    ),
-    12000,
-    'Загрузка клиента'
+  return import('./vendor/supabase-js-2.49.4.mjs').then(({ createClient }) =>
+    createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   );
 }
 
@@ -100,6 +89,16 @@ export async function supabaseCurrentUser() {
   const { data, error } = await supabase.auth.getUser();
   if (error || !data?.user) return null;
   return data.user;
+}
+
+// Локальная сессия из хранилища без сетевого запроса: дёшево опрашивать
+// в цикле ожидания recovery-токена (см. checkPendingPasswordReset в app.js).
+export async function supabaseLocalSession() {
+  if (!isSupabaseConfigured()) return null;
+  const supabase = await getSupabase();
+  const { data } = await supabase.auth.getSession();
+  if (!data?.session?.user) return null;
+  return data.session.user;
 }
 
 export async function supabaseLoadProfile(userId) {
@@ -478,7 +477,7 @@ export async function supabaseSaveConsentsBulk(userId, consents) {
       consent_type: type,
       granted: !!granted,
       user_agent: navigator.userAgent.slice(0, 500)
-    }).catch(() => {});
+    }).then(() => {}, () => {});
   }
 
   const updatePayload = { updated_at: new Date().toISOString() };

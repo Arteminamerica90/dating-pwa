@@ -139,6 +139,33 @@ const PERSONAS = [
     values: ['family', 'online'], meetingIntent: ['serious', 'friend'], meetingPlaces: ['park', 'gallery', 'cafe'],
     income: '220000', area: '95', profession: 'Архитектор',
     likes: { relationship: ['отношения_в_браке'], family: ['семья_дети', 'семья_с_родителями'] }
+  },
+  {
+    name: 'Екатерина', gender: 'f', group: 'calm', age: 30, city: 'Moscow', zodiac: 'Стрелец',
+    job: 'HR-директор', education: 'Высшее', budget: '150–200 тыс. ₽/мес',
+    about: 'Управляю командами в IT, но дома — кошки, книги и тихие пятницы. Ищу надёжного человека: близость важнее количества встреч, верность важнее обещаний. Не тороплю события, но когда решаюсь — вкладываюсь всерьёз. Без драйва мне скучно, без спокойствия — тревожно, идеально, когда есть и то, и другое.',
+    interests: ['books', 'art', 'coffee', 'museums'], communication: ['chat', 'slow', 'meet'],
+    values: ['family', 'goout'], meetingIntent: ['serious', 'acquaintance'], meetingPlaces: ['cafe', 'gallery', 'theatre'],
+    income: '150000', area: '60', profession: 'HR-директор',
+    likes: { relationship: ['отношения_навсегда', 'отношения_в_браке'], family: ['семья_дети', 'семья_с_родителями'] }
+  },
+  {
+    name: 'Сергей', gender: 'm', group: 'warm', age: 33, city: 'Saint Petersburg', zodiac: 'Водолей',
+    job: 'Инженер-проектировщик', education: 'Высшее', budget: '150–200 тыс. ₽/мес',
+    about: 'Проектирую мосты в Петербурге, по выходным бегаю вдоль Невы и фотографирую закаты. Не ищу идеала — ищу рядом человека, с которым интересно молчать и интересно спорить. Из меня получается спокойный партнёр: готовим вместе, путешествуем недолго, но часто, и я всегда за честные разговоры.',
+    interests: ['sport', 'walks', 'cinema', 'coffee'], communication: ['chat', 'voice', 'meet'],
+    values: ['goout', 'just'], meetingIntent: ['acquaintance', 'friend', 'hangout'], meetingPlaces: ['sport', 'park', 'cinema'],
+    income: '170000', area: '68', profession: 'Инженер',
+    likes: { relationship: ['отношения_в_браке', 'свободные_отношения'], family: ['семья_с_родителями', 'свободный_перед'] }
+  },
+  {
+    name: 'Наталья', gender: 'f', group: 'live', age: 24, city: 'Kazan', zodiac: 'Лев',
+    job: 'SMM-специалист', education: 'Высшее', budget: '80–100 тыс. ₽/мес',
+    about: 'Веду соцсети брендов, а сама — про живые эмоции: концерты, настолки с друзьями, спонтанные поездки. Умею зажечь вечер и собрать компанию. Ищу такого же лёгкого на подъём: посмеяться, обсудить всё на свете, сходить на рынок за фруктами в воскресенье. Драма — не мой жанр, зато юмор — мой.',
+    interests: ['night', 'music', 'food', 'theatre', 'boardgames'], communication: ['chat', 'video', 'games'],
+    values: ['just', 'goout'], meetingIntent: ['party', 'hangout', 'acquaintance'], meetingPlaces: ['club', 'cafe', 'theatre'],
+    income: '75000', area: '30', profession: 'SMM-специалист',
+    likes: { relationship: ['свободные_отношения', 'отношения_в_браке'], family: ['свободный_перед', 'семья_с_родителями'] }
   }
 ];
 
@@ -152,7 +179,8 @@ const PHOTO_POOL = [
 // Это тестовые входы, не пользовательские данные — их можно свободно пересоздать.
 const SEED_SLUG = {
   'Анна': 'anna', 'Мария': 'maria', 'Ольга': 'olga',
-  'Алексей': 'alexey', 'Дмитрий': 'dmitry', 'Игорь': 'igor'
+  'Алексей': 'alexey', 'Дмитрий': 'dmitry', 'Игорь': 'igor',
+  'Екатерина': 'ekaterina', 'Сергей': 'sergey', 'Наталья': 'natalya'
 };
 const SEED_LOGIN = {};
 for (const persona of PERSONAS) {
@@ -467,9 +495,12 @@ validate();
 
 const mode = process.argv.includes('--print') ? 'print' : 'push';
 const refresh = process.argv.includes('--refresh');
+const onlyIdx = process.argv.indexOf('--only');
+const onlyName = onlyIdx >= 0 ? process.argv[onlyIdx + 1] : null;
 
 if (mode === 'print') {
   for (const p of profiles) {
+    if (onlyName && p.name !== onlyName) continue;
     const persona = PERSONAS.find((x) => x.name === p.name);
     const answered = Object.keys(p.questionnaireAnswers).length;
     console.log(`${p.name} (${p.gender}, ${p.age}, ${CITY_NAME[p.city]}, архетип ${persona.group}) — ответов ${answered}/${ALL_QUESTIONS.length}, зодиак ${p.zodiac}, профессия ${p.jobTitle}`);
@@ -499,18 +530,25 @@ if (mode === 'print') {
     'Content-Type': 'application/json'
   };
 
-  // Уже засеянные анкеты не дублируем.
-  const existingRes = await withRetry(() => fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,payload`, { headers: anon, signal: AbortSignal.timeout(20000) }));
+  // Уже засеянные анкеты не дублируем. Сразу выбираем только нужные поля
+  // (ответы целиком не тащим — payload со 282 ответами на всех медленный).
+  const existingRes = await withRetry(
+    () => fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?select=id,payload->profile->name,payload->profile->questionnaireAnswers`,
+      { headers: anon, signal: AbortSignal.timeout(45000) }
+    )
+  );
   const existing = (await existingRes.json()) || [];
   const seededRows = existing.filter((r) => {
-    const p = r.payload?.profile;
-    return p && typeof p.questionnaireAnswers === 'object' && Object.keys(p.questionnaireAnswers).length >= ALL_QUESTIONS.length;
+    const answers = r.questionnaireAnswers;
+    return answers && typeof answers === 'object' && Object.keys(answers).length >= ALL_QUESTIONS.length;
   });
-  const seededNames = new Set(seededRows.map((r) => r.payload.profile.name));
+  const seededNames = new Set(seededRows.map((r) => r.name).filter(Boolean));
 
   const byName = {};
   for (const row of seededRows) {
-    const name = row.payload.profile.name;
+    const name = row.name;
+    if (!name) continue;
     byName[name] = byName[name] || [];
     byName[name].push(row.id);
   }
@@ -529,6 +567,7 @@ if (mode === 'print') {
 
   const credentials = [];
   for (const p of profiles) {
+    if (onlyName && p.name !== onlyName) continue;
     if (seededNames.has(p.name) && !refresh) {
       console.log(`SKIP ${p.name} — анкета уже есть в базе`);
       continue;
