@@ -2609,6 +2609,11 @@ async function addProfilePhotoFromUrl(url) {
 }
 
 async function addProfilePhotoFromFile(file) {
+  // Единая точка входа: гость не может положить фото в анкету — сначала регистрация.
+  if (!accountInfo?.id) {
+    requireRegistration('Сначала зарегистрируйтесь — потом сможете загрузить фото');
+    return;
+  }
   syncProfileFormFields();
   const dataUrl = await readImageAsDataUrl(file, 1024);
   const analysis = await analyzePhotoNsfw(dataUrl, detectPhotoCategories(dataUrl));
@@ -4698,7 +4703,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v176</div>
+        <div class="muted app-version">v177</div>
     </div>
   `;
 
@@ -4966,7 +4971,7 @@ function renderStats() {
           <div class="photo-hero-actions">
             <button class="btn" type="button" data-action="pickPhoto" ${photos.length >= 3 ? 'disabled' : ''}>Загрузить фото</button>
             <input id="profilePhotoInput" type="file" accept="image/*" hidden />
-            <button class="btn ghost" type="button" data-action="clearPhotos">Удалить все</button>
+            <button class="btn ghost" type="button" data-action="clearPhotos" ${photos.length ? '' : 'disabled'}>Удалить все</button>
           </div>
           <div id="profilePhotosPreview" class="photo-strip">
             ${photos.length
@@ -4976,7 +4981,8 @@ function renderStats() {
                   .join('')
               : ''}
             ${photos.length ? '<div class="muted photo-hint" style="text-align:center;font-size:10px">Нажмите на фото, чтобы сделать его главным</div>' : ''}
-            ${photos.length < 3 ? '<div class="muted photo-hint" style="text-align:center;font-size:10px">Можно загрузить до 3 фото</div>' : ''}
+            ${photos.length < 3 && accountInfo?.id ? '<div class="muted photo-hint" style="text-align:center;font-size:10px">Можно загрузить до 3 фото</div>' : ''}
+            ${!accountInfo?.id ? '<div class="muted photo-hint" style="text-align:center;font-size:10px">Сначала регистрация — потом загрузка фото</div>' : ''}
             ${photosPending.length
               ? `<div class="photo-pending-strip">
                   ${photosPending
@@ -5111,6 +5117,11 @@ function renderStats() {
   $('#view-stats').querySelector('#profilePhotoInput')?.addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!accountInfo?.id) {
+      e.target.value = '';
+      requireRegistration('Загрузка фото доступна только зарегистрированным пользователям');
+      return;
+    }
     try {
       await addProfilePhotoFromFile(file);
     } catch {
@@ -5123,6 +5134,10 @@ function renderStats() {
   $('#view-stats').querySelectorAll('[data-action="pickPhoto"]').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (btn.disabled) return;
+      if (!accountInfo?.id) {
+        requireRegistration('Сначала зарегистрируйтесь — потом сможете загрузить фото');
+        return;
+      }
       $('#view-stats').querySelector('#profilePhotoInput')?.click();
     });
   });
@@ -6285,6 +6300,13 @@ function switchTab(tab) {
   }
   const btn = document.querySelector(`.tab[data-tab="${tab}"]`);
   if (btn) btn.click();
+}
+
+// Гость не может добавлять контент профиля (фото) — сначала регистрация, потом фото.
+function requireRegistration(message) {
+  toast(message);
+  haptic('warning');
+  openRegisterDialog();
 }
 
 function toast(msg) {
