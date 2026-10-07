@@ -2112,7 +2112,7 @@ a { color: inherit; }
   right: 0;
   bottom: 0;
   z-index: 2;
-  max-height: 58%;
+  max-height: 43.5%;
   height: auto;
   overflow-y: auto;
   /* Тёмный блок плавно заходит на фото, начиная с имени и возраста: сверху
