@@ -4721,7 +4721,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v168</div>
+        <div class="muted app-version">v169</div>
     </div>
   `;
 
@@ -6588,12 +6588,9 @@ function renderTinderInner(p) {
     interestTags = sharedTraits.map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ');
   }
   const qm = countQuestionnaireMatches(state.profile, p);
-  const qmHasSignal = qm.total > 0 || Object.keys(p.questionnaireAnswers || {}).length || Object.keys(p.persona || {}).length || Object.keys(p.factual || {}).length;
   const qmBadge = qm.total > 0
     ? `<span class="pill status-pill good match-badge">${qm.matched} из ${qm.total} вопросов анкеты совпало</span>`
-    : qmHasSignal
-      ? `<span class="pill muted-pill">анкета: данные ещё формируются</span>`
-      : '';
+    : '';
   const myCityKey = currentCityKey();
   const cityStr = cityName(p.city);
   const distKm = myCityKey && p.city ? cityDistanceKm(myCityKey, p.city) : null;
@@ -6621,14 +6618,14 @@ function renderTinderInner(p) {
               ? `, ${ageFromBirthDate(p.birthDate) ?? ''}`
               : ''}</div>
           ${interestTags ? `<div class="tinder-tags">${interestTags}</div>` : ''}
-          <div class="tinder-sub"><span class="verdict ${compat.tone || 'warn'}">${verdictEmoji(compat.tone || 'warn')}</span> ${escapeHtml(compat.label)}</div>
+          ${compat.label ? `<div class="tinder-sub"><span class="verdict ${compat.tone || 'warn'}">${verdictEmoji(compat.tone || 'warn')}</span> ${escapeHtml(compat.label)}</div>` : ''}
         </div>
         ${qmBadge}
         <div class="tinder-about">${escapeHtml(p.about)}</div>
         <div class="tinder-badges">${comm}</div>
         <div class="tinder-badges">${vals}</div>
         <div class="tinder-badges">${zodiac} ${job} ${edu}</div>
-        <div class="tinder-badges"><span class="pill status-pill ${circle.tone === 'good' ? 'good' : circle.tone === 'bad' ? 'bad' : circle.tone === 'warn' ? 'warn' : 'muted'}">${circle.label}</span></div>
+        ${circle.tone !== 'muted' ? `<div class="tinder-badges"><span class="pill status-pill ${circle.tone === 'good' ? 'good' : circle.tone === 'bad' ? 'bad' : circle.tone === 'warn' ? 'warn' : 'muted'}">${circle.label}</span></div>` : ''}
         ${circleHighlights.values.length ? `<div class="tinder-badges">${circleHighlights.values.slice(0, 2).map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ')}</div>` : ''}
         <div class="tinder-badges">${treeBadge}</div>
         ${shared ? `<div class="tinder-badges">${shared}</div>` : ''}
@@ -6909,7 +6906,7 @@ function buildPairCompatibility(user = {}, candidate = {}) {
     }
   }
 
-  let label = 'есть отличия, но можно обсудить';
+  let label = '';
   let tone = 'warn';
   const net = out.support - out.tension;
   if (out.tension >= 3.2) {

@@ -2011,6 +2011,40 @@ a { color: inherit; }
   gap: 6px;
   max-width: 100%;
 }
+/* Пили на тёмном футе карточки: базовый фиолетовый (#6d28d9) и тёмно-серый muted там
+   не читаются — перекрашиваем в светлые оттенки. Стоит до .tinder-tags, чтобы имя-теги
+   оставались белыми. */
+.tinder-foot .pill {
+  color: #ede9fe;
+  background: rgba(124, 58, 237, 0.22);
+  border-color: rgba(196, 181, 253, 0.34);
+}
+.tinder-foot .pill.muted-pill {
+  color: #cbd5e1;
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.3);
+}
+.tinder-foot .status-pill.good {
+  color: #86efac;
+  background: rgba(22, 163, 74, 0.18);
+  border-color: rgba(34, 197, 94, 0.42);
+}
+.tinder-foot .status-pill.warn {
+  color: #fcd34d;
+  background: rgba(217, 119, 6, 0.16);
+  border-color: rgba(251, 191, 36, 0.42);
+}
+.tinder-foot .status-pill.bad {
+  color: #fca5a5;
+  background: rgba(190, 18, 60, 0.16);
+  border-color: rgba(248, 113, 113, 0.4);
+}
+.tinder-foot .status-pill.muted {
+  color: #cbd5e1;
+}
+.tinder-foot .verdict.good { color: #6ee7b7; }
+.tinder-foot .verdict.bad { color: #fda4af; }
+.tinder-foot .verdict.warn { color: #fcd34d; }
 .tinder-tags .pill {
   margin: 0;
   color: #fff;
@@ -2127,7 +2161,7 @@ a { color: inherit; }
   pointer-events: auto;
   width: 56px;
   height: 56px;
-  font-size: 23px;
+  font-size: 21px;
   font-weight: 900;
   color: #fff;
   border-radius: 999px;
