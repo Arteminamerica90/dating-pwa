@@ -2109,13 +2109,13 @@ a { color: inherit; }
 .tbtn.like { border-color: rgba(52, 211, 153, 0.45); background: rgba(52, 211, 153, 0.08); }
 .tbtn.nope { border-color: rgba(251, 113, 133, 0.50); background: rgba(251, 113, 133, 0.06); }
 
-/* Кнопки «Не нравится»/«Нравится» — на фото, в нижней трети карточки (90% от верхнего края),
+/* Кнопки «Не нравится»/«Нравится» — на фото, у нижнего края карточки (96% от верхнего края),
    с лёгкой подкраской в цвет бренда (#7c3aed). */
 .tinder-photo-actions {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 10%;
+  bottom: 4%;
   z-index: 4;
   display: flex;
   justify-content: center;
