@@ -598,6 +598,7 @@ let liveProfiles = [];
 let liveProfilesLoaded = false;
 let loadingLiveProfiles = false;
 let lastPushedMatchIds = [];
+const loadedPhotoCache = new Set();
 
 function toDatingProfile(p) {
   return {
@@ -2631,7 +2632,7 @@ function syncProfileFormFields() {
   if (!root) return;
   const nextName = String(root.querySelector('#profileName')?.value || '').trim().slice(0, 40);
   const nextGender = String(root.querySelector('#profileGender')?.value || '');
-  const nextDescription = String(root.querySelector('#profileDescription')?.value || '').slice(0, 2000);
+  const nextDescription = String(root.querySelector('#profileDescription')?.value || '').slice(0, 300);
   const nextInterestsRaw = String(root.querySelector('#profileInterestsText')?.value || '');
   const nextInterests = nextInterestsRaw
     .split(',')
@@ -2831,12 +2832,10 @@ function renderQuestionnaireSummary(profile = state.profile) {
     : '';
   const answered = portrait.answered || 0;
   const total = portrait.total || ALL_QUESTIONS.length;
-  const done = answered >= total;
   return `
     <div class="muted">Ответы строят портрет и помогают подбирать пару. Они сохраняются на сервере — дерево решений считается по ответам обоих участников пары.</div>
     <div class="row-inline" style="margin-top:12px;gap:12px;align-items:center;flex-wrap:wrap">
       <div class="muted" style="white-space:nowrap">Ответов: ${answered} / ${total}</div>
-      <button class="btn" type="button" data-action="openQuestionnaire">${done ? 'Просмотреть ответы' : answered > 0 ? `Ответить на вопросы (ещё ${total - answered})` : 'Ответить на вопросы'}</button>
     </div>
     ${snippet ? `<div class="row-inline" style="margin-top:10px">${snippet}</div>` : ''}
   `;
@@ -4624,7 +4623,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v170</div>
+        <div class="muted app-version">v171</div>
     </div>
   `;
 
@@ -4927,18 +4926,13 @@ function renderStats() {
 
       <div class="profile-editor">
         <div class="profile-field">
-          <label class="label">Имя</label>
-          <input id="profileNameInput" class="input" maxlength="60" value="${escapeHtml(state.profile?.name === 'Вы' ? '' : state.profile?.name || '')}" placeholder="Ваше имя" />
-          <div class="muted" style="font-size:12px;margin-top:4px">Имя показывается на вашей карточке во втором табе.</div>
-        </div>
-        <div class="profile-field">
           <label class="label">Дата рождения</label>
           <input id="profileBirthInput" class="input" type="date" value="${escapeHtml(state.profile?.birthDate || '')}" />
           <div class="muted" style="font-size:12px;margin-top:4px">Возраст показывается на карточке во втором табе.</div>
         </div>
         <div class="profile-field">
           <label class="label">Описание</label>
-          <textarea id="profileDescription" class="input" maxlength="2000" placeholder="Расскажите о себе (до 2000 символов)">${escapeHtml(description)}</textarea>
+          <textarea id="profileDescription" class="input" maxlength="300" placeholder="Расскажите о себе (до 300 символов)">${escapeHtml(description)}</textarea>
         </div>
         <div class="profile-field">
           <label class="label">Интересы</label>
@@ -5145,7 +5139,7 @@ function renderStats() {
       state.profile.birthDate = nextBirth;
       state.profile.ageConfirmed = true;
     }
-    const nextDescription = String($('#view-stats').querySelector('#profileDescription')?.value || '').slice(0, 2000);
+    const nextDescription = String($('#view-stats').querySelector('#profileDescription')?.value || '').slice(0, 300);
     const nextInterestsRaw = String($('#view-stats').querySelector('#profileInterestsText')?.value || '');
     const nextInterests = nextInterestsRaw
       .split(',')
@@ -6268,6 +6262,29 @@ function mountTinder(profiles) {
   const top = cards[0];
   if (!top) return;
 
+  // Пока фото не загружено — блюр + сердечко на карточке.
+  const photoEl = top.querySelector('.tinder-photo');
+  if (photoEl) {
+    const url = (photoEl.style.backgroundImage || '').match(/url\(["']?(.*?)["']?\)/)?.[1];
+    if (!url) {
+      photoEl.classList.remove('loading');
+    } else if (loadedPhotoCache.has(url)) {
+      photoEl.classList.remove('loading');
+    } else {
+      photoEl.classList.add('loading');
+      const img = new Image();
+      img.onload = () => {
+        loadedPhotoCache.add(url);
+        photoEl.classList.remove('loading');
+      };
+      img.onerror = () => {
+        loadedPhotoCache.add(url);
+        photoEl.classList.remove('loading');
+      };
+      img.src = url;
+    }
+  }
+
   let startX = 0;
   let startY = 0;
   let dx = 0;
@@ -6482,6 +6499,8 @@ function renderTinderInner(p) {
     <div class="tinder-stamp like">LIKE</div>
     <div class="tinder-stamp nope">NOPE</div>
     <div class="tinder-photo ${photo ? '' : 'nophoto'}" style="${photoCss}"></div>
+    ${photo ? `<div class="tinder-photo-blur" style="${photoCss}"></div>
+    <div class="tinder-photo-heart" aria-hidden="true">♥</div>` : ''}
     <div class="tinder-scrim"></div>
     <div class="tinder-top">
       ${locText ? `<div class="tinder-loc"><span class="tinder-loc-ico" aria-hidden="true">🏙</span><span>${escapeHtml(locText)}</span></div>` : '<span></span>'}

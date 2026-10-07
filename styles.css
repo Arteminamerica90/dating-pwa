@@ -2057,6 +2057,55 @@ a { color: inherit; }
   border-color: rgba(255, 255, 255, 0.3);
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
+/* Строки-теги на карточке прокручиваются горизонтально: интересы и все ответы
+   по вопросам анкеты видны полностью свайпом влево/вправо. */
+.tinder-tags,
+.tinder-badges {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  max-width: 100%;
+}
+.tinder-tags::-webkit-scrollbar,
+.tinder-badges::-webkit-scrollbar { display: none; }
+.tinder-tags .pill,
+.tinder-badges .pill { flex: 0 0 auto; }
+
+/* Описание на карточке чуть мельче (16px по умолчанию → 14px). */
+.tinder-about { font-size: 14px; }
+
+/* Подгрузка фото: блюр и простое сердечко поверх, пока снимок не загружен. */
+.tinder-photo-blur {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center 8%;
+  filter: blur(16px) brightness(0.7);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.tinder-photo.loading + .tinder-photo-blur { opacity: 1; }
+.tinder-photo-heart {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  font-size: 56px;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 6px 28px rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.tinder-photo.loading ~ .tinder-photo-heart { opacity: 1; }
 .tinder-foot {
   position: absolute;
   left: 0;
