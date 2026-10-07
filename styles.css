@@ -2027,7 +2027,15 @@ a { color: inherit; }
   max-height: 58%;
   height: auto;
   overflow-y: auto;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.46) 0%, rgba(15, 23, 42, 0.66) 40%, rgba(15, 23, 42, 0.93) 100%);
+  /* Тёмный блок плавно заходит на фото, начиная с имени и возраста: сверху
+     прозрачный, к низу плотный. Без резкой границы «экран|фото». */
+  background: linear-gradient(180deg,
+    rgba(15, 23, 42, 0) 0%,
+    rgba(15, 23, 42, 0.10) 6%,
+    rgba(15, 23, 42, 0.42) 14%,
+    rgba(15, 23, 42, 0.72) 40%,
+    rgba(15, 23, 42, 0.94) 80%,
+    rgba(15, 23, 42, 0.98) 100%);
   border-radius: 0 0 var(--radius-xl) var(--radius-xl);
 }
 .tinder-foot .pad,
@@ -2035,7 +2043,7 @@ a { color: inherit; }
   display: grid;
   gap: 12px;
   height: auto;
-  padding: 14px 18px 58px;
+  padding: 16px 18px 108px;
   grid-auto-rows: min-content;
   color: #fff;
 }
@@ -2101,25 +2109,24 @@ a { color: inherit; }
 .tbtn.like { border-color: rgba(52, 211, 153, 0.45); background: rgba(52, 211, 153, 0.08); }
 .tbtn.nope { border-color: rgba(251, 113, 133, 0.50); background: rgba(251, 113, 133, 0.06); }
 
-/* Кнопки «Не нравится»/«Нравится» — прямо на фото, перед информацией снизу.
-   Первым слоем: видно, что карточку можно дислайкнуть/лайкнуть свайпом. */
+/* Кнопки «Не нравится»/«Нравится» — на фото, у нижнего края экрана карточки. */
 .tinder-photo-actions {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(58% + 18px);
+  bottom: 20px;
   z-index: 4;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 30px;
+  gap: 24px;
   pointer-events: none;
 }
 .tinder-photo-actions .tbtn {
   pointer-events: auto;
-  width: 62px;
-  height: 62px;
-  font-size: 26px;
+  width: 56px;
+  height: 56px;
+  font-size: 23px;
   font-weight: 900;
   color: #fff;
   border-radius: 999px;
