@@ -162,6 +162,11 @@ a { color: inherit; }
   line-height: 1.4;
   color: var(--danger);
 }
+.auth-error.ok {
+  border-color: rgba(5, 150, 105, 0.35);
+  background: rgba(5, 150, 105, 0.08);
+  color: var(--ok);
+}
 .auth-error[hidden] { display: none; }
 
 .muted { color: var(--muted); line-height: 1.35; }

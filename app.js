@@ -1447,15 +1447,6 @@ function hideAuthErrorMessage() {
 }
 
 function wireSettings() {
-  $('#authForm')?.addEventListener('submit', (e) => {
-    e.preventDefault();
-  });
-
-  $('#accountEmail')?.addEventListener('change', (e) => {
-    state.cloud.email = String(e.target.value || '').trim();
-    save();
-  });
-
   async function runWithButton(btn, label, fn) {
     if (!btn || btn.dataset.busy) return;
     btn.dataset.busy = '1';
@@ -1471,110 +1462,10 @@ function wireSettings() {
     }
   }
 
-  $('#btnAccountRegister')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    runWithButton($('#btnAccountRegister'), 'Регистрация', async () => {
-      const email = String($('#accountEmail').value || state.cloud.email || '').trim().toLowerCase();
-      const password = String($('#accountPassword').value || '');
-      if (!email || password.length < 6) return toast('Нужны email и пароль от 6 символов');
-      const ageConfirm = $('#accountAgeConfirm');
-      if (ageConfirm && !ageConfirm.checked) return toast('Подтвердите, что вам исполнилось 18 лет');
-      try {
-        const reg = await supabaseSignUp(email, password, {
-          emailRedirectTo: location.origin + location.pathname
-        });
-        state.cloud.email = email;
-        state.cloud.enabled = true;
-        save();
-        accountInfo = reg.user;
-        hideAuthErrorMessage();
-        renderAll();
-        toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
-        haptic('light');
-        syncProfileAfterAuth().catch(() => {});
-        setTimeout(() => openSubscriptionDialog(), 1500);
-      } catch (err) {
-        const msg = friendlyAuthError(err);
-        showAuthErrorMessage(msg);
-        toast(msg);
-      }
-    });
-  });
-
-  $('#btnAccountLogin')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    runWithButton($('#btnAccountLogin'), 'Войти', async () => {
-      const email = String($('#accountEmail').value || state.cloud.email || '').trim().toLowerCase();
-      const password = String($('#accountPassword').value || '');
-      if (!email || !password) return toast('Введите email и пароль');
-      try {
-        const user = await supabaseSignIn(email, password);
-        accountInfo = user;
-        state.cloud.email = email;
-        state.cloud.enabled = true;
-        save();
-        hideAuthErrorMessage();
-        renderAll();
-        toast('Вход выполнен');
-        haptic('light');
-        syncProfileAfterAuth().catch(() => {});
-        setTimeout(() => {
-          refreshSubscription().then(() => {
-            if (mySubscription.planId === 'free') openSubscriptionDialog();
-          });
-        }, 800);
-      } catch (err) {
-        const msg = String(err?.message || '');
-        if (/invalid/i.test(msg)) {
-          const friendly = 'Неверный email или пароль. Если аккаунт создавался ранее — нажмите «Регистрация»: оно отправит письмо подтверждения.';
-          showAuthErrorMessage(friendly);
-          toast(friendly);
-        } else {
-          const friendly = friendlyAuthError(err);
-          showAuthErrorMessage(friendly);
-          toast(friendly);
-        }
-      }
-    });
-  });
-
-  $('#btnForgotPassword')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    runWithButton($('#btnForgotPassword'), 'Забыли пароль?', async () => {
-      const email = String($('#accountEmail').value || '').trim().toLowerCase();
-      if (!email) return toast('Введите email в поле выше');
-      try {
-        state.cloud.pendingPasswordReset = true;
-        state.cloud.email = email;
-        save();
-        await supabaseResetPassword(email);
-        hideAuthErrorMessage();
-        toast('Письмо для сброса пароля отправлено на ' + email);
-      } catch (err) {
-        state.cloud.pendingPasswordReset = false;
-        save();
-        const friendly = friendlyAuthError(err);
-        showAuthErrorMessage(friendly);
-        toast(friendly);
-      }
-    });
-  });
-
-  $('#btnResendConfirm')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    runWithButton($('#btnResendConfirm'), 'Повторить письмо', async () => {
-      const email = String($('#accountEmail').value || '').trim().toLowerCase();
-      if (!email) return toast('Введите email в поле выше');
-      try {
-        await supabaseResendConfirmation(email);
-        hideAuthErrorMessage();
-        toast('Письмо подтверждения отправлено. Проверьте почту.');
-      } catch (err) {
-        const friendly = friendlyAuthError(err);
-        showAuthErrorMessage(friendly);
-        toast(friendly);
-      }
-    });
+  // Вход/регистрация открываются в общем диалоге (как на первом табе).
+  $('#btnOpenRegister')?.addEventListener('click', () => {
+    haptic('light');
+    openRegisterDialog();
   });
 
   $('#btnOpenSubscription')?.addEventListener('click', () => openSubscriptionDialog());
@@ -2105,79 +1996,155 @@ function maybeStartOnboarding() {
   dlg.addEventListener('close', () => renderAll());
 }
 
-function openRegisterDialog() {
-  const dlg = $('#dlgRegister');
-  if (!dlg) return;
-  dlg.showModal();
+let __regMode = 'register';
+let __regWired = false;
 
+// Сообщения регистрации/входа показываем прямо в форме диалога (текущая вкладка),
+// а не плавающим тостом.
+function __regMsg(text, ok) {
+  const el = document.getElementById('regMsg');
+  if (!el) { if (text) toast(text); return; }
+  if (!text) { el.hidden = true; el.textContent = ''; return; }
+  el.textContent = text;
+  el.className = 'auth-error' + (ok ? ' ok' : '');
+  el.hidden = false;
+}
+
+function wireRegisterDialogOnce() {
+  if (__regWired) return;
+  __regWired = true;
+  const dlg = $('#dlgRegister');
   const form = $('#regForm');
+  const submitBtn = $('#btnRegSubmit');
   const emailInput = $('#regEmail');
   const passwordInput = $('#regPassword');
-  const submitBtn = $('#btnRegSubmit');
 
-  form?.addEventListener('submit', (e) => {
-    e.preventDefault();
-  });
+  form?.addEventListener('submit', (e) => e.preventDefault());
 
   submitBtn?.addEventListener('click', async () => {
     const email = String(emailInput?.value || '').trim().toLowerCase();
     const password = String(passwordInput?.value || '');
-    if (!email || password.length < 6) return toast('Нужны email и пароль от 6 символов');
-    const ageConfirm = $('#regAgeConfirm');
-    if (ageConfirm && !ageConfirm.checked) return toast('Подтвердите, что вам исполнилось 18 лет');
-    const thirdPartyConfirm = $('#regThirdPartyConfirm');
-    if (thirdPartyConfirm && !thirdPartyConfirm.checked) return toast('Необходимо дать согласие на передачу данных третьим лицам');
+    if (!email) return __regMsg('Введите email', 0);
+    if (password.length < 6) return __regMsg('Пароль должен быть от 6 символов', 0);
+    if (__regMode === 'register') {
+      const age = $('#regAgeConfirm');
+      if (age && !age.checked) return __regMsg('Подтвердите, что вам исполнилось 18 лет', 0);
+      const tp = $('#regThirdPartyConfirm');
+      if (tp && !tp.checked) return __regMsg('Необходимо дать согласие на передачу данных третьим лицам', 0);
+    }
     submitBtn.disabled = true;
     submitBtn.textContent = 'Одну секунду…';
     try {
-      const reg = await supabaseSignUp(email, password, {
-        emailRedirectTo: location.origin + location.pathname
-      });
-      state.cloud.email = email;
-      state.cloud.enabled = true;
-      save();
-      accountInfo = reg.user;
-      dlg.close();
-      toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
-      haptic('light');
-      renderAll();
-      syncProfileAfterAuth().catch(() => {});
-      setTimeout(() => openSubscriptionDialog(), 1500);
+      if (__regMode === 'login') {
+        const user = await supabaseSignIn(email, password);
+        accountInfo = user;
+        state.cloud.email = email;
+        state.cloud.enabled = true;
+        save();
+        dlg.close();
+        toast('Вход выполнен');
+        haptic('light');
+        renderAll();
+        syncProfileAfterAuth().catch(() => {});
+        setTimeout(() => {
+          refreshSubscription().then(() => {
+            if (mySubscription.planId === 'free') openSubscriptionDialog();
+          });
+        }, 800);
+      } else {
+        const reg = await supabaseSignUp(email, password, {
+          emailRedirectTo: location.origin + location.pathname
+        });
+        state.cloud.email = email;
+        state.cloud.enabled = true;
+        save();
+        accountInfo = reg.user;
+        dlg.close();
+        toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
+        haptic('light');
+        renderAll();
+        syncProfileAfterAuth().catch(() => {});
+        setTimeout(() => openSubscriptionDialog(), 1500);
+      }
     } catch (err) {
-      toast(friendlyAuthError(err) || 'Ошибка регистрации');
+      const msg = String(err?.message || '');
+      const friendly = __regMode === 'login' && /invalid/i.test(msg)
+        ? 'Неверный email или пароль. Если аккаунт создавался ранее — нажмите «Регистрация»: оно отправит письмо подтверждения.'
+        : (friendlyAuthError(err) || 'Ошибка');
+      __regMsg(friendly, 0);
     } finally {
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Зарегистрироваться';
+      submitBtn.textContent = __regMode === 'login' ? 'Войти' : 'Зарегистрироваться';
     }
   });
 
   $('#btnRegLogin')?.addEventListener('click', () => {
-    dlg.close();
-    openLoginDialog();
+    __regMode = __regMode === 'login' ? 'register' : 'login';
+    const title = dlg?.querySelector('.dialog-title');
+    if (title) title.textContent = __regMode === 'login' ? 'Вход' : 'Регистрация';
+    if (submitBtn) submitBtn.textContent = __regMode === 'login' ? 'Войти' : 'Зарегистрироваться';
+    const lb = $('#btnRegLogin');
+    if (lb) lb.textContent = __regMode === 'login' ? 'Регистрация' : 'Войти';
+    __regMsg('', 0);
   });
 
-  const forgotBtn = $('#btnRegForgot');
-  forgotBtn?.addEventListener('click', async () => {
+  // «Забыли пароль?» — сообщение пишется в саму форму диалога (текущая вкладка).
+  $('#btnRegForgot')?.addEventListener('click', async () => {
     const email = String(emailInput?.value || '').trim().toLowerCase();
-    if (!email) return toast('Введите email в поле выше');
+    if (!email) return __regMsg('Введите email в поле выше', 0);
+    const fb = $('#btnRegForgot');
+    const orig = fb?.textContent;
+    if (fb) { fb.disabled = true; fb.textContent = 'Отправляем…'; }
     try {
       state.cloud.pendingPasswordReset = true;
       state.cloud.email = email;
       save();
       await supabaseResetPassword(email);
-      toast('Письмо для сброса пароля отправлено на ' + email);
+      __regMsg('Письмо для сброса пароля отправлено на ' + email + '. Перейдите по ссылке в письме — откроется форма нового пароля.', 1);
     } catch (err) {
       state.cloud.pendingPasswordReset = false;
       save();
-      toast(friendlyAuthError(err) || 'Не удалось отправить письмо');
+      __regMsg(friendlyAuthError(err) || 'Не удалось отправить письмо', 0);
+    } finally {
+      if (fb) { fb.disabled = false; fb.textContent = orig; }
     }
   });
 
   $('#btnRegClose')?.addEventListener('click', () => {
     dlg.close();
   });
+}
 
-  setTimeout(() => emailInput?.focus(), 120);
+function openRegisterDialog() {
+  const dlg = $('#dlgRegister');
+  if (!dlg) return;
+  wireRegisterDialogOnce();
+  __regMode = 'register';
+  const title = dlg.querySelector('.dialog-title');
+  if (title) title.textContent = 'Регистрация';
+  const sb = $('#btnRegSubmit');
+  if (sb) sb.textContent = 'Зарегистрироваться';
+  const lb = $('#btnRegLogin');
+  if (lb) lb.textContent = 'Войти';
+  __regMsg('', 0);
+  dlg.showModal();
+  setTimeout(() => $('#regEmail')?.focus(), 120);
+}
+
+function openLoginDialog() {
+  const dlg = $('#dlgRegister');
+  if (!dlg) return;
+  wireRegisterDialogOnce();
+  __regMode = 'login';
+  const title = dlg.querySelector('.dialog-title');
+  if (title) title.textContent = 'Вход';
+  const sb = $('#btnRegSubmit');
+  if (sb) sb.textContent = 'Войти';
+  const lb = $('#btnRegLogin');
+  if (lb) lb.textContent = 'Регистрация';
+  __regMsg('', 0);
+  dlg.showModal();
+  setTimeout(() => $('#regEmail')?.focus(), 120);
 }
 
 function openChangePasswordDialog() {
@@ -2510,70 +2477,6 @@ async function startPayment(planId) {
   } catch (err) {
     toast(err?.message || 'Ошибка запуска оплаты');
   }
-}
-
-function openLoginDialog() {
-  const dlg = $('#dlgRegister');
-  if (!dlg) return;
-  dlg.showModal();
-
-  const form = $('#regForm');
-  const emailInput = $('#regEmail');
-  const passwordInput = $('#regPassword');
-  const submitBtn = $('#btnRegSubmit');
-
-  const origText = submitBtn?.textContent;
-  if (submitBtn) submitBtn.textContent = 'Войти';
-
-  form?.addEventListener('submit', (e) => {
-    e.preventDefault();
-  });
-
-  submitBtn?.removeEventListener?.('click', submitBtn?._regHandler);
-
-  const loginHandler = async () => {
-    const email = String(emailInput?.value || '').trim().toLowerCase();
-    const password = String(passwordInput?.value || '');
-    if (!email || !password) return toast('Введите email и пароль');
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Одну секунду…';
-    try {
-      const user = await supabaseSignIn(email, password);
-      accountInfo = user;
-      state.cloud.email = email;
-      state.cloud.enabled = true;
-      save();
-      dlg.close();
-      toast('Вход выполнен');
-      haptic('light');
-      renderAll();
-      syncProfileAfterAuth().catch(() => {});
-      setTimeout(() => {
-        refreshSubscription().then(() => {
-          if (mySubscription.planId === 'free') openSubscriptionDialog();
-        });
-      }, 800);
-    } catch (err) {
-      const msg = String(err?.message || '');
-      if (/invalid/i.test(msg)) {
-        toast('Неверный email или пароль');
-      } else {
-        toast(friendlyAuthError(err) || 'Ошибка входа');
-      }
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Войти';
-    }
-  };
-  submitBtn?.addEventListener('click', loginHandler);
-
-  $('#btnRegLogin')?.addEventListener('click', () => {
-    if (submitBtn) submitBtn.textContent = origText || 'Зарегистрироваться';
-  });
-
-  $('#btnRegClose')?.addEventListener('click', () => {
-    dlg.close();
-  });
 }
 
 function isProfileIncomplete(st) {
@@ -4721,7 +4624,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v169</div>
+        <div class="muted app-version">v170</div>
     </div>
   `;
 
@@ -5055,15 +4958,14 @@ function renderStats() {
         <button id="btnShareColleague" class="btn" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block;font-size:13px">📨 Поделиться с коллегой</button>
       </div>
 
+      ${accountInfo ? `
       <div class="card" id="accountCard" ${state.ui?.accountExpanded === false ? '' : ''}>
         <button class="accordion-head narrow" type="button" data-toggle-account aria-expanded="${state.ui?.accountExpanded !== false ? 'true' : 'false'}">
           <span class="accordion-title">Аккаунт</span>
           <span class="chevron" aria-hidden="true"></span>
         </button>
         <div class="accordion-body" ${state.ui?.accountExpanded !== false ? '' : 'hidden'}>
-        <div class="account-badge" id="accountBadge"></div>
-        ${accountInfo
-          ? `
+          <div class="account-badge" id="accountBadge"></div>
           <div class="row-inline" style="margin-top:10px" id="accountSignedIn">
             <button id="btnChangePassword" class="btn" type="button">Сменить пароль</button>
             <button id="btnExportData" class="btn" type="button" title="Скачать копию своих персональных данных (152-ФЗ, ст. 14)">Экспорт данных</button>
@@ -5081,36 +4983,14 @@ function renderStats() {
               <button id="btnChangePasswordCancel" class="btn ghost" type="button">Отмена</button>
             </div>
           </div>
-          <div class="muted" style="margin-top:8px"></div>`
-          : `
-          <form class="auth-form" id="authForm" autocomplete="on">
-            <div class="row auth-field" style="margin-top:10px">
-              <label class="label" for="accountEmail">Email</label>
-              <input id="accountEmail" name="email" class="input" type="email" inputmode="email" autocomplete="email" required placeholder="name@example.com" value="${escapeHtml(state.cloud?.email || '')}" />
-            </div>
-            <div class="row auth-field">
-              <label class="label" for="accountPassword">Пароль</label>
-              <input id="accountPassword" name="password" class="input" type="password" autocomplete="current-password" placeholder="минимум 6 символов" />
-            </div>
-            <div class="row" style="margin-bottom:4px">
-              <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
-                <input type="checkbox" id="accountAgeConfirm" required style="margin-top:3px;width:16px;height:16px;accent-color:var(--brand)" />
-                <span>Мне исполнилось 18 лет. Я принимаю <a href="./legal.html#offer" target="_blank" rel="noopener" style="color:var(--brand)">оферту</a> и <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:var(--brand)">политику</a>.</span>
-              </label>
-            </div>
-            <div class="row-inline">
-              <button id="btnAccountRegister" class="btn" type="submit" formnovalidate>Регистрация</button>
-              <button id="btnAccountLogin" class="btn ghost" type="submit" formnovalidate>Войти</button>
-            </div>
-            <div class="row-inline" style="margin-top:8px; justify-content:center; gap:12px">
-              <button id="btnForgotPassword" class="link-btn" type="button">Забыли пароль?</button>
-              <button id="btnResendConfirm" class="link-btn" type="button">Повторить письмо</button>
-            </div>
-            <div id="authError" class="auth-error" hidden></div>
-          </form>
-          <div class="muted" id="accountHint">Не можете войти по своему паролю? Нажмите «Забыли пароль?» — на почту придёт ссылка для смены пароля.</div>`}
         </div>
       </div>
+      ` : `
+      <div class="card" id="accountCard">
+        <button id="btnOpenRegister" class="btn" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block">🔑 Войти / Зарегистрироваться</button>
+        <div class="muted" style="text-align:center;margin-top:6px;font-size:12px">Анкета, переписка и оплата привязаны к вашему email</div>
+      </div>
+      `}
 
       <div class="card" id="legalConsentCard" ${allLegalConsentsAccepted && state.ui?.legalConsentExpanded !== true ? 'hidden' : ''}>
         <button class="accordion-head narrow" type="button" data-toggle-legal-consent aria-expanded="${state.ui?.legalConsentExpanded ? 'true' : 'false'}">
@@ -6593,7 +6473,7 @@ function renderTinderInner(p) {
     : '';
   const myCityKey = currentCityKey();
   const cityStr = cityName(p.city);
-  const distKm = myCityKey && p.city ? cityDistanceKm(myCityKey, p.city) : null;
+  const distKm = (myCityKey && p.city && state.consent?.geo) ? cityDistanceKm(myCityKey, p.city) : null;
   const locParts = [];
   if (cityStr) locParts.push(cityStr);
   if (distKm != null) locParts.push(Math.round(distKm) + ' км');
