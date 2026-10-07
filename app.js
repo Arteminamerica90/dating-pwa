@@ -1215,7 +1215,10 @@ function scheduleCloudSync() {
   cloudPushTimer = setTimeout(() => {
     if (state.cloud?.enabled && state.cloud?.token) {
       cloudPush().catch(() => {});
-    } else if (isSupabaseConfigured()) {
+    }
+    // Анкета совместимости всегда уходит на сервер, если есть Supabase-сессия:
+    // дерево решений пары считается по ответам обоих участников.
+    if (isSupabaseConfigured()) {
       supabasePushProfile().catch(() => {});
     }
   }, 4000);
@@ -2923,8 +2926,15 @@ function renderQuestionnaireSummary(profile = state.profile) {
   const snippet = labels.length
     ? labels.slice(0, 4).map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ')
     : '';
+  const answered = portrait.answered || 0;
+  const total = portrait.total || ALL_QUESTIONS.length;
+  const done = answered >= total;
   return `
-    <div class="muted">Ответы строят портрет и помогают подбирать пару.</div>
+    <div class="muted">Ответы строят портрет и помогают подбирать пару. Они сохраняются на сервере — дерево решений считается по ответам обоих участников пары.</div>
+    <div class="row-inline" style="margin-top:12px;gap:12px;align-items:center;flex-wrap:wrap">
+      <div class="muted" style="white-space:nowrap">Ответов: ${answered} / ${total}</div>
+      <button class="btn" type="button" data-action="openQuestionnaire">${done ? 'Просмотреть ответы' : answered > 0 ? `Ответить на вопросы (ещё ${total - answered})` : 'Ответить на вопросы'}</button>
+    </div>
     ${snippet ? `<div class="row-inline" style="margin-top:10px">${snippet}</div>` : ''}
   `;
 }
@@ -4711,8 +4721,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        ${renderDatingOwnProfileNotice()}
-      <div class="muted app-version">v165</div>
+        <div class="muted app-version">v166</div>
     </div>
   `;
 
@@ -4943,66 +4952,6 @@ function plural(n, one, few, many) {
   return many;
 }
 
-// Подсказка в ленте: что ещё не заполнено у пользователя и что это даст.
-function renderDatingOwnProfileNotice() {
-  const c = profileCompletion();
-  if (c.pct >= 100) return '';
-  const need = [];
-  if (!c.checks.find((x) => x.id === 'name')?.ok) need.push('имя');
-  if (!c.checks.find((x) => x.id === 'photos')?.ok) need.push('фото');
-  if (!c.checks.find((x) => x.id === 'birthDate')?.ok) need.push('дата рождения');
-  const qnLeft = c.total - c.answered;
-  return `
-    <div class="card own-profile-notice">
-      <div class="own-profile-notice-head">
-        <div>
-          <div class="card-title">Ваша анкета готова на ${c.pct}%</div>
-          <div class="muted">${qnLeft > 0
-            ? `Осталось ${qnLeft} ${plural(qnLeft, 'вопрос', 'вопроса', 'вопросов')} анкеты совместимости.`
-            : 'Ответы на вопросы заполнены.'}${need.length ? ` Не хватает: ${escapeHtml(need.join(', '))}.` : ''}</div>
-        </div>
-        <div class="own-profile-pct">${c.pct}%</div>
-      </div>
-      <div class="qn-progress" style="margin:10px 0"><div class="qn-progress-bar" style="width:${c.pct}%"></div></div>
-      <div class="row-inline">
-        <button class="btn" type="button" data-action="openQuestionnaire">Заполнить анкету</button>
-        <button class="btn ghost" type="button" data-open-tab="stats">В профиль</button>
-      </div>
-      <div class="muted" style="margin-top:8px">Без заполненной анкеты в карточках нет процента совместимости, вердикта и дерева решений.</div>
-    </div>
-  `;
-}
-
-function renderProfileStatus() {
-  const c = profileCompletion();
-  const done = c.checks.filter((x) => x.ok).length;
-  const doneOpt = c.optional.filter((x) => x.ok).length;
-  return `
-    <div class="card profile-status">
-      <div class="profile-status-head">
-        <div>
-          <div class="card-title">Готовность вашей анкеты</div>
-          <div class="muted">Заполнено ${done} из ${c.checks.length} · вопросов ${c.answered} из ${c.total}</div>
-        </div>
-        <div class="profile-status-pct">${c.pct}%</div>
-      </div>
-      <div class="qn-progress" style="margin:12px 0"><div class="qn-progress-bar" style="width:${c.pct}%"></div></div>
-      <ul class="check-list">
-        ${c.checks.map((x) => `<li class="${x.ok ? 'ok' : 'todo'}"><span class="check-ico">${x.ok ? '✓' : '•'}</span>${escapeHtml(x.label)}</li>`).join('')}
-        <li class="${c.qnRatio >= 1 ? 'ok' : c.answered > 0 ? 'part' : 'todo'}"><span class="check-ico">${c.qnRatio >= 1 ? '✓' : c.answered > 0 ? '…' : '•'}</span>Анкета совместимости — ${c.answered} из ${c.total}</li>
-      </ul>
-      <div class="muted" style="margin-top:10px">Без ответов на вопросы в ленте не показывается процент совместимости и дерево решений.</div>
-      <button class="btn" type="button" data-action="openQuestionnaire" style="margin-top:12px">Ответить на вопросы${c.answered > 0 && c.qnRatio < 1 ? ` (ещё ${c.total - c.answered})` : ''}</button>
-      <details class="profile-status-more">
-        <summary>Необязательно: ${doneOpt} из ${c.optional.length}</summary>
-        <ul class="check-list">
-          ${c.optional.map((x) => `<li class="${x.ok ? 'ok' : 'todo'}"><span class="check-ico">${x.ok ? '✓' : '•'}</span>${escapeHtml(x.label)}</li>`).join('')}
-        </ul>
-      </details>
-    </div>
-  `;
-}
-
 function renderStats() {
   const name = state.profile?.name || '';
   const description = state.profile?.description || '';
@@ -5028,7 +4977,6 @@ function renderStats() {
 
   $('#view-stats').innerHTML = `
     <div class="grid">
-      ${renderProfileStatus()}
       <div class="card profile-editor">
         <div class="card-title">Анкета</div>
         <div class="photo-hero-wrap">
