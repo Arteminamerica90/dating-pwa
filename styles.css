@@ -2109,12 +2109,13 @@ a { color: inherit; }
 .tbtn.like { border-color: rgba(52, 211, 153, 0.45); background: rgba(52, 211, 153, 0.08); }
 .tbtn.nope { border-color: rgba(251, 113, 133, 0.50); background: rgba(251, 113, 133, 0.06); }
 
-/* Кнопки «Не нравится»/«Нравится» — на фото, у нижнего края экрана карточки. */
+/* Кнопки «Не нравится»/«Нравится» — на фото, в нижней трети карточки (90% от верхнего края),
+   с лёгкой подкраской в цвет бренда (#7c3aed). */
 .tinder-photo-actions {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 20px;
+  bottom: 10%;
   z-index: 4;
   display: flex;
   justify-content: center;
@@ -2131,8 +2132,8 @@ a { color: inherit; }
   color: #fff;
   border-radius: 999px;
   border: 2px solid rgba(255, 255, 255, 0.92);
-  background: rgba(15, 23, 42, 0.35);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38);
+  background: linear-gradient(160deg, rgba(124, 58, 237, 0.68), rgba(8, 145, 178, 0.6));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38), 0 0 22px rgba(124, 58, 237, 0.45);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   transition: transform 120ms ease, background 120ms ease;
@@ -2143,11 +2144,11 @@ a { color: inherit; }
 }
 .tinder-photo-actions .tbtn.like {
   border-color: rgba(52, 211, 153, 0.95);
-  background: rgba(16, 185, 129, 0.82);
+  background: linear-gradient(160deg, rgba(124, 58, 237, 0.5), rgba(16, 185, 129, 0.55));
 }
 .tinder-photo-actions .tbtn.nope {
   border-color: rgba(251, 113, 133, 0.95);
-  background: rgba(225, 29, 72, 0.82);
+  background: linear-gradient(160deg, rgba(124, 58, 237, 0.5), rgba(225, 29, 72, 0.55));
 }
 
 .tinder-stamp {
