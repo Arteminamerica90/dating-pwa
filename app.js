@@ -6766,7 +6766,7 @@ function comparePortraits(userPortrait = {}, candidatePersona = {}) {
     neutral.push(`${block}: ${la} ↔ ${lb}`);
   }
 
-  let label = 'есть отличия, но можно обсудить';
+  let label = '';
   let tone = 'warn';
   const net = support - tension;
   if (tension >= 3.2) {
