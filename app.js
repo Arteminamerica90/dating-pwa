@@ -2792,6 +2792,11 @@ function multiAnswerList(answerId) {
 }
 
 function setQuestionnaireAnswer(questionId, optionId, { silent } = {}) {
+  // Единая точка записи ответов: гость не может редактировать дерево решений.
+  if (!accountInfo?.id) {
+    if (!silent) requireRegistration('Заполнение анкеты доступно только зарегистрированным пользователям');
+    return;
+  }
   const q = ALL_QUESTIONS.find((x) => x.id === questionId);
   let stored = optionId;
   if (q?.multi) {
@@ -3012,6 +3017,10 @@ function renderQuestionnaireCategories(profile = state.profile) {
 }
 
 function openQuestionnaireAt(qid) {
+  if (!accountInfo?.id) {
+    requireRegistration('Заполнение анкеты доступно только зарегистрированным пользователям');
+    return;
+  }
   const idx = ALL_QUESTIONS.findIndex((q) => q.id === qid);
   if (idx < 0) return openQuestionnaire();
   qnIndex = idx;
@@ -3030,6 +3039,10 @@ function openQuestionnaireCategory(catId) {
 }
 
 function openQuestionnaire() {
+  if (!accountInfo?.id) {
+    requireRegistration('Заполнение анкеты доступно только зарегистрированным пользователям');
+    return;
+  }
   const answers = getQuestionnaireAnswers();
   const firstUnanswered = ALL_QUESTIONS.findIndex((q) => !answers[q.id]);
   qnIndex = firstUnanswered >= 0 ? firstUnanswered : ALL_QUESTIONS.length - 1;
@@ -4703,7 +4716,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v177</div>
+        <div class="muted app-version">v178</div>
     </div>
   `;
 
@@ -5219,6 +5232,10 @@ function renderStats() {
   });
 
   $('#view-stats').querySelector('[data-action="saveProfileMini"]')?.addEventListener('click', () => {
+    if (!accountInfo?.id) {
+      requireRegistration('Сохранение анкеты доступно только зарегистрированным пользователям');
+      return;
+    }
     const nextName = String($('#view-stats').querySelector('#profileNameInput')?.value || '').trim().slice(0, 60);
     if (nextName) state.profile.name = nextName;
     const nextBirth = String($('#view-stats').querySelector('#profileBirthInput')?.value || '').trim();
@@ -5243,6 +5260,25 @@ function renderStats() {
     pushPublicProfileNow().catch(() => {});
     toast('Анкета сохранена');
     renderAll();
+  });
+
+  // Дата рождения, описание и интересы — редактируются только после регистрации.
+  ['#profileBirthInput', '#profileDescription', '#profileInterestsText'].forEach((sel) => {
+    const el = $('#view-stats').querySelector(sel);
+    if (!el) return;
+    const onBlockedFocus = () => {
+      if (accountInfo?.id) return;
+      el.blur();
+      requireRegistration('Редактирование анкеты доступно только зарегистрированным пользователям');
+    };
+    el.addEventListener('focus', onBlockedFocus);
+    el.addEventListener('pointerdown', onBlockedFocus);
+    el.addEventListener('keydown', (e) => {
+      if (accountInfo?.id) return;
+      e.preventDefault();
+      requireRegistration('Редактирование анкеты доступно только зарегистрированным пользователям');
+    });
+    if (!accountInfo?.id) el.setAttribute('readonly', 'true');
   });
 
   $('#view-stats').querySelectorAll('[data-question-answer]').forEach((btn) => {
