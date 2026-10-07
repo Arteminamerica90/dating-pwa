@@ -2,6 +2,18 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL } from './supabase-config.js?v=46';
 
 let clientPromise = null;
 
+// Канонический адрес прода — в письма (сброс пароля, подтверждение) всегда
+// подставляем его, чтобы ссылки из локального dev-сервера (localhost:*)
+// не вели на «мёртвый» localhost с другого устройства и после запуска.
+const PROD_ORIGIN = 'https://pwa-dating-delta.vercel.app';
+
+function siteRedirect() {
+  const origin = location.origin || '';
+  const local = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+  if (local) return PROD_ORIGIN + '/';
+  return origin + location.pathname;
+}
+
 // SDK лежит локально в vendor/ — без зависимости от CDN (тормоза/таймауты
 // сети до jsdelivr раньше превращались в «Не удалось связаться с сервером»
 // при смене пароля). Сборка статическая, деплоится вместе с приложением.
@@ -36,7 +48,7 @@ export async function supabaseSignUp(email, password, options) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: options || {}
+    options: { ...(options || {}), emailRedirectTo: siteRedirect() }
   });
   if (error) throw new Error(error.message);
   if (!data.user) throw new Error('Не удалось создать аккаунт (проверьте почту)');
@@ -62,7 +74,7 @@ export async function supabaseSignOut() {
 export async function supabaseResetPassword(email) {
   const supabase = await getSupabase();
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: location.origin + location.pathname
+    redirectTo: siteRedirect()
   });
   if (error) throw new Error(error.message);
 }
@@ -94,7 +106,7 @@ export async function supabaseResendConfirmation(email) {
   const { error } = await supabase.auth.resend({
     type: 'signup',
     email,
-    options: { emailRedirectTo: location.origin + location.pathname }
+    options: { emailRedirectTo: siteRedirect() }
   });
   if (error) throw new Error(error.message);
 }

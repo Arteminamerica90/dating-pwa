@@ -48,7 +48,7 @@ import {
   supabaseSaveConsent,
   supabaseSaveConsentsBulk,
   supabaseGetConsents
-} from './supabase.js?v=105';
+} from './supabase.js?v=106';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
@@ -1112,8 +1112,65 @@ function syncLegalConsentFromStorage() {
   }
 }
 
+function handleAuthErrorHash() {
+  const raw = (location.hash || '') + '&' + (location.search || '');
+  if (!/(^|[#&?])error=/.test(raw)) return;
+  let params = null;
+  try { params = new URLSearchParams(raw.replace(/^[#?&]+/, '')); } catch { /* ignore */ }
+  const code = params?.get('error_code') || '';
+  const desc = params?.get('error_description') || params?.get('error') || '';
+  // Убираем error-параметры сразу: чтобы ошибка не повторялась после перезагрузки
+  // и чтобы SDK не пытался разобрать их как сессию (SDK при error-параметрах
+  // бросает AuthError, который в этом приложении никуда не выводится —
+  // пользователь просто «не заходит» без объяснений).
+  try {
+    const strip = (s) => {
+      const p = new URLSearchParams(s.replace(/^[?#]/, ''));
+      for (const k of ['error', 'error_code', 'error_description', 'sb']) p.delete(k);
+      const t = p.toString();
+      if (!t) return '';
+      return (s.startsWith('#') ? '#' : '?') + t;
+    };
+    history.replaceState(null, '', location.pathname + strip(location.search) + strip(location.hash));
+  } catch { /* ignore */ }
+  const expired = /otp_expired|link is invalid or has expired/i.test(code + ' ' + desc);
+  const msg = expired
+    ? 'Ссылка из письма устарела или уже использована. Запросите новое письмо для восстановления пароля.'
+    : 'Не удалось войти по ссылке из письма'
+      + (desc ? ': ' + String(desc).slice(0, 140) : '')
+      + '. Запросите новое письмо для восстановления пароля.';
+  showAuthNotice(msg);
+}
+
+// Дружелюбное постоянное уведомление поверх интерфейса (в отличие от toast
+// оно не исчезает через пару секунд и не требует открытого диалога формы).
+function showAuthNotice(message) {
+  let el = document.getElementById('authNotice');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'authNotice';
+    el.style.cssText = 'position:fixed;left:12px;right:12px;top:12px;z-index:9999;'
+      + 'padding:12px 14px;border-radius:16px;border:1px solid rgba(255,255,255,0.14);'
+      + 'background:rgba(17,24,39,0.94);backdrop-filter:blur(12px);'
+      + 'box-shadow:0 18px 60px rgba(0,0,0,0.55);color:#e5e7eb;'
+      + 'font:600 13px ui-sans-serif,system-ui;line-height:1.45;';
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.textContent = 'Понятно';
+    close.style.cssText = 'display:block;margin-top:10px;width:100%;padding:9px 12px;'
+      + 'border-radius:12px;border:1px solid rgba(255,255,255,0.16);'
+      + 'background:rgba(255,255,255,0.06);color:#e5e7eb;font:600 13px ui-sans-serif,system-ui;cursor:pointer;';
+    close.addEventListener('click', () => el.remove());
+    el.appendChild(document.createElement('div'));
+    el.appendChild(close);
+    document.body.appendChild(el);
+  }
+  el.firstChild.textContent = message;
+}
+
 function boot() {
   installGlobalErrorOverlay();
+  handleAuthErrorHash();
   syncLegalConsentFromStorage();
   warmupSupabase();
   ensureTodaySteps();
@@ -4641,7 +4698,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v175</div>
+        <div class="muted app-version">v176</div>
     </div>
   `;
 
