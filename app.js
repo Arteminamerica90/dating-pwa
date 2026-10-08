@@ -1899,8 +1899,8 @@ function maybeStartOnboarding() {
   dlg.addEventListener('close', () => renderAll());
 }
 
-let __regMode = 'register';
 let __regWired = false;
+let __regBusy = false;
 
 // Сообщения регистрации/входа показываем прямо в форме диалога (текущая вкладка),
 // а не плавающим тостом.
@@ -1913,84 +1913,117 @@ function __regMsg(text, ok) {
   el.hidden = false;
 }
 
+// Общая часть входа после успешной авторизации (и для входа, и для регистрации).
+function __regAfterAuth(dlg) {
+  dlg.close();
+  haptic('light');
+  renderAll();
+  refreshAccountDialogIfOpen();
+  syncProfileAfterAuth().catch(() => {});
+}
+
 function wireRegisterDialogOnce() {
   if (__regWired) return;
   __regWired = true;
   const dlg = $('#dlgRegister');
   const form = $('#regForm');
-  const submitBtn = $('#btnRegSubmit');
   const emailInput = $('#regEmail');
   const passwordInput = $('#regPassword');
 
-  form?.addEventListener('submit', (e) => e.preventDefault());
+  form?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    // Enter в поле — та же регистрация, что и по кнопке.
+    doRegister();
+  });
 
-  submitBtn?.addEventListener('click', async () => {
+  const readCreds = () => {
     const email = String(emailInput?.value || '').trim().toLowerCase();
     const password = String(passwordInput?.value || '');
-    if (!email) return __regMsg('Введите email', 0);
-    if (password.length < 6) return __regMsg('Пароль должен быть от 6 символов', 0);
-    if (__regMode === 'register') {
-      const age = $('#regAgeConfirm');
-      if (age && !age.checked) return __regMsg('Подтвердите, что вам исполнилось 18 лет', 0);
-      const tp = $('#regThirdPartyConfirm');
-      if (tp && !tp.checked) return __regMsg('Необходимо дать согласие на передачу данных третьим лицам', 0);
-    }
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Одну секунду…';
+    if (!email) { __regMsg('Введите email', 0); return null; }
+    if (password.length < 6) { __regMsg('Пароль должен быть от 6 символов', 0); return null; }
+    return { email, password };
+  };
+
+  // Вход: кнопка действует сразу, без переключения режимов.
+  const doLogin = async () => {
+    if (__regBusy) return;
+    const creds = readCreds();
+    if (!creds) return;
+    __regMsg('', 0);
+    __regBusy = true;
+    const loginBtn = $('#btnRegLogin');
+    const regBtn = $('#btnRegSubmit');
+    const origLogin = loginBtn?.textContent;
+    if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Одну секунду…'; }
+    if (regBtn) regBtn.disabled = true;
     try {
-      if (__regMode === 'login') {
-        const user = await supabaseSignIn(email, password);
-        accountInfo = user;
-        state.cloud.email = email;
-        state.cloud.enabled = true;
-        save();
-        dlg.close();
-        toast('Вход выполнен');
-        haptic('light');
-        renderAll();
-        refreshAccountDialogIfOpen();
-        syncProfileAfterAuth().catch(() => {});
-        setTimeout(() => {
-          refreshSubscription().then(() => {
-            if (mySubscription.planId === 'free') openSubscriptionDialog();
-          });
-        }, 800);
-      } else {
-        const reg = await supabaseSignUp(email, password, {
-          emailRedirectTo: location.origin + location.pathname
+      const user = await supabaseSignIn(creds.email, creds.password);
+      accountInfo = user;
+      state.cloud.email = creds.email;
+      state.cloud.enabled = true;
+      save();
+      __regAfterAuth(dlg);
+      toast('Вход выполнен');
+      setTimeout(() => {
+        refreshSubscription().then(() => {
+          if (mySubscription.planId === 'free') openSubscriptionDialog();
         });
-        state.cloud.email = email;
-        state.cloud.enabled = true;
-        save();
-        accountInfo = reg.user;
-        dlg.close();
-        toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
-        haptic('light');
-        renderAll();
-        refreshAccountDialogIfOpen();
-        syncProfileAfterAuth().catch(() => {});
-        setTimeout(() => openSubscriptionDialog(), 1500);
-      }
+      }, 800);
     } catch (err) {
       const msg = String(err?.message || '');
-      const friendly = __regMode === 'login' && /invalid/i.test(msg)
-        ? 'Неверный email или пароль. Если аккаунт создавался ранее — нажмите «Регистрация»: оно отправит письмо подтверждения.'
+      const friendly = /invalid/i.test(msg)
+        ? 'Неверный email или пароль. Если аккаунт создавался ранее — нажмите «Зарегистрироваться»: оно отправит письмо подтверждения.'
         : (friendlyAuthError(err) || 'Ошибка');
       __regMsg(friendly, 0);
     } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = __regMode === 'login' ? 'Войти' : 'Зарегистрироваться';
+      __regBusy = false;
+      if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = origLogin; }
+      if (regBtn) regBtn.disabled = false;
     }
+  };
+
+  // Регистрация: кнопка действует сразу, без переключения режимов.
+  const doRegister = async () => {
+    if (__regBusy) return;
+    const creds = readCreds();
+    if (!creds) return;
+    const age = $('#regAgeConfirm');
+    if (age && !age.checked) return __regMsg('Подтвердите, что вам исполнилось 18 лет', 0);
+    const tp = $('#regThirdPartyConfirm');
+    if (tp && !tp.checked) return __regMsg('Необходимо дать согласие на передачу данных третьим лицам', 0);
+    __regBusy = true;
+    const regBtn = $('#btnRegSubmit');
+    const loginBtn = $('#btnRegLogin');
+    const origReg = regBtn?.textContent;
+    if (regBtn) { regBtn.disabled = true; regBtn.textContent = 'Одну секунду…'; }
+    if (loginBtn) loginBtn.disabled = true;
+    try {
+      const reg = await supabaseSignUp(creds.email, creds.password, {
+        emailRedirectTo: location.origin + location.pathname
+      });
+      state.cloud.email = creds.email;
+      state.cloud.enabled = true;
+      save();
+      accountInfo = reg.user;
+      __regAfterAuth(dlg);
+      toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
+      setTimeout(() => openSubscriptionDialog(), 1500);
+    } catch (err) {
+      __regMsg(friendlyAuthError(err) || 'Ошибка', 0);
+    } finally {
+      __regBusy = false;
+      if (regBtn) { regBtn.disabled = false; regBtn.textContent = origReg; }
+      if (loginBtn) loginBtn.disabled = false;
+    }
+  };
+
+  $('#btnRegSubmit')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    doRegister();
   });
 
   $('#btnRegLogin')?.addEventListener('click', () => {
-    __regMode = __regMode === 'login' ? 'register' : 'login';
-    const title = dlg?.querySelector('.dialog-title');
-    if (title) title.textContent = __regMode === 'login' ? 'Вход' : 'Регистрация';
-    if (submitBtn) submitBtn.textContent = __regMode === 'login' ? 'Войти' : 'Зарегистрироваться';
-    const lb = $('#btnRegLogin');
-    if (lb) lb.textContent = __regMode === 'login' ? 'Регистрация' : 'Войти';
-    __regMsg('', 0);
+    doLogin();
   });
 
   // «Забыли пароль?» — сообщение пишется в саму форму диалога (текущая вкладка).
@@ -2310,13 +2343,8 @@ function openRegisterDialog() {
   const dlg = $('#dlgRegister');
   if (!dlg) return;
   wireRegisterDialogOnce();
-  __regMode = 'register';
   const title = dlg.querySelector('.dialog-title');
   if (title) title.textContent = 'Регистрация';
-  const sb = $('#btnRegSubmit');
-  if (sb) sb.textContent = 'Зарегистрироваться';
-  const lb = $('#btnRegLogin');
-  if (lb) lb.textContent = 'Войти';
   __regMsg('', 0);
   dlg.showModal();
   setTimeout(() => $('#regEmail')?.focus(), 120);
@@ -2326,13 +2354,8 @@ function openLoginDialog() {
   const dlg = $('#dlgRegister');
   if (!dlg) return;
   wireRegisterDialogOnce();
-  __regMode = 'login';
   const title = dlg.querySelector('.dialog-title');
   if (title) title.textContent = 'Вход';
-  const sb = $('#btnRegSubmit');
-  if (sb) sb.textContent = 'Войти';
-  const lb = $('#btnRegLogin');
-  if (lb) lb.textContent = 'Регистрация';
   __regMsg('', 0);
   dlg.showModal();
   setTimeout(() => $('#regEmail')?.focus(), 120);
@@ -4848,7 +4871,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v182</div>
+        <div class="muted app-version">v183</div>
     </div>
   `;
 
@@ -5387,6 +5410,11 @@ function renderStats() {
 
   $('#view-stats').querySelector('#btnOpenAccount')?.addEventListener('click', () => {
     haptic('light');
+    // Гость: сразу окно регистрации, без промежуточного «Аккаунт».
+    if (!accountInfo?.email) {
+      openRegisterDialog();
+      return;
+    }
     openAccountDialog();
   });
 
@@ -6668,9 +6696,14 @@ function renderTinderInner(p) {
   const compat = p.compatibility || { label: 'портрет ещё строится', shared: [], differences: [], neutral: [] };
   const circle = getCircleRecommendationStatus(circleKey(p.name || ''));
   const circleHighlights = getCircleRecommendationHighlights(circleKey(p.name || ''));
-  const shared = Array.isArray(compat.shared) && compat.shared.length ? compat.shared.slice(0, 3).map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ') : '';
-  const diff = Array.isArray(compat.differences) && compat.differences.length ? compat.differences.slice(0, 2).map((x) => `<span class="pill muted-pill">${escapeHtml(x)}</span>`).join(' ') : '';
-  const neutral = Array.isArray(compat.neutral) && compat.neutral.length ? compat.neutral.slice(0, 2).map((x) => `<span class="pill muted-pill">${escapeHtml(x)}</span>`).join(' ') : '';
+  // Каждый ответ по вопросам анкеты — отдельной строкой: у каждой строки своя
+  // горизонтальная прокрутка, ответы не едут «в общем» с остальной анкетой.
+  const sharedRows = (Array.isArray(compat.shared) ? compat.shared : []).slice(0, 4)
+    .map((x) => `<div class="tinder-badges"><span class="pill">${escapeHtml(x)}</span></div>`).join('');
+  const diffRows = (Array.isArray(compat.differences) ? compat.differences : []).slice(0, 3)
+    .map((x) => `<div class="tinder-badges"><span class="pill muted-pill">${escapeHtml(x)}</span></div>`).join('');
+  const neutralRows = (Array.isArray(compat.neutral) ? compat.neutral : []).slice(0, 3)
+    .map((x) => `<div class="tinder-badges"><span class="pill muted-pill">${escapeHtml(x)}</span></div>`).join('');
   const tree = treeMatchCompatibility(state.profile, p);
   const myTreeBranches = Object.keys(treeDims(buildUserTree(state.profile))).length;
   const treeBadge = !tree.enabled
@@ -6742,9 +6775,9 @@ function renderTinderInner(p) {
         ${circle.tone !== 'muted' ? `<div class="tinder-badges"><span class="pill status-pill ${circle.tone === 'good' ? 'good' : circle.tone === 'bad' ? 'bad' : circle.tone === 'warn' ? 'warn' : 'muted'}">${circle.label}</span></div>` : ''}
         ${circleHighlights.values.length ? `<div class="tinder-badges">${circleHighlights.values.slice(0, 2).map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ')}</div>` : ''}
         <div class="tinder-badges">${treeBadge}</div>
-        ${shared ? `<div class="tinder-badges">${shared}</div>` : ''}
-        ${diff ? `<div class="tinder-badges">${diff}</div>` : ''}
-        ${neutral ? `<div class="tinder-badges">${neutral}</div>` : ''}
+        ${sharedRows}
+        ${diffRows}
+        ${neutralRows}
         ${reportStatus}
       </div>
     </div>

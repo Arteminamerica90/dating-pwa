@@ -698,6 +698,24 @@ a { color: inherit; }
 .auth-form { display: flex; flex-direction: column; gap: 6px; align-items: center; }
 .auth-form .row { margin-top: 4px; }
 .auth-form .row-inline { flex-wrap: wrap; justify-content: center; }
+/* «Зарегистрироваться» и «Войти» — одинаковые кнопки в одну линию. */
+.auth-form .reg-actions {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  gap: 10px;
+  justify-content: stretch;
+  flex-wrap: nowrap;
+  margin-top: 8px;
+}
+.auth-form .reg-actions .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+  max-width: none;
+  white-space: nowrap;
+  text-align: center;
+}
 .auth-form .row.auth-field {
   flex-direction: column;
   align-items: stretch;
@@ -2072,8 +2090,9 @@ a { color: inherit; }
 .tinder-tags .pill,
 .tinder-badges .pill { flex: 0 0 auto; }
 
-/* Описание на карточке чуть мельче (16px по умолчанию → 14px). */
-.tinder-about { font-size: 14px; }
+/* Описание на карточке чуть мельче (16px по умолчанию → 14px) и статично:
+   не прокручивается вбок ни при каких условиях. */
+.tinder-about { font-size: 14px; overflow-x: hidden; }
 
 /* Подгрузка фото: блюр и простое сердечко поверх, пока снимок не загружен. */
 .tinder-photo-blur {
@@ -2115,6 +2134,9 @@ a { color: inherit; }
   max-height: 43.5%;
   height: auto;
   overflow-y: auto;
+  /* Фут не едет вбок целиком: горизонтально прокручиваются только отдельные
+     строки-сущности (интересы, ответы по вопросам), описание — статично. */
+  overflow-x: hidden;
   /* Тёмный блок плавно заходит на фото, начиная с имени и возраста: сверху
      прозрачный, к низу плотный. Без резкой границы «экран|фото». */
   background: linear-gradient(180deg,
@@ -2134,7 +2156,23 @@ a { color: inherit; }
   padding: 16px 18px 108px;
   grid-auto-rows: min-content;
   color: #fff;
+  /* Описание и блоки фута не сдвигаются вбок: горизонтальная прокрутка
+     живёт только внутри строк .tinder-tags / .tinder-badges.
+     minmax(0,1fr) не даёт колонке раздуться до min-content детей —
+     иначе строки не будут шире контейнера и не смогут скроллиться. */
+  grid-template-columns: minmax(0, 1fr);
+  overflow-x: hidden;
 }
+.tinder-foot .pad > * { min-width: 0; }
+/* Внутри фута каждая строка-сущность (интересы, ответ по вопросу анкеты)
+   — отдельная полоса прокрутки: nowrap, чтобы содержимое не переносилось,
+   а уезжало вбок; сам фут при этом не едет (overflow-x: hidden выше). */
+.tinder-foot .tinder-tags,
+.tinder-foot .tinder-badges { flex-wrap: nowrap; min-width: 0; }
+/* Длинный pill не сжимается под ширину строки — строка скроллится вбок целиком. */
+.tinder-foot .tinder-tags .pill,
+.tinder-foot .tinder-badges .pill { max-width: none; }
+.tinder-foot .tinder-about { overflow-x: hidden; }
 .tinder-foot .tinder-sub { color: rgba(255, 255, 255, 0.88); }
 .tinder-card .tinder-foot .tinder-about { color: rgba(255, 255, 255, 0.94); }
 .tinder-foot .muted { color: rgba(255, 255, 255, 0.72); }
@@ -2725,3 +2763,39 @@ textarea.input {
   padding: 14px;
   margin-top: 12px;
 }
+
+.btn {
+  min-height: 46px;
+  border-radius: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.btn:active { filter: brightness(0.95); }
+.btn.ok { min-height: 46px; }
+.input, .select, textarea.input {
+  border-radius: 12px;
+  min-height: 46px;
+  border-color: rgba(15, 23, 42, 0.12);
+  background: rgba(242, 242, 247, 0.9);
+}
+.auth-form .input {
+  border-radius: 12px;
+  min-height: 46px;
+  border-color: rgba(15, 23, 42, 0.12);
+  background: rgba(242, 242, 247, 0.9);
+}
+.input:focus, .select:focus, .auth-form .input:focus {
+  background: #fff;
+  border-color: rgba(167, 139, 250, 0.65);
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(167, 139, 250, 0.16);
+}
+.tabs {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 0.5px solid rgba(15, 23, 42, 0.12);
+}
+.tab { font-weight: 600; }
+.tab.active { background: rgba(167, 139, 250, 0.16); }
+.dialog-title { font-weight: 700; letter-spacing: -0.02em; font-size: 17px; }

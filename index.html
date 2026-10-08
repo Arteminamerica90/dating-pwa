@@ -9,7 +9,7 @@
     <title>xystar</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=182" />
+    <link rel="stylesheet" href="./styles.css?v=183" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script defer src="https://widget.cloudpayments.ru/bundles/cloudpayments.js"></script>
@@ -153,38 +153,38 @@
         <div class="dialog-head" style="justify-content:center">
           <div class="dialog-title">Регистрация</div>
         </div>
-        <form class="auth-form" id="regForm" autocomplete="on">
+        <form class="auth-form" id="regForm" autocomplete="on" novalidate>
           <div class="row auth-field" style="margin-top:10px">
             <label class="label" for="regEmail">Email</label>
-            <input id="regEmail" name="email" class="input" type="email" inputmode="email" autocomplete="email" required placeholder="name@example.com" style="width:100%;max-width:360px" />
+            <input id="regEmail" name="email" class="input" type="email" inputmode="email" autocomplete="email" placeholder="name@example.com" style="width:100%;max-width:360px" />
           </div>
           <div class="row auth-field">
             <label class="label" for="regPassword">Пароль</label>
             <input id="regPassword" name="password" class="input" type="password" autocomplete="new-password" placeholder="минимум 6 символов" style="width:100%;max-width:360px" />
           </div>
-          <div class="row" style="margin-bottom:4px">
+          <div class="row reg-consent" style="margin-bottom:4px">
             <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
-              <input type="checkbox" id="regAgeConfirm" required style="margin-top:3px;width:16px;height:16px;accent-color:var(--brand)" />
+              <input type="checkbox" id="regAgeConfirm" style="margin-top:3px;width:16px;height:16px;accent-color:var(--brand)" />
               <span>Мне исполнилось 18 лет. Я подтверждаю, что достиг возраста совершеннолетия и принимаю <a href="./legal.html#offer" target="_blank" rel="noopener" style="color:var(--brand)">условия оферты</a> и <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:var(--brand)">политику конфиденциальности</a>.</span>
             </label>
           </div>
-          <div class="row" style="margin-bottom:4px">
+          <div class="row reg-consent" style="margin-bottom:4px">
             <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
-              <input type="checkbox" id="regThirdPartyConfirm" required style="margin-top:3px;width:16px;height:16px;accent-color:var(--brand)" />
+              <input type="checkbox" id="regThirdPartyConfirm" style="margin-top:3px;width:16px;height:16px;accent-color:var(--brand)" />
               <span>Я даю отдельное согласие на передачу моих персональных данных третьим лицам (Supabase, Vercel, GitHub, jsDelivr CDN, платёжная система) в целях обеспечения работы Сервиса. Подробнее: <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:var(--brand)">Политика конфиденциальности, п. 3.7</a>.</span>
             </label>
           </div>
-          <div class="row-inline">
+          <div class="row-inline reg-actions">
             <button id="btnRegSubmit" class="btn" type="submit">Зарегистрироваться</button>
-          </div>
-          <div class="row-inline" style="margin-top:8px; justify-content:center; gap:12px">
             <button id="btnRegLogin" class="btn" type="button">Войти</button>
+          </div>
+          <div class="row-inline" style="justify-content:center">
             <button id="btnRegForgot" class="link-btn" type="button">Забыли пароль?</button>
           </div>
           <div id="regMsg" class="auth-error" hidden></div>
         </form>
         <div style="text-align:center;margin-top:12px">
-          <button class="btn ghost" id="btnRegClose" type="button">Пока нет</button>
+          <button class="btn ghost" id="btnRegClose" type="button">Отмена</button>
         </div>
       </div>
     </dialog>
@@ -376,7 +376,7 @@
 
       window.__xystarImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=182')
+      import('./app.js?v=183')
         .then(() => {
           window.__xystarImportOk = true;
         })
