@@ -3,11 +3,11 @@ import { derivePairKey, encryptChatText, decryptChatText } from '../chat-crypto.
 const { SUPABASE_URL, SUPABASE_ANON_KEY } = await import('../supabase-config.js');
 
 const ACC = {
-  olga: { email: 'seed.olga@example.com', id: 'f9190bb8-4fa2-4e2b-af4f-28cedd87ed8a' },
-  dmitry: { email: 'seed.dmitry@example.com', id: '65ba861b-c76e-4e48-a680-3cc5aa4240ea' },
-  ekaterina: { email: 'seed.ekaterina@example.com', id: 'd24f17b0-7e65-48cc-b2d8-4c045a177b77' },
-  sergey: { email: 'seed.sergey@example.com', id: '8233884d-4d5b-41de-98eb-73bd99d60102' },
-  natalya: { email: 'seed.natalya@example.com', id: '408edc6f-5622-405b-8424-d331c8d7ae96' }
+  olga: { email: 'seed.olga@example.com' },
+  dmitry: { email: 'seed.dmitry@example.com' },
+  ekaterina: { email: 'seed.ekaterina@example.com' },
+  sergey: { email: 'seed.sergey@example.com' },
+  natalya: { email: 'seed.natalya@example.com' }
 };
 const PASSWORD = 'WalkDate2026!';
 
@@ -20,7 +20,7 @@ async function tokenFor(email) {
   });
   const d = await r.json();
   if (!d.access_token) throw new Error(`login ${email}: ${JSON.stringify(d).slice(0, 120)}`);
-  return d.access_token;
+  return { token: d.access_token, uid: d.user?.id || d.user?.sub };
 }
 
 async function api(path, method, token, body) {
@@ -108,21 +108,25 @@ async function readThread(tokenMe, meId, otherId) {
 
 console.log('Логинимся…');
 const tokens = {};
-for (const [name, acc] of Object.entries(ACC)) tokens[name] = await tokenFor(acc.email);
+for (const [name, acc] of Object.entries(ACC)) {
+  const { token, uid } = await tokenFor(acc.email);
+  tokens[name] = { token, uid };
+  ACC[name].id = uid;
+}
 
 async function roundtrip(aName, bName, msgsAB, msgsBA) {
   const A = ACC[aName]; const B = ACC[bName];
   console.log(`\n=== Пара ${aName} ↔ ${bName} ===`);
-  await setupPair(tokens[aName], A.id, tokens[bName], B.id);
+  await setupPair(tokens[aName].token, A.id, tokens[bName].token, B.id);
   console.log(`матч создан (likes + matches)`);
 
-  for (const t of msgsAB) await sendMsg(tokens[aName], A.id, B.id, t);
+  for (const t of msgsAB) await sendMsg(tokens[aName].token, A.id, B.id, t);
   console.log(`${aName} → ${bName}: ${msgsAB.length} сообщ. отправлено`);
-  for (const t of msgsBA) await sendMsg(tokens[bName], B.id, A.id, t);
+  for (const t of msgsBA) await sendMsg(tokens[bName].token, B.id, A.id, t);
   console.log(`${bName} → ${aName}: ${msgsBA.length} сообщ. отправлено`);
 
-  const fromB = await readThread(tokens[bName], B.id, A.id);
-  const fromA = await readThread(tokens[aName], A.id, B.id);
+  const fromB = await readThread(tokens[bName].token, B.id, A.id);
+  const fromA = await readThread(tokens[aName].token, A.id, B.id);
   console.log(`Глазами ${bName}:`); for (const l of fromB) console.log('  ' + l);
   console.log(`Глазами ${aName}:`); for (const l of fromA) console.log('  ' + l);
 
