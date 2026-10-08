@@ -1505,28 +1505,22 @@ function hideAuthErrorMessage() {
   if (el) el.hidden = true;
 }
 
-function wireSettings() {
-  async function runWithButton(btn, label, fn) {
-    if (!btn || btn.dataset.busy) return;
-    btn.dataset.busy = '1';
-    const original = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Одну секунду…';
-    try {
-      await fn();
-    } finally {
-      btn.disabled = false;
-      btn.textContent = original;
-      delete btn.dataset.busy;
-    }
+async function runWithButton(btn, label, fn) {
+  if (!btn || btn.dataset.busy) return;
+  btn.dataset.busy = '1';
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Одну секунду…';
+  try {
+    await fn();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+    delete btn.dataset.busy;
   }
+}
 
-  // Вход/регистрация открываются в общем диалоге (как на первом табе).
-  $('#btnOpenRegister')?.addEventListener('click', () => {
-    haptic('light');
-    openRegisterDialog();
-  });
-
+function wireSettings() {
   $('#btnOpenSubscription')?.addEventListener('click', () => openSubscriptionDialog());
 
   $('#btnShareColleague')?.addEventListener('click', async () => {
@@ -1546,127 +1540,6 @@ function wireSettings() {
     } catch {
       try { await navigator.clipboard.writeText('https://xystar.ru'); toast('Ссылка скопирована'); } catch {}
     }
-  });
-
-  $('#btnAccountLogout')?.addEventListener('click', (e) => {
-    haptic('light');
-    const btn = $('#btnAccountLogout');
-    if (btn) { btn.disabled = true; const old = btn.textContent; btn.textContent = 'Выход…'; }
-    // Local logout first — instant response, never blocked by network.
-    state.cloud.token = null;
-    state.cloud.enabled = false;
-    accountInfo = null;
-    liveProfiles = [];
-    liveProfilesLoaded = false;
-    if (state.dating) {
-      state.dating.likedMe = {};
-      for (const id of Object.keys(state.dating.likes)) delete state.dating.likes[id];
-    }
-    save();
-    toast('Выход');
-    renderAll();
-    // Remote sign-out in background — must never block the UI.
-    supabaseSignOut().catch(() => {});
-    if (btn) setTimeout(() => { btn.disabled = false; btn.textContent = old; }, 400);
-  });
-
-  $('#btnChangePassword')?.addEventListener('click', () => {
-    $('#changePasswordBox').hidden = false;
-  });
-
-  $('#btnChangePasswordCancel')?.addEventListener('click', () => {
-    $('#changePasswordBox').hidden = true;
-    const inp = $('#newPassword');
-    if (inp) inp.value = '';
-  });
-
-  $('#btnChangePasswordSave')?.addEventListener('click', async () => {
-    const password = String($('#newPassword')?.value || '');
-    if (password.length < 6) return toast('Пароль должен быть минимум 6 символов');
-    try {
-      await supabaseChangePassword(password);
-      const inp = $('#newPassword');
-      if (inp) inp.value = '';
-      $('#changePasswordBox').hidden = true;
-      toast('Пароль изменён');
-      haptic('light');
-    } catch (err) {
-      toast(err?.message || 'Не удалось сменить пароль');
-    }
-  });
-
-  $('#btnExportData')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    // 152-ФЗ ст. 14 п. 7: субъект вправе получить копию своих ПДн.
-    runWithButton($('#btnExportData'), 'Экспорт данных', async () => {
-      try {
-        let exported = {
-          exportedAt: new Date().toISOString(),
-          operator: 'ИП Меньшиков Артем Геннадьевич',
-          source: 'client',
-          account: accountInfo ? { id: accountInfo.id, email: accountInfo.email } : null,
-          profile: state.profile || {},
-          consent: state.consent || {},
-          dating: state.dating || {}
-        };
-        const server = state.cloud?.serverUrl;
-        const token = state.cloud?.token;
-        if (server && token) {
-          try {
-            const apiBase = normalizeServerUrl(server);
-            const resp = await fetch(`${apiBase}/api/data/export`, { headers: { Authorization: `Bearer ${token}` } });
-            if (resp.ok) {
-              const remote = await resp.json();
-              exported = { ...exported, remote };
-              exported.source = 'client+server';
-            }
-          } catch (err) {
-            console.warn('export server', err?.message);
-          }
-        }
-        downloadJson(exported, `walkdate-data-export-${new Date().toISOString().slice(0, 10)}.json`);
-        toast('Экспорт готов — файл скачан');
-        haptic('light');
-      } catch (err) {
-        toast(err?.message || 'Экспорт не удался');
-      }
-    });
-  });
-
-  $('#btnDeleteAccount')?.addEventListener('click', async (e) => {
-    e.preventDefault();
-    haptic('light');
-    if (!confirm('Удалить аккаунт? \n\nБудут уничтожены анкета, переписки, согласия и все персональные данные. Восстановление невозможно.')) return;
-    const btn = $('#btnDeleteAccount');
-    runWithButton($('#btnDeleteAccount'), 'Удалить аккаунт', async () => {
-      try {
-        const server = state.cloud?.serverUrl;
-        const token = state.cloud?.token;
-        if (server && token) {
-          try {
-            const apiBase = normalizeServerUrl(server);
-            await fetch(`${apiBase}/api/account`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-          } catch (err) {
-            console.warn('delete server', err?.message);
-          }
-        }
-        if (accountInfo?.id) {
-          try { await supabaseDeleteProfile(accountInfo.id); } catch (err) { console.warn('delete supabase', err?.message); }
-        }
-        // Уничтожаем локальное состояние (152-ФЗ ст. 21).
-        const fresh = defaultState();
-        state.profile = fresh.profile;
-        state.cloud = fresh.cloud;
-        state.dating = fresh.dating;
-        state.consent = fresh.consent;
-        accountInfo = null;
-        save();
-        renderAll();
-        toast('Аккаунт удалён. Прощайте!');
-      } catch (err) {
-        toast(err?.message || 'Не удалось удалить аккаунт');
-      }
-    });
   });
 
   $('#btnAcceptAll')?.addEventListener('click', async () => {
@@ -2121,6 +1994,7 @@ function wireRegisterDialogOnce() {
         toast('Вход выполнен');
         haptic('light');
         renderAll();
+        refreshAccountDialogIfOpen();
         syncProfileAfterAuth().catch(() => {});
         setTimeout(() => {
           refreshSubscription().then(() => {
@@ -2139,6 +2013,7 @@ function wireRegisterDialogOnce() {
         toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
         haptic('light');
         renderAll();
+        refreshAccountDialogIfOpen();
         syncProfileAfterAuth().catch(() => {});
         setTimeout(() => openSubscriptionDialog(), 1500);
       }
@@ -2189,6 +2064,185 @@ function wireRegisterDialogOnce() {
   $('#btnRegClose')?.addEventListener('click', () => {
     dlg.close();
   });
+}
+
+
+// Действия аккаунта живут в диалоге #dlgAccount; вешаются после каждого рендера тела.
+function wireAccountDialogBody() {
+  $('#btnAccountLogout')?.addEventListener('click', (e) => {
+    haptic('light');
+    const btn = $('#btnAccountLogout');
+    const old = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Выход…'; }
+    // Local logout first — instant response, never blocked by network.
+    state.cloud.token = null;
+    state.cloud.enabled = false;
+    accountInfo = null;
+    liveProfiles = [];
+    liveProfilesLoaded = false;
+    if (state.dating) {
+      state.dating.likedMe = {};
+      for (const id of Object.keys(state.dating.likes)) delete state.dating.likes[id];
+    }
+    save();
+    toast('Выход');
+    renderAll();
+    refreshAccountDialogIfOpen();
+    // Remote sign-out in background — must never block the UI.
+    supabaseSignOut().catch(() => {});
+    if (btn) setTimeout(() => { btn.disabled = false; btn.textContent = old; }, 400);
+  });
+
+  $('#btnChangePassword')?.addEventListener('click', () => {
+    $('#changePasswordBox').hidden = false;
+  });
+
+  $('#btnChangePasswordCancel')?.addEventListener('click', () => {
+    $('#changePasswordBox').hidden = true;
+    const inp = $('#newPassword');
+    if (inp) inp.value = '';
+  });
+
+  $('#btnChangePasswordSave')?.addEventListener('click', async () => {
+    const password = String($('#newPassword')?.value || '');
+    if (password.length < 6) return toast('Пароль должен быть минимум 6 символов');
+    try {
+      await supabaseChangePassword(password);
+      const inp = $('#newPassword');
+      if (inp) inp.value = '';
+      $('#changePasswordBox').hidden = true;
+      toast('Пароль изменён');
+      haptic('light');
+    } catch (err) {
+      toast(err?.message || 'Не удалось сменить пароль');
+    }
+  });
+
+  $('#btnExportData')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    // 152-ФЗ ст. 14 п. 7: субъект вправе получить копию своих ПДн.
+    runWithButton($('#btnExportData'), 'Экспорт данных', async () => {
+      try {
+        let exported = {
+          exportedAt: new Date().toISOString(),
+          operator: 'ИП Меньшиков Артем Геннадьевич',
+          source: 'client',
+          account: accountInfo ? { id: accountInfo.id, email: accountInfo.email } : null,
+          profile: state.profile || {},
+          consent: state.consent || {},
+          dating: state.dating || {}
+        };
+        const server = state.cloud?.serverUrl;
+        const token = state.cloud?.token;
+        if (server && token) {
+          try {
+            const apiBase = normalizeServerUrl(server);
+            const resp = await fetch(`${apiBase}/api/data/export`, { headers: { Authorization: `Bearer ${token}` } });
+            if (resp.ok) {
+              const remote = await resp.json();
+              exported = { ...exported, remote };
+              exported.source = 'client+server';
+            }
+          } catch (err) {
+            console.warn('export server', err?.message);
+          }
+        }
+        downloadJson(exported, `walkdate-data-export-${new Date().toISOString().slice(0, 10)}.json`);
+        toast('Экспорт готов — файл скачан');
+        haptic('light');
+      } catch (err) {
+        toast(err?.message || 'Экспорт не удался');
+      }
+    });
+  });
+
+  $('#btnDeleteAccount')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    haptic('light');
+    if (!confirm('Удалить аккаунт? \n\nБудут уничтожены анкета, переписки, согласия и все персональные данные. Восстановление невозможно.')) return;
+    const btn = $('#btnDeleteAccount');
+    runWithButton($('#btnDeleteAccount'), 'Удалить аккаунт', async () => {
+      try {
+        const server = state.cloud?.serverUrl;
+        const token = state.cloud?.token;
+        if (server && token) {
+          try {
+            const apiBase = normalizeServerUrl(server);
+            await fetch(`${apiBase}/api/account`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+          } catch (err) {
+            console.warn('delete server', err?.message);
+          }
+        }
+        if (accountInfo?.id) {
+          try { await supabaseDeleteProfile(accountInfo.id); } catch (err) { console.warn('delete supabase', err?.message); }
+        }
+        // Уничтожаем локальное состояние (152-ФЗ ст. 21).
+        const fresh = defaultState();
+        state.profile = fresh.profile;
+        state.cloud = fresh.cloud;
+        state.dating = fresh.dating;
+        state.consent = fresh.consent;
+        accountInfo = null;
+        save();
+        renderAll();
+        refreshAccountDialogIfOpen();
+        toast('Аккаунт удалён. Прощайте!');
+      } catch (err) {
+        toast(err?.message || 'Не удалось удалить аккаунт');
+      }
+    });
+  });
+
+}
+
+// Окно «Аккаунт»: все действия с аккаунтом (вход, пароль, данные, выход, удаление).
+function renderAccountDialogBody() {
+  const body = $('#accountDialogBody');
+  if (!body) return;
+  body.innerHTML = accountInfo ? `
+    <div class="account-badge" id="accountBadge"></div>
+    <div class="row-inline" style="margin-top:12px;justify-content:center" id="accountSignedIn">
+      <button id="btnChangePassword" class="btn" type="button">Сменить пароль</button>
+      <button id="btnExportData" class="btn" type="button" title="Скачать копию своих персональных данных (152-ФЗ, ст. 14)">Экспорт данных</button>
+      <button id="btnAccountLogout" class="btn danger" type="button">Выход</button>
+    </div>
+    <div class="row" id="changePasswordBox" hidden style="margin-top:12px">
+      <label class="label">Новый пароль</label>
+      <input id="newPassword" class="input" type="password" autocomplete="new-password" placeholder="минимум 6 символов" />
+      <div class="row-inline" style="margin-top:8px">
+        <button id="btnChangePasswordSave" class="btn" type="button">Сохранить пароль</button>
+        <button id="btnChangePasswordCancel" class="btn ghost" type="button">Отмена</button>
+      </div>
+    </div>
+    <div style="margin-top:18px;text-align:center">
+      <button id="btnDeleteAccount" class="btn danger" type="button">Удалить аккаунт</button>
+      <div class="muted" style="font-size:12px;margin-top:6px">Уничтожение всех данных, включая анкету, переписки и согласия (152-ФЗ, ст. 21). Восстановление невозможно.</div>
+    </div>
+  ` : `
+    <div class="muted" style="text-align:center;margin-bottom:12px;font-size:13px">Анкета, переписка и оплата привязаны к вашему email</div>
+    <div style="text-align:center">
+      <button id="btnOpenRegister" class="btn" type="button" style="max-width:360px">🔑 Войти / Зарегистрироваться</button>
+    </div>
+  `;
+  renderAccountBadge();
+  wireAccountDialogBody();
+  $('#btnOpenRegister')?.addEventListener('click', () => {
+    haptic('light');
+    openRegisterDialog();
+  });
+}
+
+function openAccountDialog() {
+  const dlg = $('#dlgAccount');
+  if (!dlg) return;
+  renderAccountDialogBody();
+  if (!dlg.open) dlg.showModal();
+}
+
+// Если окно аккаунта открыто — перерисовать его после входа/выхода/удаления.
+function refreshAccountDialogIfOpen() {
+  const dlg = $('#dlgAccount');
+  if (dlg?.open) renderAccountDialogBody();
 }
 
 function openRegisterDialog() {
@@ -4733,7 +4787,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v179</div>
+        <div class="muted app-version">v181</div>
     </div>
   `;
 
@@ -5063,39 +5117,14 @@ function renderStats() {
         <button id="btnShareColleague" class="btn" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block;font-size:13px">📨 Поделиться с коллегой</button>
       </div>
 
-      ${accountInfo ? `
-      <div class="card" id="accountCard" ${state.ui?.accountExpanded === false ? '' : ''}>
-        <button class="accordion-head narrow" type="button" data-toggle-account aria-expanded="${state.ui?.accountExpanded !== false ? 'true' : 'false'}">
-          <span class="accordion-title">Аккаунт</span>
-          <span class="chevron" aria-hidden="true"></span>
+      <div class="card" id="accountCard" style="margin-top:12px">
+        <button id="btnOpenAccount" class="btn" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block">
+          👤 Аккаунт${accountInfo?.email ? ` · ${escapeHtml(accountInfo.email)}` : ''}
         </button>
-        <div class="accordion-body" ${state.ui?.accountExpanded !== false ? '' : 'hidden'}>
-          <div class="account-badge" id="accountBadge"></div>
-          <div class="row-inline" style="margin-top:10px" id="accountSignedIn">
-            <button id="btnChangePassword" class="btn" type="button">Сменить пароль</button>
-            <button id="btnExportData" class="btn" type="button" title="Скачать копию своих персональных данных (152-ФЗ, ст. 14)">Экспорт данных</button>
-            <button id="btnAccountLogout" class="btn danger" type="button">Выход</button>
-          </div>
-          <div class="row" style="margin-top:8px">
-            <button id="btnDeleteAccount" class="btn danger" type="button" style="flex:none">Удалить аккаунт</button>
-            <span class="muted" style="font-size:12px">Уничтожение всех данных, включая анкету, переписки и согласия (152-ФЗ, ст. 21). Восстановление невозможно.</span>
-          </div>
-          <div class="row" id="changePasswordBox" hidden>
-            <label class="label">Новый пароль</label>
-            <input id="newPassword" class="input" type="password" autocomplete="new-password" placeholder="минимум 6 символов" />
-            <div class="row-inline" style="margin-top:8px">
-              <button id="btnChangePasswordSave" class="btn" type="button">Сохранить пароль</button>
-              <button id="btnChangePasswordCancel" class="btn ghost" type="button">Отмена</button>
-            </div>
-          </div>
+        <div class="muted" style="text-align:center;margin-top:6px;font-size:12px">
+          ${accountInfo?.email ? 'Вход выполнен — пароль, данные, выход и удаление аккаунта' : 'Вход не выполнен — войдите или зарегистрируйтесь'}
         </div>
       </div>
-      ` : `
-      <div class="card" id="accountCard">
-        <button id="btnOpenRegister" class="btn" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block">🔑 Войти / Зарегистрироваться</button>
-        <div class="muted" style="text-align:center;margin-top:6px;font-size:12px">Анкета, переписка и оплата привязаны к вашему email</div>
-      </div>
-      `}
 
       <div class="card" id="legalConsentCard" ${allLegalConsentsAccepted && state.ui?.legalConsentExpanded !== true ? 'hidden' : ''}>
         <button class="accordion-head narrow" type="button" data-toggle-legal-consent aria-expanded="${state.ui?.legalConsentExpanded ? 'true' : 'false'}">
@@ -5324,12 +5353,16 @@ function renderStats() {
     renderAll();
   });
 
-  $('#view-stats').querySelector('[data-toggle-account]')?.addEventListener('click', () => {
-    state.ui = state.ui || {};
-    state.ui.accountExpanded = state.ui.accountExpanded === false ? true : false;
-    save();
-    renderAll();
+  $('#view-stats').querySelector('#btnOpenAccount')?.addEventListener('click', () => {
+    haptic('light');
+    openAccountDialog();
   });
+
+  const accClose = $('#btnAccountClose');
+  if (accClose && !accClose.dataset.wired) {
+    accClose.dataset.wired = '1';
+    accClose.addEventListener('click', () => $('#dlgAccount')?.close());
+  }
 
   $('#view-stats').querySelector('[data-tree-toggle]')?.addEventListener('click', () => {
     state.ui = state.ui || {};
