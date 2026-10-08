@@ -1987,7 +1987,23 @@ function maybeStartOnboarding() {
   const ageSubmitBtn = $('#obAgeSubmit');
   const ageError = $('#obAgeError');
 
+  // Возраст в онбординге подтверждает только зарегистрированный пользователь.
+  const requireRegForAge = (e) => {
+    if (accountInfo?.id) return false;
+    if (e?.preventDefault) e.preventDefault();
+    requireRegistration('Подтверждение возраста доступно только зарегистрированным пользователям');
+    if (birthDateInput) birthDateInput.blur();
+    return true;
+  };
+
   if (birthDateInput) {
+    birthDateInput.addEventListener('focus', requireRegForAge);
+    birthDateInput.addEventListener('pointerdown', requireRegForAge);
+    birthDateInput.addEventListener('keydown', (e) => {
+      if (accountInfo?.id) return;
+      e.preventDefault();
+      requireRegistration('Подтверждение возраста доступно только зарегистрированным пользователям');
+    });
     birthDateInput.addEventListener('input', () => {
       const val = birthDateInput.value;
       if (!val) {
@@ -2013,6 +2029,7 @@ function maybeStartOnboarding() {
   }
 
   ageSubmitBtn?.addEventListener('click', () => {
+    if (requireRegForAge()) return;
     const val = birthDateInput?.value;
     if (!val) return;
 
@@ -4716,7 +4733,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v178</div>
+        <div class="muted app-version">v179</div>
     </div>
   `;
 
