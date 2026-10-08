@@ -48,7 +48,7 @@ import {
   supabaseSaveConsent,
   supabaseSaveConsentsBulk,
   supabaseGetConsents
-} from './supabase.js?v=106';
+} from './supabase.js?v=107';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
@@ -1542,53 +1542,6 @@ function wireSettings() {
     }
   });
 
-  $('#btnAcceptAll')?.addEventListener('click', async () => {
-    const on = !(state.consent?.agreement && state.consent?.personalData && state.consent?.newsletters && state.consent?.cookies && state.consent?.thirdPartyData);
-    state.consent.agreement = on;
-    state.consent.personalData = on;
-    state.consent.newsletters = on;
-    state.consent.cookies = on;
-    state.consent.thirdPartyData = on;
-    save();
-    if (accountInfo?.id) {
-      try {
-        await supabaseSaveConsentsBulk(accountInfo.id, {
-          agreement: on, personalData: on, newsletters: on, cookies: on, thirdPartyData: on
-        });
-      } catch {}
-    }
-    renderAll();
-    toast(on ? 'Согласие принято' : 'Согласие отозвано');
-    haptic('light');
-  });
-
-  $('#consentGeo')?.addEventListener('change', async (e) => {
-    state.consent.geo = e.target.checked;
-    save();
-    if (accountInfo?.id) {
-      try { await supabaseSaveConsent(accountInfo.id, 'geo', e.target.checked); } catch {}
-    }
-    haptic('light');
-  });
-
-  $('#consentSpecial')?.addEventListener('change', async (e) => {
-    state.consent.specialCategories = e.target.checked;
-    save();
-    if (accountInfo?.id) {
-      try { await supabaseSaveConsent(accountInfo.id, 'specialCategories', e.target.checked); } catch {}
-    }
-    haptic('light');
-  });
-
-  $('#consentProfiling')?.addEventListener('change', async (e) => {
-    state.consent.profiling = e.target.checked;
-    save();
-    if (accountInfo?.id) {
-      try { await supabaseSaveConsent(accountInfo.id, 'profiling', e.target.checked); } catch {}
-    }
-    haptic('light');
-  });
-
   window.addEventListener('message', async (event) => {
     if (event.origin !== location.origin) return;
     if (event.data && event.data.type === 'xystar-legal-consent') {
@@ -1606,6 +1559,7 @@ function wireSettings() {
         } catch {}
       }
       renderAll();
+      refreshConsentDialogIfOpen();
       toast('Согласие принято');
       haptic('light');
     }
@@ -2243,6 +2197,113 @@ function openAccountDialog() {
 function refreshAccountDialogIfOpen() {
   const dlg = $('#dlgAccount');
   if (dlg?.open) renderAccountDialogBody();
+}
+
+
+// Окно «Согласие»: все пункты, что были в аккордеоне третьего таба.
+function renderConsentDialogBody() {
+  const body = $('#consentDialogBody');
+  if (!body) return;
+  const accepted = !!(state.consent?.agreement && state.consent?.personalData && state.consent?.newsletters && state.consent?.cookies && state.consent?.thirdPartyData);
+  body.innerHTML = `
+    <div class="consent-inline" style="font-size:12px">
+      <div class="muted">Ознакомьтесь с документами по ссылкам и подтвердите согласие.</div>
+      <div class="consent-list">
+        <div class="consent-doc">
+          <a class="consent-doc-link" href="./legal.html#offer" target="_blank" rel="noopener">📄 Публичная оферта</a>
+        </div>
+        <div class="consent-doc">
+          <a class="consent-doc-link" href="./legal.html#agreement" target="_blank" rel="noopener">📄 Пользовательское соглашение</a>
+        </div>
+        <div class="consent-doc">
+          <a class="consent-doc-link" href="./legal.html#privacy" target="_blank" rel="noopener">📄 Политика конфиденциальности (152-ФЗ)</a>
+        </div>
+      </div>
+      <div class="row-inline" style="margin-top:8px">
+        <button id="btnAcceptAll" class="btn ${accepted ? 'ok' : ''}" type="button">${accepted ? 'Согласие принято ✓' : 'Я согласен со всеми пунктами'}</button>
+      </div>
+      <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:6px">
+          <input type="checkbox" id="consentGeo" ${state.consent?.geo ? 'checked' : ''} style="margin-top:2px;width:14px;height:14px;accent-color:var(--brand)" />
+          <span>Разрешаю обработку <b>геолокации</b> для показа анкет рядом со мной <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:var(--brand)">(подробнее)</a></span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:6px">
+          <input type="checkbox" id="consentSpecial" ${state.consent?.specialCategories ? 'checked' : ''} style="margin-top:2px;width:14px;height:14px;accent-color:var(--brand)" />
+          <span>Даю согласие на обработку <b>специальных категорий ПДн</b> (сведения о личной и интимной жизни) в соответствии со ст. 10 152-ФЗ</span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
+          <input type="checkbox" id="consentProfiling" ${state.consent?.profiling !== false ? 'checked' : ''} style="margin-top:2px;width:14px;height:14px;accent-color:var(--brand)" />
+          <span>Согласен на <b>профилирование</b> для подбора партнёров (алгоритм «дерево решений») — можно отключить</span>
+        </label>
+      </div>
+      <div class="muted" style="margin-top:6px">Продолжая пользоваться данным приложением вы даёте согласие с правилами пользования сервиса.</div>
+    </div>
+  `;
+  wireConsentDialogBody();
+}
+
+function openConsentDialog() {
+  const dlg = $('#dlgConsent');
+  if (!dlg) return;
+  renderConsentDialogBody();
+  if (!dlg.open) dlg.showModal();
+}
+
+function refreshConsentDialogIfOpen() {
+  const dlg = $('#dlgConsent');
+  if (dlg?.open) renderConsentDialogBody();
+}
+
+// Обработчики согласий живут в диалоге #dlgConsent; вешаются после каждого рендера тела.
+function wireConsentDialogBody() {
+  $('#btnAcceptAll')?.addEventListener('click', async () => {
+    const on = !(state.consent?.agreement && state.consent?.personalData && state.consent?.newsletters && state.consent?.cookies && state.consent?.thirdPartyData);
+    state.consent.agreement = on;
+    state.consent.personalData = on;
+    state.consent.newsletters = on;
+    state.consent.cookies = on;
+    state.consent.thirdPartyData = on;
+    save();
+    if (accountInfo?.id) {
+      try {
+        await supabaseSaveConsentsBulk(accountInfo.id, {
+          agreement: on, personalData: on, newsletters: on, cookies: on, thirdPartyData: on
+        });
+      } catch {}
+    }
+    renderAll();
+    refreshConsentDialogIfOpen();
+    toast(on ? 'Согласие принято' : 'Согласие отозвано');
+    haptic('light');
+  });
+
+  $('#consentGeo')?.addEventListener('change', async (e) => {
+    state.consent.geo = e.target.checked;
+    save();
+    if (accountInfo?.id) {
+      try { await supabaseSaveConsent(accountInfo.id, 'geo', e.target.checked); } catch {}
+    }
+    haptic('light');
+  });
+
+  $('#consentSpecial')?.addEventListener('change', async (e) => {
+    state.consent.specialCategories = e.target.checked;
+    save();
+    if (accountInfo?.id) {
+      try { await supabaseSaveConsent(accountInfo.id, 'specialCategories', e.target.checked); } catch {}
+    }
+    haptic('light');
+  });
+
+  $('#consentProfiling')?.addEventListener('change', async (e) => {
+    state.consent.profiling = e.target.checked;
+    save();
+    if (accountInfo?.id) {
+      try { await supabaseSaveConsent(accountInfo.id, 'profiling', e.target.checked); } catch {}
+    }
+    haptic('light');
+  });
+
 }
 
 function openRegisterDialog() {
@@ -4787,7 +4848,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v181</div>
+        <div class="muted app-version">v182</div>
     </div>
   `;
 
@@ -5126,46 +5187,15 @@ function renderStats() {
         </div>
       </div>
 
-      <div class="card" id="legalConsentCard" ${allLegalConsentsAccepted && state.ui?.legalConsentExpanded !== true ? 'hidden' : ''}>
-        <button class="accordion-head narrow" type="button" data-toggle-legal-consent aria-expanded="${state.ui?.legalConsentExpanded ? 'true' : 'false'}">
-          <span class="accordion-title">Согласия</span>
-          <span class="chevron" aria-hidden="true"></span>
+      <div class="card" id="legalConsentCard">
+        <button id="btnOpenConsent" class="btn" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block">
+          📄 Согласие${allLegalConsentsAccepted ? ' ✓' : ''}
         </button>
-        <div class="accordion-body" ${state.ui?.legalConsentExpanded ? '' : 'hidden'}>
-          <div class="consent-inline" style="font-size:12px">
-            <div class="muted">Ознакомьтесь с документами по ссылкам и подтвердите согласие.</div>
-            <div class="consent-list">
-              <div class="consent-doc">
-                <a class="consent-doc-link" href="./legal.html#offer" target="_blank" rel="noopener">📄 Публичная оферта</a>
-              </div>
-              <div class="consent-doc">
-                <a class="consent-doc-link" href="./legal.html#agreement" target="_blank" rel="noopener">📄 Пользовательское соглашение</a>
-              </div>
-              <div class="consent-doc">
-                <a class="consent-doc-link" href="./legal.html#privacy" target="_blank" rel="noopener">📄 Политика конфиденциальности (152-ФЗ)</a>
-              </div>
-            </div>
-            <div class="row-inline" style="margin-top:8px">
-              <button id="btnAcceptAll" class="btn ${allLegalConsentsAccepted ? 'ok' : ''}" type="button">${allLegalConsentsAccepted ? 'Согласие принято ✓' : 'Я согласен со всеми пунктами'}</button>
-            </div>
-            <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
-              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:6px">
-                <input type="checkbox" id="consentGeo" ${state.consent?.geo ? 'checked' : ''} style="margin-top:2px;width:14px;height:14px;accent-color:var(--brand)" />
-                <span>Разрешаю обработку <b>геолокации</b> для показа анкет рядом со мной <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:var(--brand)">(подробнее)</a></span>
-              </label>
-              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:6px">
-                <input type="checkbox" id="consentSpecial" ${state.consent?.specialCategories ? 'checked' : ''} style="margin-top:2px;width:14px;height:14px;accent-color:var(--brand)" />
-                <span>Даю согласие на обработку <b>специальных категорий ПДн</b> (сведения о личной и интимной жизни) в соответствии со ст. 10 152-ФЗ</span>
-              </label>
-              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
-                <input type="checkbox" id="consentProfiling" ${state.consent?.profiling !== false ? 'checked' : ''} style="margin-top:2px;width:14px;height:14px;accent-color:var(--brand)" />
-                <span>Согласен на <b>профилирование</b> для подбора партнёров (алгоритм «дерево решений») — можно отключить</span>
-              </label>
-            </div>
-            <div class="muted" style="margin-top:6px">Продолжая пользоваться данным приложением вы даёте согласие с правилами пользования сервиса.</div>
-          </div>
+        <div class="muted" style="text-align:center;margin-top:6px;font-size:12px">
+          ${allLegalConsentsAccepted ? 'Все согласия приняты — документы, геолокация, спецкатегории, профилирование' : 'Документы и согласия на обработку данных'}
         </div>
       </div>
+
     </div>
   `;
 
@@ -5344,14 +5374,16 @@ function renderStats() {
     });
   });
 
-  $('#view-stats').querySelector('[data-toggle-legal-consent]')?.addEventListener('click', () => {
-    state.ui = state.ui || {};
-    state.ui.legalConsentExpanded = !state.ui.legalConsentExpanded;
-    const card = document.getElementById('legalConsentCard');
-    if (card) card.hidden = false;
-    save();
-    renderAll();
+  $('#view-stats').querySelector('#btnOpenConsent')?.addEventListener('click', () => {
+    haptic('light');
+    openConsentDialog();
   });
+
+  const consentClose = $('#btnConsentClose');
+  if (consentClose && !consentClose.dataset.wired) {
+    consentClose.dataset.wired = '1';
+    consentClose.addEventListener('click', () => $('#dlgConsent')?.close());
+  }
 
   $('#view-stats').querySelector('#btnOpenAccount')?.addEventListener('click', () => {
     haptic('light');

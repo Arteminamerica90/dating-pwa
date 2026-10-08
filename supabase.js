@@ -29,7 +29,37 @@ export function isSupabaseConfigured() {
 
 export function getSupabase() {
   if (!clientPromise) clientPromise = createSupabaseClient();
+  // Сетевой сбой при импорте SDK не должен «отравлять» клиент навсегда —
+  // иначе каждый следующий вход падает мгновенно без повторной попытки.
+  clientPromise = clientPromise.catch((err) => {
+    clientPromise = null;
+    throw err;
+  });
   return clientPromise;
+}
+
+// Сетевые сбои (QUIC/HTTP2 ping/CORS-обрывы) на Supabase бывают спорадически:
+// сервер отвечает 200, но fetch уже упал. Повторяем 3 раза с паузой.
+export function isNetworkError(err) {
+  const msg = String(err?.message || err || '');
+  return (
+    err instanceof TypeError ||
+    /failed to fetch|networkerror|network error|load failed|net::|ERR_/i.test(msg)
+  );
+}
+
+async function withNetRetry(fn, attempts = 3) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!isNetworkError(err) || i === attempts - 1) throw err;
+      await new Promise((r) => setTimeout(r, 400 + i * 600));
+    }
+  }
+  throw lastErr;
 }
 
 export function warmupSupabase() {
@@ -45,11 +75,11 @@ export function warmupSupabase() {
 export async function supabaseSignUp(email, password, options) {
   if (!isSupabaseConfigured()) throw new Error('Supabase не настроен');
   const supabase = await getSupabase();
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await withNetRetry(() => supabase.auth.signUp({
     email,
     password,
     options: { ...(options || {}), emailRedirectTo: siteRedirect() }
-  });
+  }));
   if (error) throw new Error(error.message);
   if (!data.user) throw new Error('Не удалось создать аккаунт (проверьте почту)');
   return { user: data.user, session: data.session };
@@ -58,7 +88,7 @@ export async function supabaseSignUp(email, password, options) {
 export async function supabaseSignIn(email, password) {
   if (!isSupabaseConfigured()) throw new Error('Supabase не настроен');
   const supabase = await getSupabase();
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await withNetRetry(() => supabase.auth.signInWithPassword({ email, password }));
   if (error) throw new Error(error.message);
   if (!data.user) throw new Error('Не удалось войти');
   return data.user;
@@ -73,9 +103,9 @@ export async function supabaseSignOut() {
 
 export async function supabaseResetPassword(email) {
   const supabase = await getSupabase();
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+  const { error } = await withNetRetry(() => supabase.auth.resetPasswordForEmail(email, {
     redirectTo: siteRedirect()
-  });
+  }));
   if (error) throw new Error(error.message);
 }
 

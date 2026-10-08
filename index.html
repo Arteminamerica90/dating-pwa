@@ -9,7 +9,7 @@
     <title>xystar</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=181" />
+    <link rel="stylesheet" href="./styles.css?v=182" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script defer src="https://widget.cloudpayments.ru/bundles/cloudpayments.js"></script>
@@ -256,6 +256,16 @@
       </div>
     </dialog>
 
+    <dialog id="dlgConsent" class="dialog">
+      <div class="dialog-card questionnaire-dialog">
+        <div class="dialog-head" style="justify-content:space-between">
+          <div class="dialog-title">Согласие</div>
+          <button class="btn ghost" id="btnConsentClose" type="button">✕</button>
+        </div>
+        <div id="consentDialogBody"></div>
+      </div>
+    </dialog>
+
     <dialog id="dlgAccount" class="dialog">
       <div class="dialog-card questionnaire-dialog">
         <div class="dialog-head" style="justify-content:space-between">
@@ -366,7 +376,7 @@
 
       window.__xystarImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=181')
+      import('./app.js?v=182')
         .then(() => {
           window.__xystarImportOk = true;
         })
