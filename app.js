@@ -1977,6 +1977,8 @@ function wireRegisterDialogOnce() {
     if (age && !age.checked) return __regMsg('Подтвердите, что вам исполнилось 18 лет', 0);
     const tp = $('#regThirdPartyConfirm');
     if (tp && !tp.checked) return __regMsg('Необходимо дать согласие на передачу данных третьим лицам', 0);
+    const pd = $('#regPersonalDataConfirm');
+    if (pd && !pd.checked) return __regMsg('Необходимо согласие на обработку персональных данных — без него анкета не публикуется', 0);
     __regBusy = true;
     const regBtn = $('#btnRegSubmit');
     const loginBtn = $('#btnRegLogin');
@@ -1991,6 +1993,16 @@ function wireRegisterDialogOnce() {
       state.cloud.enabled = true;
       save();
       accountInfo = reg.user;
+      const consent = $('#regPersonalDataConfirm')?.checked;
+      const newsletters = $('#regNewslettersConfirm')?.checked;
+      const cookies = $('#regCookiesConfirm')?.checked;
+      state.consent = state.consent || {};
+      state.consent.agreement = true;
+      state.consent.personalData = !!consent;
+      state.consent.newsletters = !!newsletters;
+      state.consent.cookies = !!cookies;
+      state.consent.thirdPartyData = !!tp?.checked;
+      save();
       __regAfterAuth(dlg);
       toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
       // Анкета публикуется на сервер только после согласия на обработку ПДн.
@@ -4786,14 +4798,9 @@ function renderDating() {
   let visible = candidates
     .filter((p) => feedEligible(p) && !state.dating.likes[p.id])
     .slice(0, 6);
-  if (visible.length < 3 && candidates.length) {
-    // Новых мало — возвращаем только те анкеты, которые уже лайкнули.
-    // Пропущенные не возвращаем: иначе верхняя карточка повторяется по кругу.
-    const recycled = candidates
-      .filter((p) => feedEligible(p) && state.dating.likes[p.id] === 'like')
-      .slice(0, Math.min(6 - visible.length, 6));
-    visible = [...visible, ...recycled].slice(0, 6);
-  }
+  // Обработанные анкеты (лайкнутые или пропущенные) в колоду не возвращаются —
+  // иначе одна и та же анкета показывается по кругу и создаётся ощущение,
+  // что лайки «не отправляются».
   const matches = getMutualMatches();
   const seenMatches = state.dating.seenMatches || {};
 
@@ -4871,7 +4878,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v184</div>
+        <div class="muted app-version">v185</div>
     </div>
   `;
 

@@ -9,7 +9,7 @@
     <title>xystar</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=184" />
+    <link rel="stylesheet" href="./styles.css?v=185" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script defer src="https://widget.cloudpayments.ru/bundles/cloudpayments.js"></script>
@@ -172,6 +172,24 @@
             <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
               <input type="checkbox" id="regThirdPartyConfirm" style="margin-top:3px;width:16px;height:16px;accent-color:var(--brand)" />
               <span>Я даю отдельное согласие на передачу моих персональных данных третьим лицам (Supabase, Vercel, GitHub, jsDelivr CDN, платёжная система) в целях обеспечения работы Сервиса. Подробнее: <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:var(--brand)">Политика конфиденциальности, п. 3.7</a>.</span>
+            </label>
+          </div>
+          <div class="row reg-consent" style="margin-bottom:4px">
+            <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="regPersonalDataConfirm" style="margin-top:3px;width:16px;height:16px;accent-color:var(--brand)" />
+              <span>Я даю согласие на обработку моих персональных данных в соответствии со ст. 9 Федерального закона № 152-ФЗ. Без этого согласия анкета не будет публиковаться для других участников. Подробнее: <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:var(--brand)">Политика конфиденциальности</a>.</span>
+            </label>
+          </div>
+          <div class="row reg-consent" style="margin-bottom:4px">
+            <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="regCookiesConfirm" style="margin-top:3px;width:16px;height:16px;accent-color:var(--brand)" />
+              <span>Я даю согласие на использование файлов cookie и метрики для обеспечения работы и улучшения Сервиса.</span>
+            </label>
+          </div>
+          <div class="row reg-consent" style="margin-bottom:4px">
+            <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="regNewslettersConfirm" checked style="margin-top:3px;width:16px;height:16px;accent-color:var(--brand)" />
+              <span>Хочу получать подборки и новости Сервиса (можно отключить в любой момент).</span>
             </label>
           </div>
           <div class="row-inline reg-actions">
@@ -376,7 +394,7 @@
 
       window.__xystarImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=184')
+      import('./app.js?v=185')
         .then(() => {
           window.__xystarImportOk = true;
         })
