@@ -9,7 +9,7 @@
     <title>xystar</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=183" />
+    <link rel="stylesheet" href="./styles.css?v=184" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script defer src="https://widget.cloudpayments.ru/bundles/cloudpayments.js"></script>
@@ -376,7 +376,7 @@
 
       window.__xystarImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=183')
+      import('./app.js?v=184')
         .then(() => {
           window.__xystarImportOk = true;
         })

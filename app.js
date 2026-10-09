@@ -1814,23 +1814,10 @@ function maybeStartOnboarding() {
   const ageSubmitBtn = $('#obAgeSubmit');
   const ageError = $('#obAgeError');
 
-  // Возраст в онбординге подтверждает только зарегистрированный пользователь.
-  const requireRegForAge = (e) => {
-    if (accountInfo?.id) return false;
-    if (e?.preventDefault) e.preventDefault();
-    requireRegistration('Подтверждение возраста доступно только зарегистрированным пользователям');
-    if (birthDateInput) birthDateInput.blur();
-    return true;
-  };
-
+  // Данные онбординга вводятся свободно и хранятся локально; на сервер
+  // публикуются только после регистрации (supabasePushProfile требует сессию
+  // и состоявшееся согласие на обработку персональных данных).
   if (birthDateInput) {
-    birthDateInput.addEventListener('focus', requireRegForAge);
-    birthDateInput.addEventListener('pointerdown', requireRegForAge);
-    birthDateInput.addEventListener('keydown', (e) => {
-      if (accountInfo?.id) return;
-      e.preventDefault();
-      requireRegistration('Подтверждение возраста доступно только зарегистрированным пользователям');
-    });
     birthDateInput.addEventListener('input', () => {
       const val = birthDateInput.value;
       if (!val) {
@@ -1856,7 +1843,6 @@ function maybeStartOnboarding() {
   }
 
   ageSubmitBtn?.addEventListener('click', () => {
-    if (requireRegForAge()) return;
     const val = birthDateInput?.value;
     if (!val) return;
 
@@ -2007,7 +1993,21 @@ function wireRegisterDialogOnce() {
       accountInfo = reg.user;
       __regAfterAuth(dlg);
       toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
-      setTimeout(() => openSubscriptionDialog(), 1500);
+      // Анкета публикуется на сервер только после согласия на обработку ПДн.
+      // Если согласие ещё не дано — показываем окно согласия, а подписку — после его закрытия.
+      if (!state.consent?.personalData) {
+        setTimeout(() => {
+          openConsentDialog();
+          const consentDlg = $('#dlgConsent');
+          const openSubAfterConsent = () => {
+            consentDlg?.removeEventListener('close', openSubAfterConsent);
+            setTimeout(() => openSubscriptionDialog(), 600);
+          };
+          consentDlg?.addEventListener('close', openSubAfterConsent);
+        }, 600);
+      } else {
+        setTimeout(() => openSubscriptionDialog(), 1500);
+      }
     } catch (err) {
       __regMsg(friendlyAuthError(err) || 'Ошибка', 0);
     } finally {
@@ -4871,7 +4871,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v183</div>
+        <div class="muted app-version">v184</div>
     </div>
   `;
 
