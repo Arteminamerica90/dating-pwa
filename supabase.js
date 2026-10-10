@@ -236,7 +236,7 @@ export async function supabaseListPublicProfiles({ excludeUserId, limit = 50 } =
   return (data || []).map((r) => {
     const flat = { id: r.id, updatedAt: r.updated_at };
     for (const c of PUBLIC_PROFILE_COLUMNS) {
-      if (c in r) flat[c] = r[c];
+      const k = 'payload->profile->' + c; if (k in r) flat[c] = r[k]; else if (c in r) flat[c] = r[c];
     }
     return flat;
   });
