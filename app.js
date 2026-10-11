@@ -1033,6 +1033,7 @@ async function init() {
 }
 
 let accountInfo = null;
+let lastAccountId = null;
 
 // Ссылки восстановления пароля (PKCE и implicit) приходят с этими маркерами в URL.
 const URL_HAD_AUTH_CODE = /([?&#])(code|access_token)=/.test(location.href) || /([?&#])type=(recovery|magiclink)/.test(location.href);
@@ -1040,9 +1041,18 @@ let mySubscription = { planId: 'free', likesThisMonth: 0, expiresAt: null, incom
 
 async function refreshAccountInfo() {
   try {
+    const prev = accountInfo?.id;
     accountInfo = await supabaseCurrentUser();
+    if (accountInfo?.id && prev !== accountInfo.id) {
+      lastAccountId = accountInfo.id;
+    } else if (!lastAccountId && accountInfo?.id) {
+      lastAccountId = accountInfo.id;
+    } else if (!accountInfo) {
+      lastAccountId = null;
+    }
   } catch {
     accountInfo = null;
+    lastAccountId = null;
   }
   await refreshSubscription();
   renderAccountBadge();
@@ -1194,6 +1204,7 @@ function boot() {
       toast('Введите новый пароль');
     } else if (event === 'SIGNED_OUT') {
       accountInfo = null;
+      lastAccountId = null;
       renderAccountBadge();
       renderAll();
     }
@@ -1328,17 +1339,29 @@ async function syncProfileAfterAuth() {
   try {
     const user = await supabaseCurrentUser();
     if (!user) return;
+    const accountSwitched = !!(lastAccountId && lastAccountId !== user.id);
+    if (accountSwitched) {
+      lastAccountId = user.id;
+    } else if (!lastAccountId) {
+      lastAccountId = user.id;
+    }
     const payload = await supabaseLoadProfile(user.id);
     if (payload) {
       if (payload.profile) {
         const remote = { ...payload.profile };
         const localAnswers = Object.keys(state.profile.questionnaireAnswers || {}).length;
         const remoteAnswers = Object.keys(remote.questionnaireAnswers || {}).length;
-        if (localAnswers > remoteAnswers) {
-          delete remote.questionnaireAnswers;
-          delete remote.portrait;
+        if (accountSwitched) {
+          state.profile = { ...remote };
+        } else {
+          if (localAnswers > remoteAnswers) {
+            delete remote.questionnaireAnswers;
+            delete remote.portrait;
+          }
+          state.profile = { ...state.profile, ...remote };
         }
-        state.profile = { ...state.profile, ...remote };
+      } else if (accountSwitched) {
+        state.profile = { name: user.email?.split('@')[0] || '', gender: '', birthDate: '', photos: [], interests: [], description: '', questionnaireAnswers: {} };
       }
       if (payload.plans) state.plans = payload.plans;
       if (payload.dating?.likes) state.dating.likes = { ...state.dating.likes, ...payload.dating.likes };
@@ -4900,7 +4923,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v188</div>
+        <div class="muted app-version">v189</div>
     </div>
   `;
 
