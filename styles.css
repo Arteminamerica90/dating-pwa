@@ -70,6 +70,30 @@ a { color: inherit; }
 .brand-sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
 .top-actions { display: flex; gap: 12px; }
 
+.app-topbar { justify-content: flex-start; }
+.app-logo { width: 40px; height: 40px; display: block; border-radius: var(--radius-md); flex: 0 0 auto; }
+
+.auth-head-brand { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+
+.auth-gate {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  padding: 28px 24px calc(48px + env(safe-area-inset-bottom));
+  max-width: 460px;
+  width: 100%;
+  margin: 0 auto;
+}
+.auth-gate-logo { width: 84px; height: 84px; border-radius: 26px; box-shadow: var(--shadow); display: block; }
+.auth-gate-logo-sm { width: 56px; height: 56px; border-radius: 18px; margin: 0 auto; }
+.auth-gate-wordmark { font-size: 30px; font-weight: 800; letter-spacing: 0.6px; }
+.auth-gate-sub { color: var(--muted); font-size: 14px; line-height: 1.45; margin-bottom: 10px; max-width: 320px; }
+.auth-gate .btn { width: 100%; max-width: 320px; }
+
 .tabs {
   position: fixed;
   left: 50%;

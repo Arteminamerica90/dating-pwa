@@ -1034,6 +1034,7 @@ async function init() {
 
 let accountInfo = null;
 let lastAccountId = null;
+let authResolved = false;
 
 // Ссылки восстановления пароля (PKCE и implicit) приходят с этими маркерами в URL.
 const URL_HAD_AUTH_CODE = /([?&#])(code|access_token)=/.test(location.href) || /([?&#])type=(recovery|magiclink)/.test(location.href);
@@ -1101,6 +1102,42 @@ function renderAccountBadge() {
     el.className = 'account-badge';
     el.innerHTML = `
       <span class="muted">Вход не выполнен</span>`;
+  }
+}
+
+// Гостю показываем экран регистрации вместо интерфейса: сначала онбординг,
+// затем регистрация, и только после входа — основной интерфейс с логотипом.
+function updateGuestGate() {
+  const signedIn = !!accountInfo?.id;
+  const showGate = authResolved && !signedIn;
+  const gate = document.getElementById('authGate');
+  const topbar = document.getElementById('appTopbar');
+  const tabs = document.querySelector('.tabs');
+  const main = document.querySelector('.main');
+  if (gate) gate.classList.toggle('hidden', !showGate);
+  if (tabs) tabs.classList.toggle('hidden', !signedIn);
+  if (main) main.classList.toggle('hidden', !signedIn);
+  // Шапку с логотипом прячем только когда показан экран регистрации
+  // (у него свой логотип); во время определения сессии она видна как заглушка.
+  if (topbar) topbar.classList.toggle('hidden', showGate);
+}
+
+function wireAuthGate() {
+  const reg = document.getElementById('authGateRegister');
+  const login = document.getElementById('authGateLogin');
+  if (reg && !reg.dataset.wired) {
+    reg.dataset.wired = '1';
+    reg.addEventListener('click', () => {
+      haptic('light');
+      openRegisterDialog();
+    });
+  }
+  if (login && !login.dataset.wired) {
+    login.dataset.wired = '1';
+    login.addEventListener('click', () => {
+      haptic('light');
+      openLoginDialog();
+    });
   }
 }
 
@@ -1189,9 +1226,12 @@ function boot() {
   wirePwa();
   wireSwipes();
   wireQuestionnaire();
+  wireAuthGate();
+  if (!isSupabaseConfigured()) authResolved = true;
   renderAll();
   maybeStartOnboarding();
   supabaseOnAuth((event) => {
+    authResolved = true;
     if (event === 'SIGNED_IN' || (event === 'INITIAL_SESSION' && isSupabaseConfigured())) {
       refreshAccountInfo();
       syncProfileAfterAuth();
@@ -1209,6 +1249,14 @@ function boot() {
       renderAll();
     }
   });
+  // Страховка: если событие авторизации почему-то не пришло, не оставляем
+  // гостя на пустом экране — показываем экран регистрации.
+  setTimeout(() => {
+    if (!authResolved) {
+      authResolved = true;
+      renderAll();
+    }
+  }, 2500);
 
   checkPendingPasswordReset();
 
@@ -1771,6 +1819,7 @@ function renderAll() {
   // renderCircle(); // скрыто — вернём позже
   renderAccountBadge();
   syncSettingsUi();
+  updateGuestGate();
 }
 
 function maybeStartOnboarding() {
@@ -4923,7 +4972,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v189</div>
+        <div class="muted app-version">v190</div>
     </div>
   `;
 

@@ -9,7 +9,7 @@
     <title>xystar</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=185" />
+    <link rel="stylesheet" href="./styles.css?v=190" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script defer src="https://widget.cloudpayments.ru/bundles/cloudpayments.js"></script>
@@ -52,6 +52,24 @@
             <button id="cookieSaveSettings" class="btn" type="button" style="display:none;font-size:12px;padding:6px 14px;color:#fff">Сохранить настройки</button>
           </div>
         </div>
+      </div>
+
+      <header class="topbar app-topbar" id="appTopbar">
+        <div class="brand">
+          <img class="app-logo" src="./icons/icon.svg" alt="xystar" width="40" height="40" />
+          <div>
+            <div class="brand-title">xystar</div>
+            <div class="brand-sub">Знакомства и досуг по интересам</div>
+          </div>
+        </div>
+      </header>
+
+      <div class="auth-gate hidden" id="authGate">
+        <img class="auth-gate-logo" src="./icons/icon.svg" alt="xystar" width="84" height="84" />
+        <div class="auth-gate-wordmark">xystar</div>
+        <div class="auth-gate-sub">Найдите людей рядом по интересам и целям</div>
+        <button class="btn" type="button" id="authGateRegister">Зарегистрироваться</button>
+        <button class="btn ghost" type="button" id="authGateLogin">Войти</button>
       </div>
 
       <nav class="tabs" aria-label="Разделы">
@@ -151,7 +169,10 @@
     <dialog id="dlgRegister" class="dialog">
       <div class="dialog-card questionnaire-dialog">
         <div class="dialog-head" style="justify-content:center">
-          <div class="dialog-title">Регистрация</div>
+          <div class="auth-head-brand">
+            <img class="auth-gate-logo auth-gate-logo-sm" src="./icons/icon.svg" alt="xystar" width="56" height="56" />
+            <div class="dialog-title" style="margin-top:8px">Регистрация</div>
+          </div>
         </div>
         <form class="auth-form" id="regForm" autocomplete="on" novalidate>
           <div class="row auth-field" style="margin-top:10px">
@@ -394,7 +415,7 @@
 
       window.__xystarImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=188')
+      import('./app.js?v=190')
         .then(() => {
           window.__xystarImportOk = true;
         })
