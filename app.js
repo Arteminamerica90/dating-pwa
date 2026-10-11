@@ -1232,8 +1232,10 @@ function boot() {
   maybeStartOnboarding();
   supabaseOnAuth((event) => {
     authResolved = true;
-    if (event === 'SIGNED_IN' || (event === 'INITIAL_SESSION' && isSupabaseConfigured())) {
-      refreshAccountInfo();
+    if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+      // Гостю syncProfileAfterAuth() выходит раньше и не рендерит — поэтому после
+      // определения сессии сами показываем либо экран регистрации, либо интерфейс.
+      refreshAccountInfo().then(() => updateGuestGate()).catch(() => updateGuestGate());
       syncProfileAfterAuth();
     } else if (event === 'PASSWORD_RECOVERY') {
       state.cloud.pendingPasswordReset = false;
@@ -1252,10 +1254,8 @@ function boot() {
   // Страховка: если событие авторизации почему-то не пришло, не оставляем
   // гостя на пустом экране — показываем экран регистрации.
   setTimeout(() => {
-    if (!authResolved) {
-      authResolved = true;
-      renderAll();
-    }
+    if (!authResolved) authResolved = true;
+    updateGuestGate();
   }, 2500);
 
   checkPendingPasswordReset();
@@ -4972,7 +4972,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v190</div>
+        <div class="muted app-version">v191</div>
     </div>
   `;
 

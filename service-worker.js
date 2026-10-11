@@ -1,9 +1,9 @@
-const CACHE_NAME = 'walkdate-v190';
+const CACHE_NAME = 'walkdate-v191';
 const CORE = [
   './',
   './index.html',
-  './styles.css?v=190',
-  './app.js?v=190',
+  './styles.css?v=191',
+  './app.js?v=191',
   './storage.js?v=70',
   './idb.js?v=70',
   './encryption.js?v=70',
