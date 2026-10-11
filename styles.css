@@ -2276,6 +2276,11 @@ a { color: inherit; }
   border-color: rgba(251, 113, 133, 0.95);
   background: linear-gradient(160deg, rgba(124, 58, 237, 0.5), rgba(225, 29, 72, 0.55));
 }
+.tinder-photo-actions .tbtn.back {
+  border-color: rgba(255, 255, 255, 0.95);
+  background: linear-gradient(160deg, rgba(124, 58, 237, 0.62), rgba(59, 130, 246, 0.6));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38), 0 0 22px rgba(59, 130, 246, 0.45);
+}
 
 .tinder-stamp {
   position: absolute;

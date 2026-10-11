@@ -4878,7 +4878,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v186</div>
+        <div class="muted app-version">v187</div>
     </div>
   `;
 
@@ -6612,6 +6612,12 @@ function mountTinder(profiles) {
       e.stopPropagation();
       return;
     }
+    const backBtn = e.target.closest('[data-tinder-back]');
+    if (backBtn) {
+      goBack();
+      e.stopPropagation();
+      return;
+    }
     if (e.target.closest('[data-report]')) {
       closeMenus();
       return;
@@ -6641,8 +6647,24 @@ function mountTinder(profiles) {
   const commit = (dir) => {
     const pid = top.dataset.pid;
     if (!pid) return;
+    state.dating.swipeHistory = state.dating.swipeHistory || [];
+    state.dating.swipeHistory.push({ id: pid, dir });
+    save();
     if (dir === 'right') onLike(pid);
     else onSkip(pid);
+  };
+
+  const goBack = () => {
+    if (state.__locked) return;
+    const hist = state.dating.swipeHistory || [];
+    const last = hist.pop();
+    if (!last) return;
+    delete state.dating.likes[last.id];
+    state.dating.swipeHistory = hist;
+    save();
+    toast('Возврат: анкета вернулась в колоду');
+    haptic('open');
+    renderDating();
   };
 
   const onUp = () => {
@@ -6791,6 +6813,7 @@ function renderTinderInner(p) {
     <div class="tinder-photo-actions">
       <button class="tbtn nope" type="button" data-tinder="nope" aria-label="Не нравится">&#10005;</button>
       <button class="tbtn like" type="button" data-tinder="like" aria-label="Нравится">&#10084;</button>
+      ${(state.dating.swipeHistory || []).length ? `<button class="tbtn back" type="button" data-tinder-back aria-label="Назад" title="Вернуть предыдущую анкету"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg></button>` : ''}
     </div>
     <div class="tinder-menu-wrap tinder-menu-bottom">
       <button class="tinder-dots" type="button" data-tinder-menu aria-label="Ещё">&#8943;</button>
