@@ -4700,6 +4700,28 @@ function countQuestionnaireMatches(userProfile = state.profile, candidate = {}) 
 }
 
 function renderDating() {
+  if (!accountInfo?.id) {
+    const cards = `
+      <div class="card">
+        <div class="card-title">Общение</div>
+        <div class="tinder-wrap">
+          <div class="tinder-empty">
+            <div class="tinder-empty-text">Общение доступно только зарегистрированным пользователям.</div>
+          </div>
+        </div>
+      </div>
+    `;
+    return `
+      <div class="locked-wrap locked">
+        ${cards}
+        <div class="locked-overlay">
+          <div class="locked-badge">🔒</div>
+          <div class="locked-text">Свайпы, анкеты и метчи доступны только после регистрации.</div>
+          <button class="btn" type="button" data-open-tab="account">Зарегистрироваться</button>
+        </div>
+      </div>
+    `;
+  }
   syncReportStatuses().catch(() => {});
   const cityKey = currentCityKey();
   const userPortrait = buildQuestionnairePortrait(state.profile?.questionnaireAnswers || {});
@@ -4878,7 +4900,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v187</div>
+        <div class="muted app-version">v188</div>
     </div>
   `;
 
