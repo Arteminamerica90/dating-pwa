@@ -1334,7 +1334,7 @@ async function handleSupabaseAccountDelete(req, res) {
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   const user = await supabaseVerifyAccessToken(token);
   if (!user?.id) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
-  if (!SB_SERVICE()) return sendJson(res, 503, { error: 'service_key_missing' }, corsHeaders());
+  if (!SB_SERVICE()) return sendJson(res, 503, { error: 'service_key_missing', _diag: { vercelEnv: process.env.VERCEL_ENV || null, total: Object.keys(process.env).length, service: !!process.env.SUPABASE_SERVICE_KEY, serviceLen: (process.env.SUPABASE_SERVICE_KEY || '').length, serviceRole: !!process.env.SUPABASE_SERVICE_ROLE_KEY, names: Object.keys(process.env).filter((k) => /SUPABASE|SERVICE/i.test(k)) } }, corsHeaders());
   const uid = user.id;
   try {
     const ip = String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '');
