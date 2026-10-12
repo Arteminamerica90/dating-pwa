@@ -1246,7 +1246,7 @@ function boot() {
       toast('Введите новый пароль');
     } else if (event === 'SIGNED_OUT') {
       // Сессия завершена (в т.ч. протухла) — стираем локальные данные и на старт.
-      clearLocalUserData().then(() => { renderAll(); maybeStartOnboarding(); });
+      clearLocalUserData().then(() => renderAll());
     }
   });
   // Страховка: если событие авторизации почему-то не пришло, не оставляем
@@ -2182,7 +2182,6 @@ function wireAccountDialogBody() {
     await clearLocalUserData();
     toast('Выход');
     renderAll();
-    maybeStartOnboarding();
     if (btn) { btn.disabled = false; btn.textContent = old; }
   });
 
@@ -2278,7 +2277,7 @@ function wireAccountDialogBody() {
         accountInfo = null;
         save();
         renderAll();
-        refreshAccountDialogIfOpen();
+        $('#dlgAccount')?.close();
         toast('Аккаунт удалён. Прощайте!');
       } catch (err) {
         toast(err?.message || 'Не удалось удалить аккаунт');
@@ -4994,7 +4993,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v192</div>
+        <div class="muted app-version">v193</div>
     </div>
   `;
 
