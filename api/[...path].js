@@ -1272,11 +1272,11 @@ async function supabaseAdminRequest(path, options = {}) {
 
 async function supabaseVerifyAccessToken(token) {
   const supabaseUrl = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !anonKey || !token) return null;
+  const apiKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !apiKey || !token) return null;
   try {
     const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: { 'apikey': anonKey, 'Authorization': `Bearer ${token}` }
+      headers: { 'apikey': apiKey, 'Authorization': `Bearer ${token}` }
     });
     if (!res.ok) return null;
     const info = await res.json();
@@ -1330,7 +1330,7 @@ async function handleSupabaseAccountDelete(req, res) {
   const auth = String(req.headers.authorization || '');
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   const user = await supabaseVerifyAccessToken(token);
-  if (!user?.id) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
+  if (!user?.id) return sendJson(res, 401, { error: 'unauthorized', _diag: { url: !!process.env.SUPABASE_URL, anon: !!process.env.SUPABASE_ANON_KEY, service: !!process.env.SUPABASE_SERVICE_KEY, names: Object.keys(process.env).filter((k) => /SUPABASE|SERVICE/i.test(k)) } }, corsHeaders());
   const uid = user.id;
   try {
     const ip = String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '');
