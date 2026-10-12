@@ -1253,11 +1253,16 @@ async function handleAccountDelete(req, res) {
   }
 }
 
+// Публичные значения проекта (они и так лежат в клиентском коде); в Vercel
+// достаточно задать только секретный SUPABASE_SERVICE_KEY.
+const SB_URL = process.env.SUPABASE_URL || 'https://mdabznllmqnhddgwontq.supabase.co';
+const SB_ANON = process.env.SUPABASE_ANON_KEY || 'sb_publishable_tzNogxPFA4jfbNhfIRd0-g_-tHDh7JM';
+function SB_SERVICE() { return process.env.SUPABASE_SERVICE_KEY || ''; }
+
 async function supabaseAdminRequest(path, options = {}) {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-  if (!supabaseUrl || !supabaseKey) return null;
-  const res = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
+  const supabaseKey = SB_SERVICE();
+  if (!SB_URL || !supabaseKey) return null;
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -1271,11 +1276,10 @@ async function supabaseAdminRequest(path, options = {}) {
 }
 
 async function supabaseVerifyAccessToken(token) {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const apiKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !apiKey || !token) return null;
+  const apiKey = SB_SERVICE() || SB_ANON;
+  if (!SB_URL || !apiKey || !token) return null;
   try {
-    const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    const res = await fetch(`${SB_URL}/auth/v1/user`, {
       headers: { 'apikey': apiKey, 'Authorization': `Bearer ${token}` }
     });
     if (!res.ok) return null;
@@ -1287,11 +1291,10 @@ async function supabaseVerifyAccessToken(token) {
 }
 
 async function supabaseAdminDeleteAuthUser(uid) {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_KEY;
-  if (!supabaseUrl || !serviceKey) return false;
+  const serviceKey = SB_SERVICE();
+  if (!SB_URL || !serviceKey) return false;
   try {
-    const res = await fetch(`${supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(uid)}`, {
+    const res = await fetch(`${SB_URL}/auth/v1/admin/users/${encodeURIComponent(uid)}`, {
       method: 'DELETE',
       headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` }
     });
@@ -1330,7 +1333,8 @@ async function handleSupabaseAccountDelete(req, res) {
   const auth = String(req.headers.authorization || '');
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   const user = await supabaseVerifyAccessToken(token);
-  if (!user?.id) return sendJson(res, 401, { error: 'unauthorized', _diag: { url: !!process.env.SUPABASE_URL, anon: !!process.env.SUPABASE_ANON_KEY, service: !!process.env.SUPABASE_SERVICE_KEY, names: Object.keys(process.env).filter((k) => /SUPABASE|SERVICE/i.test(k)) } }, corsHeaders());
+  if (!user?.id) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
+  if (!SB_SERVICE()) return sendJson(res, 503, { error: 'service_key_missing' }, corsHeaders());
   const uid = user.id;
   try {
     const ip = String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '');
