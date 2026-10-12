@@ -2704,7 +2704,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET' && url.pathname === '/api/audit') return handleAuditLog(req, res);
   if (req.method === 'GET' && url.pathname === '/api/data/export') return handleDataExport(req, res);
   if (req.method === 'DELETE' && url.pathname === '/api/account') return handleAccountDelete(req, res);
-  if (req.method === 'POST' && url.pathname === '/api/account/delete') return handleSupabaseAccountDelete(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/account-delete') return handleSupabaseAccountDelete(req, res);
   if (req.method === 'POST' && url.pathname === '/api/validate-photo') return handleValidatePhoto(req, res);
   if (req.method === 'POST' && url.pathname === '/api/photo/analyze') return handlePhotoAnalyze(req, res);
   if (req.method === 'POST' && url.pathname === '/api/message') return handleMessage(req, res);

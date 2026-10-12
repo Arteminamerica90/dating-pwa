@@ -2264,7 +2264,7 @@ function wireAccountDialogBody() {
           const sbToken = await supabaseAccessToken();
           if (sbToken) {
             const apiBase = normalizeServerUrl(state.cloud?.serverUrl || location.origin);
-            const resp = await fetch(`${apiBase}/api/account/delete`, {
+            const resp = await fetch(`${apiBase}/api/account-delete`, {
               method: 'POST',
               headers: { Authorization: `Bearer ${sbToken}` }
             });
@@ -5007,7 +5007,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v194</div>
+        <div class="muted app-version">v195</div>
     </div>
   `;
 
