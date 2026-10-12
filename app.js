@@ -21,6 +21,7 @@ import {
   isSupabaseConfigured,
   supabaseCurrentUser,
   supabaseLocalSession,
+  supabaseAccessToken,
   supabaseEnsureMatch,
   supabaseGetMyLikes,
   supabaseGetMyMatches,
@@ -48,7 +49,7 @@ import {
   supabaseSaveConsent,
   supabaseSaveConsentsBulk,
   supabaseGetConsents
-} from './supabase.js?v=107';
+} from './supabase.js?v=108';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
@@ -2255,19 +2256,32 @@ function wireAccountDialogBody() {
     const btn = $('#btnDeleteAccount');
     runWithButton($('#btnDeleteAccount'), 'Удалить аккаунт', async () => {
       try {
-        const server = state.cloud?.serverUrl;
-        const token = state.cloud?.token;
-        if (server && token) {
-          try {
-            const apiBase = normalizeServerUrl(server);
-            await fetch(`${apiBase}/api/account`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-          } catch (err) {
-            console.warn('delete server', err?.message);
+        // Настоящее удаление — на сервере: он проверяет наш Supabase-токен,
+        // сносит данные service-ключом и удаляет пользователя из auth.users.
+        // Без этого вход и анкета восстанавливались при следующем входе.
+        let serverDeleted = false;
+        try {
+          const sbToken = await supabaseAccessToken();
+          if (sbToken) {
+            const apiBase = normalizeServerUrl(state.cloud?.serverUrl || location.origin);
+            const resp = await fetch(`${apiBase}/api/account/delete`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${sbToken}` }
+            });
+            if (resp.ok) {
+              const data = await resp.json().catch(() => ({}));
+              serverDeleted = !!data?.ok;
+              if (!data?.authDeleted) console.warn('delete: auth user not deleted');
+            }
           }
+        } catch (err) {
+          console.warn('delete server', err?.message);
         }
-        if (accountInfo?.id) {
+        // Подстраховка, если сервер недоступен: чистим строки клиентом.
+        if (!serverDeleted && accountInfo?.id) {
           try { await supabaseDeleteProfile(accountInfo.id); } catch (err) { console.warn('delete supabase', err?.message); }
         }
+        await supabaseSignOut().catch(() => {});
         // Уничтожаем локальное состояние (152-ФЗ ст. 21).
         const fresh = defaultState();
         state.profile = fresh.profile;
@@ -4993,7 +5007,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v193</div>
+        <div class="muted app-version">v194</div>
     </div>
   `;
 

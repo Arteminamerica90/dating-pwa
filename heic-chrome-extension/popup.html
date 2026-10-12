@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HEIC → JPEG/PNG</title>
+  <link rel="stylesheet" href="css/popup.css">
+</head>
+
+<body>
+  <div class="popup-container">
+    <header class="header">
+      <h1>HEIC → JPEG / PNG</h1>
+      <p class="subtitle">Конвертация без загрузки на сервер</p>
+    </header>
+
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" accept=".heic,.heif,image/heic,image/heif" multiple hidden>
+      <div class="dropzone-content">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M12 16V4m0 0l-4 4m4-4l4 4M2 16l1.5 2.5A2 2 0 005.5 21h13a2 2 0 001.5-1.5L22 16" />
+        </svg>
+        <p>Выбери или перетащи <b>.HEIC/.HEIF</b></p>
+        <small>Множественный выбор</small>
+      </div>
+    </div>
+
+    <div class="settings">
+      <div class="setting-row">
+        <label for="format">Формат</label>
+        <select id="format">
+          <option value="jpeg">JPEG</option>
+          <option value="png">PNG</option>
+        </select>
+      </div>
+      <div class="setting-row" id="qualityRow">
+        <label for="quality">Качество JPEG: <span id="qualityValue">90%</span></label>
+        <input type="range" id="quality" min="0.1" max="1" step="0.05" value="0.9">
+      </div>
+      <div class="checkbox-row">
+        <label>
+          <input type="checkbox" id="resizeCheck"> Ограничить максимальный размер
+        </label>
+      </div>
+      <div class="resize-row hidden" id="resizeRow">
+        <input type="number" id="maxWidth" placeholder="Ширина, px" min="1">
+        <input type="number" id="maxHeight" placeholder="Высота, px" min="1">
+      </div>
+    </div>
+
+    <button class="convert-btn" id="convertBtn" disabled>Конвертировать все</button>
+
+    <div class="results" id="results"></div>
+
+    <footer class="footer">
+      <small>Всё выполняется локально</small>
+    </footer>
+  </div>
+
+  <script src="js/libheif.js"></script>
+  <script type="module" src="js/popup.js"></script>
+</body>
+
+</html>

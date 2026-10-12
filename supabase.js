@@ -159,6 +159,15 @@ export async function supabaseLocalSession() {
   return data.session.user;
 }
 
+// Access-token текущей сессии: нужен серверу, чтобы удалить аккаунт
+// (service_role-ключ хранится только на сервере).
+export async function supabaseAccessToken() {
+  if (!isSupabaseConfigured()) return null;
+  const supabase = await getSupabase();
+  const { data } = await supabase.auth.getSession();
+  return data?.session?.access_token || null;
+}
+
 export async function supabaseLoadProfile(userId) {
   const supabase = await getSupabase();
   const { data, error } = await supabase

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UI Coach</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">UI&nbsp;Coach</div>
+      <div id="tabInfo" class="tab-info" title="Активная вкладка">—</div>
+    </header>
+
+    <section class="ask">
+      <p class="hint-line">Задайте вопрос один раз — дальше ведёт сама страница: карточка с шагом рядом с нужной кнопкой.</p>
+      <div class="row">
+        <label class="field">
+          <span>Инструмент</span>
+          <select id="tool"></select>
+        </label>
+        <label class="field narrow">
+          <span>Где</span>
+          <select id="surface">
+            <option value="web">Веб (в браузере)</option>
+            <option value="desktop">Настольная</option>
+          </select>
+        </label>
+      </div>
+
+      <textarea id="goal" rows="3" placeholder="Что хочу узнать. Например: как делать маски в After Effects"></textarea>
+
+      <div class="examples" id="examples"></div>
+
+      <div class="actions">
+        <button id="ask" class="primary">Показать на интерфейсе</button>
+        <button id="pick" class="ghost" title="Кликните по нужному элементу прямо на странице">Указать элемент мышью</button>
+      </div>
+      <div id="status" class="status"></div>
+    </section>
+
+    <section id="plan" class="plan" hidden>
+      <div class="plan-head">
+        <span id="planTool" class="badge"></span>
+        <span id="planMeta" class="meta"></span>
+      </div>
+      <p id="planSummary" class="summary"></p>
+      <ol id="steps" class="steps"></ol>
+
+      <div class="nav">
+        <button id="prev" title="Предыдущий шаг">←</button>
+        <button id="next" title="Следующий шаг">→</button>
+        <button id="stop" title="Убрать подсветку">Убрать</button>
+        <label class="check"><input type="checkbox" id="dim" /> затемнить фон</label>
+      </div>
+
+      <details id="assumptions" class="details" hidden>
+        <summary>Допущения и подводные камни</summary>
+        <div id="assumptionsBody"></div>
+      </details>
+
+      <div id="pickCard" class="pick-card" hidden></div>
+      <div id="toolOffer" class="offer" hidden></div>
+    </section>
+
+    <nav class="tabs">
+      <button data-tab="tools" class="tab active">Инструменты</button>
+      <button data-tab="settings" class="tab">Настройки</button>
+      <span id="providerState" class="provider"></span>
+    </nav>
+
+    <section id="tab-tools" class="pane active">
+      <div id="toolsList" class="tools"></div>
+      <details class="details" id="addToolBox">
+        <summary>Добавить инструмент вручную</summary>
+        <div class="form">
+          <label>Название<input id="nt_name" type="text" placeholder="Blender" /></label>
+          <label>Тип<input id="nt_kind" type="text" placeholder="3D-моделирование" /></label>
+          <label>URL веб-версии (шаблон, можно * )<input id="nt_url" type="text" placeholder="*://*.blender.org/*" /></label>
+          <label>Название веб-версии<input id="nt_weblabel" type="text" placeholder="Веб-версия" /></label>
+          <button id="nt_save" class="primary small">Сохранить инструмент</button>
+        </div>
+      </details>
+      <details class="details" id="addTopicBox">
+        <summary>Добавить тему (как устроен инструмент) — работает без ИИ</summary>
+        <div class="form">
+          <label>Инструмент<select id="ntp_tool"></select></label>
+          <label>Ключевые слова через запятую<input id="ntp_keywords" type="text" placeholder="маска, mask, рото" /></label>
+          <label>Название темы<input id="ntp_title" type="text" placeholder="Маски" /></label>
+          <div id="ntp_steps" class="step-editor"></div>
+          <button id="ntp_add" class="ghost small">+ шаг</button>
+          <button id="ntp_save" class="primary small">Сохранить тему</button>
+        </div>
+      </details>
+    </section>
+
+    <section id="tab-settings" class="pane">
+      <div class="form">
+        <label>Провайдер ИИ
+          <select id="st_provider">
+            <option value="openai">OpenAI (или совместимый: Groq, OpenRouter, YandexGPT…)</option>
+            <option value="anthropic">Anthropic Claude</option>
+            <option value="ollama">Ollama локально (офлайн)</option>
+            <option value="none">Без ИИ (только встроенная база)</option>
+          </select>
+        </label>
+        <label>Base URL<input id="st_base" type="text" placeholder="https://api.openai.com/v1" /></label>
+        <label>Модель<input id="st_model" type="text" placeholder="gpt-4o-mini" /></label>
+        <label>API-ключ<input id="st_key" type="password" placeholder="sk-…" /></label>
+        <label>Элементов в каталоге страницы<input id="st_limit" type="number" min="60" max="800" step="20" /></label>
+        <div class="note">Подсказки показываются прямо на странице: карточка рядом с нужной кнопкой, «Далее» в ней, переход — по клику на выделенный элемент. Голос включается галочкой ниже.</div>
+        <label class="check"><input type="checkbox" id="st_auto" /> сразу подсвечивать первый шаг</label>
+        <label class="check"><input type="checkbox" id="st_dim" /> затемнять страницу вокруг подсветки</label>
+        <label class="check"><input type="checkbox" id="st_voice" /> озвучивать шаг голосом</label>
+        <div class="actions">
+          <button id="st_save" class="primary small">Сохранить настройки</button>
+          <button id="st_test" class="ghost small">Проверить связь</button>
+        </div>
+        <div id="st_note" class="note"></div>
+      </div>
+    </section>
+
+    <script type="module" src="panel.js"></script>
+  </body>
+</html>

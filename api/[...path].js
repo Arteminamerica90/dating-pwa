@@ -1253,6 +1253,126 @@ async function handleAccountDelete(req, res) {
   }
 }
 
+async function supabaseAdminRequest(path, options = {}) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !supabaseKey) return null;
+  const res = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': supabaseKey,
+      'Authorization': `Bearer ${supabaseKey}`,
+      ...options.headers
+    }
+  });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+
+async function supabaseVerifyAccessToken(token) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !anonKey || !token) return null;
+  try {
+    const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: { 'apikey': anonKey, 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) return null;
+    const info = await res.json();
+    return info && info.id ? info : null;
+  } catch {
+    return null;
+  }
+}
+
+async function supabaseAdminDeleteAuthUser(uid) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !serviceKey) return false;
+  try {
+    const res = await fetch(`${supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(uid)}`, {
+      method: 'DELETE',
+      headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` }
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function anonymizeAuditForAdmin(uid) {
+  const rows = await supabaseAdminRequest(`audit_log?user_id=eq.${encodeURIComponent(uid)}&limit=500&select=id,details`);
+  if (!Array.isArray(rows)) return 0;
+  const erased = erasedUserId(uid);
+  let n = 0;
+  for (const row of rows) {
+    const details = row.details && typeof row.details === 'object' ? row.details : {};
+    const clean = {};
+    for (const [k, v] of Object.entries(details)) {
+      if (k === 'email' || k === 'accountId' || k === 'targetId') continue;
+      clean[k] = v;
+    }
+    await supabaseAdminRequest(`audit_log?id=eq.${encodeURIComponent(row.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ user_id: erased, details: clean })
+    });
+    n++;
+  }
+  return n;
+}
+
+// Настоящее удаление аккаунта Supabase: клиент присылает свой access-token,
+// мы проверяем его, сносим данные service-ключом и удаляем пользователя из
+// auth.users. Без удаления из auth.users вход и анкета восстанавливались бы
+// при следующем входе (главная причина «аккаунт не удалился»).
+async function handleSupabaseAccountDelete(req, res) {
+  const auth = String(req.headers.authorization || '');
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  const user = await supabaseVerifyAccessToken(token);
+  if (!user?.id) return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
+  const uid = user.id;
+  try {
+    const ip = String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '');
+    auditAction(uid, 'account_delete_requested', { email: user.email }, { ip, userAgent: req.headers['user-agent'] });
+
+    // 1. Отменяем автопродления CloudPayments, чтобы не списывали после удаления.
+    const canceledSubscriptions = await cancelActiveSubscriptionsFor(uid);
+
+    // 2. Строки по user_id (profiles хранит id в колонке id, likes/messages/matches — парные колонки).
+    const byUserId = ['consents', 'current_consents', 'plans', 'locations', 'events', 'subscriptions'];
+    await Promise.all(byUserId.map((t) => supabaseAdminRequest(`${t}?user_id=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null)));
+    await Promise.all([
+      supabaseAdminRequest(`profiles?id=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null),
+      supabaseAdminRequest(`likes?from_user=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null),
+      supabaseAdminRequest(`likes?to_user=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null),
+      supabaseAdminRequest(`messages?from_user=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null),
+      supabaseAdminRequest(`messages?to_user=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null),
+      supabaseAdminRequest(`matches?a_user=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null),
+      supabaseAdminRequest(`matches?b_user=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null),
+      supabaseAdminRequest(`reports?reporter_id=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null),
+      supabaseAdminRequest(`reports?target_id=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null),
+      supabaseAdminRequest(`moderation_status?target_id=eq.${encodeURIComponent(uid)}`, { method: 'DELETE' }).catch(() => null)
+    ]);
+
+    // 3. Журнал не удаляем, но обезличиваем (152-ФЗ: остаётся минимум 3 года).
+    const anonymizedAudit = await anonymizeAuditForAdmin(uid);
+
+    // 4. Удаляем самого пользователя из auth.users.
+    const authDeleted = await supabaseAdminDeleteAuthUser(uid);
+
+    return sendJson(res, 200, {
+      ok: true,
+      message: 'account_deleted',
+      authDeleted,
+      canceledSubscriptions: canceledSubscriptions.length,
+      anonymizedAudit
+    }, corsHeaders());
+  } catch {
+    return sendJson(res, 400, { error: 'bad_request' }, corsHeaders());
+  }
+}
+
 function validateImageBuffer(buffer, filename) {
   if (!buffer || buffer.length < 100) return { ok: false, error: 'empty_file' };
   if (buffer.length > 10 * 1024 * 1024) return { ok: false, error: 'file_too_large_10mb' };
@@ -2584,6 +2704,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET' && url.pathname === '/api/audit') return handleAuditLog(req, res);
   if (req.method === 'GET' && url.pathname === '/api/data/export') return handleDataExport(req, res);
   if (req.method === 'DELETE' && url.pathname === '/api/account') return handleAccountDelete(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/account/delete') return handleSupabaseAccountDelete(req, res);
   if (req.method === 'POST' && url.pathname === '/api/validate-photo') return handleValidatePhoto(req, res);
   if (req.method === 'POST' && url.pathname === '/api/photo/analyze') return handlePhotoAnalyze(req, res);
   if (req.method === 'POST' && url.pathname === '/api/message') return handleMessage(req, res);
