@@ -2263,16 +2263,9 @@ function wireAccountDialogBody() {
         try {
           const sbToken = await supabaseAccessToken();
           if (sbToken) {
-            const apiBase = normalizeServerUrl(state.cloud?.serverUrl || location.origin);
-            const resp = await fetch(`${apiBase}/api/account-delete`, {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${sbToken}` }
-            });
-            if (resp.ok) {
-              const data = await resp.json().catch(() => ({}));
-              serverDeleted = !!data?.ok;
-              if (!data?.authDeleted) console.warn('delete: auth user not deleted');
-            }
+            const data = await requestAccountDelete(sbToken);
+            serverDeleted = !!data?.ok;
+            if (data && !data.authDeleted) console.warn('delete: auth user not deleted');
           }
         } catch (err) {
           console.warn('delete server', err?.message);
@@ -2299,6 +2292,31 @@ function wireAccountDialogBody() {
     });
   });
 
+}
+
+// Удаление аккаунта — на сервере (service-ключ Supabase есть только там).
+// Приложение живёт на статике (xystar.ru / GitHub Pages), поэтому запрос идёт
+// на Vercel-проект, где развёрнута /api. Перебираем известные хосты: у статики
+// собственного /api нет, поэтому нужен абсолютный адрес бэкенда.
+async function requestAccountDelete(sbToken) {
+  const local = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(location.origin);
+  const hosts = local
+    ? ['', location.origin]
+    : ['https://dating-pwa-pink.vercel.app', 'https://pwa-dating-delta.vercel.app', location.origin];
+  const seen = new Set();
+  for (const host of hosts) {
+    if (seen.has(host)) continue;
+    seen.add(host);
+    try {
+      const resp = await fetch(`${host}/api/account-delete`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${sbToken}` }
+      });
+      if (resp.ok) return await resp.json().catch(() => ({}));
+      if (resp.status === 401) return null;
+    } catch { /* пробуем следующий хост */ }
+  }
+  return null;
 }
 
 // Окно «Аккаунт»: все действия с аккаунтом (вход, пароль, данные, выход, удаление).
@@ -5007,7 +5025,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v195</div>
+        <div class="muted app-version">v196</div>
     </div>
   `;
 
