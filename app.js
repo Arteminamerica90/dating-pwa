@@ -1245,10 +1245,8 @@ function boot() {
       setTimeout(() => openChangePasswordDialog(), 350);
       toast('Введите новый пароль');
     } else if (event === 'SIGNED_OUT') {
-      accountInfo = null;
-      lastAccountId = null;
-      renderAccountBadge();
-      renderAll();
+      // Сессия завершена (в т.ч. протухла) — стираем локальные данные и на старт.
+      clearLocalUserData().then(() => { renderAll(); maybeStartOnboarding(); });
     }
   });
   // Страховка: если событие авторизации почему-то не пришло, не оставляем
@@ -1834,7 +1832,7 @@ function maybeStartOnboarding() {
 
   const dlg = $('#dlgOnboarding');
   if (!dlg) return;
-  dlg.showModal();
+  if (!dlg.open) dlg.showModal();
 
   let chosenGender = gender === 'male' ? 'male' : gender === 'female' ? 'female' : '';
 
@@ -2138,30 +2136,54 @@ function wireRegisterDialogOnce() {
 }
 
 
+const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Выход «как в Twinby»: возвращаемся на стартовый экран и НЕ храним на устройстве
+// персональные/платёжные данные и куки. Серверная копия не трогается — при
+// следующем входе анкета, переписка и оплата подтянутся заново по email.
+async function clearLocalUserData() {
+  if (cloudPushTimer) { clearTimeout(cloudPushTimer); cloudPushTimer = null; }
+  try { await clearState(); } catch { /* ignore */ }
+  state = defaultState();
+  mySubscription = { planId: 'free', likesThisMonth: 0, expiresAt: null, incomeAddons: [] };
+  accountInfo = null;
+  lastAccountId = null;
+  liveProfiles = [];
+  liveProfilesLoaded = false;
+  try {
+    localStorage.removeItem(COOKIE_CONSENT_KEY);
+    document.cookie.split(';').forEach((c) => {
+      const name = c.split('=')[0].trim();
+      if (name && !COOKIE_NECESSARY.includes(name)) {
+        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+      }
+    });
+  } catch { /* ignore */ }
+}
+
 // Действия аккаунта живут в диалоге #dlgAccount; вешаются после каждого рендера тела.
 function wireAccountDialogBody() {
-  $('#btnAccountLogout')?.addEventListener('click', (e) => {
+  $('#btnAccountLogout')?.addEventListener('click', async (e) => {
+    e.preventDefault();
     haptic('light');
     const btn = $('#btnAccountLogout');
     const old = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = 'Выход…'; }
-    // Local logout first — instant response, never blocked by network.
+    // Мгновенно убираем доступ к аккаунту в интерфейсе и закрываем окно аккаунта.
+    accountInfo = null;
     state.cloud.token = null;
     state.cloud.enabled = false;
-    accountInfo = null;
-    liveProfiles = [];
-    liveProfilesLoaded = false;
-    if (state.dating) {
-      state.dating.likedMe = {};
-      for (const id of Object.keys(state.dating.likes)) delete state.dating.likes[id];
-    }
-    save();
+    $('#dlgAccount')?.close();
+    renderAll();
+    // Best-effort: отдаём анкету на сервер и завершаем сессию, затем полностью
+    // стираем локальные данные (best-effort — сеть не должна блокировать выход).
+    await Promise.race([supabasePushProfile().catch(() => {}), delay(2500)]);
+    await Promise.race([supabaseSignOut().catch(() => {}), delay(2500)]);
+    await clearLocalUserData();
     toast('Выход');
     renderAll();
-    refreshAccountDialogIfOpen();
-    // Remote sign-out in background — must never block the UI.
-    supabaseSignOut().catch(() => {});
-    if (btn) setTimeout(() => { btn.disabled = false; btn.textContent = old; }, 400);
+    maybeStartOnboarding();
+    if (btn) { btn.disabled = false; btn.textContent = old; }
   });
 
   $('#btnChangePassword')?.addEventListener('click', () => {
@@ -4972,7 +4994,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v191</div>
+        <div class="muted app-version">v192</div>
     </div>
   `;
 
