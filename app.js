@@ -1130,7 +1130,7 @@ function wireAuthGate() {
     reg.dataset.wired = '1';
     reg.addEventListener('click', () => {
       haptic('light');
-      openRegisterDialog();
+      startRegistrationFlow();
     });
   }
   if (login && !login.dataset.wired) {
@@ -1230,13 +1230,20 @@ function boot() {
   wireAuthGate();
   if (!isSupabaseConfigured()) authResolved = true;
   renderAll();
-  maybeStartOnboarding();
+  // Cookie-баннер показываем сразу на первом экране: онбординг теперь не
+  // открывается сам и больше не «приносит» его за собой.
+  window.__showCookieBanner?.();
   supabaseOnAuth((event) => {
     authResolved = true;
     if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
       // Гостю syncProfileAfterAuth() выходит раньше и не рендерит — поэтому после
       // определения сессии сами показываем либо экран регистрации, либо интерфейс.
-      refreshAccountInfo().then(() => updateGuestGate()).catch(() => updateGuestGate());
+      refreshAccountInfo().then(() => {
+        updateGuestGate();
+        // Вопросы анкеты (пол/имя/возраст) задаём только после входа или по кнопке
+        // «Зарегистрироваться» — на первом экране гостя их быть не должно.
+        if (accountInfo?.id) maybeStartOnboarding();
+      }).catch(() => updateGuestGate());
       syncProfileAfterAuth();
     } else if (event === 'PASSWORD_RECOVERY') {
       state.cloud.pendingPasswordReset = false;
@@ -1821,64 +1828,110 @@ function renderAll() {
   updateGuestGate();
 }
 
-function maybeStartOnboarding() {
+// Данные анкеты (пол, имя, возраст) спрашиваем только по действию пользователя.
+// Раньше онбординг стартовал сам в boot(): гость видел вопросы и подтверждение
+// 18+ ещё до нажатия «Зарегистрироваться», а после выхода из старой анкеты
+// диалог больше не открывался — пол оставалось пустым и лента показывала обоих.
+function onboardingDataComplete() {
   const name = String(state.profile?.name || '').trim();
   const gender = String(state.profile?.gender || '').trim();
   const hasAge = !!state.profile?.birthDate && !!state.profile?.ageConfirmed;
+  return !!(name && name !== 'Вы' && gender && hasAge);
+}
 
-  if (name && name !== 'Вы' && gender && hasAge) {
-    window.__showCookieBanner?.();
+function startRegistrationFlow() {
+  if (onboardingDataComplete()) {
+    openRegisterDialog();
     return;
   }
+  maybeStartOnboarding();
+}
 
-  const dlg = $('#dlgOnboarding');
-  if (!dlg) return;
-  if (!dlg.open) dlg.showModal();
+let __obWired = false;
+let __obGender = '';
 
-  let chosenGender = gender === 'male' ? 'male' : gender === 'female' ? 'female' : '';
+function showOnboardingStep(which) {
+  const set = (id, on) => {
+    const el = document.querySelector(id);
+    if (el) el.hidden = !on;
+  };
+  // Шаги живут в DOM и переживают переоткрытия диалога — сбрасываем их явно,
+  // иначе после выхода из анкеты виден «не тот» шаг (это и была «каша»).
+  set('#onboardingStep1', which === 'gender');
+  set('#onboardingStep2', which === 'name');
+  set('#onboardingStepAge', which === 'age');
+  set('#onboardingStep3', which === 'done');
 
-  if (name && name !== 'Вы' && gender && !hasAge) {
-    $('#onboardingStep1').hidden = true;
-    $('#onboardingStep2').hidden = true;
-    $('#onboardingStepAge').hidden = false;
-    window.__showCookieBanner?.();
-  }
-
-  function showStep2() {
-    $('#onboardingStep1').hidden = true;
-    $('#onboardingStep2').hidden = false;
-    const inp = $('#obNameInput');
+  if (which === 'name') {
+    const inp = document.querySelector('#obNameInput');
+    const btn = document.querySelector('#obNameSubmit');
+    const cur = String(state.profile?.name || '').trim();
     if (inp) {
-      inp.value = name !== 'Вы' ? name : '';
-      inp.addEventListener('input', () => {
-        $('#obNameSubmit').disabled = !inp.value.trim();
-      });
+      inp.value = cur && cur !== 'Вы' ? cur : '';
+      if (btn) btn.disabled = !inp.value.trim();
       setTimeout(() => inp.focus(), 120);
     }
   }
+  if (which === 'age') {
+    const err = document.querySelector('#obAgeError');
+    if (err) { err.textContent = ''; err.style.display = 'none'; }
+    const submit = document.querySelector('#obAgeSubmit');
+    if (submit) submit.disabled = true;
+  }
+}
 
-  $('#obGenderMale')?.addEventListener('click', () => {
-    chosenGender = 'male';
+function maybeStartOnboarding() {
+  const dlg = $('#dlgOnboarding');
+  if (!dlg) return;
+  if (onboardingDataComplete()) {
     window.__showCookieBanner?.();
-    showStep2();
+    return;
+  }
+  if (!__obWired) {
+    __obWired = true;
+    wireOnboardingDialog(dlg);
+  }
+
+  const name = String(state.profile?.name || '').trim();
+  const gender = String(state.profile?.gender || '').trim();
+  const hasAge = !!state.profile?.birthDate && !!state.profile?.ageConfirmed;
+  __obGender = gender === 'male' ? 'male' : gender === 'female' ? 'female' : '';
+  const hasName = !!(name && name !== 'Вы');
+  const hasGender = gender === 'male' || gender === 'female';
+
+  if (!dlg.open) dlg.showModal();
+  if (hasName && hasGender && !hasAge) showOnboardingStep('age');
+  else if (hasGender && !hasName) showOnboardingStep('name');
+  else showOnboardingStep('gender');
+}
+
+function wireOnboardingDialog(dlg) {
+  $('#obGenderMale')?.addEventListener('click', () => {
+    __obGender = 'male';
+    window.__showCookieBanner?.();
+    showOnboardingStep('name');
   });
 
   $('#obGenderFemale')?.addEventListener('click', () => {
-    chosenGender = 'female';
+    __obGender = 'female';
     window.__showCookieBanner?.();
-    showStep2();
+    showOnboardingStep('name');
+  });
+
+  $('#obNameInput')?.addEventListener('input', (e) => {
+    const btn = $('#obNameSubmit');
+    if (btn) btn.disabled = !String(e.target.value || '').trim();
   });
 
   $('#obNameSubmit')?.addEventListener('click', () => {
     const nameVal = String($('#obNameInput')?.value || '').trim();
-    if (!nameVal) return;
+    if (!nameVal || !__obGender) return;
 
     state.profile.name = nameVal;
-    state.profile.gender = chosenGender;
+    state.profile.gender = __obGender;
     save();
 
-    $('#onboardingStep2').hidden = true;
-    $('#onboardingStepAge').hidden = false;
+    showOnboardingStep('age');
   });
 
   const birthDateInput = $('#obBirthDate');
@@ -1933,10 +1986,10 @@ function maybeStartOnboarding() {
 
     state.profile.birthDate = val;
     state.profile.ageConfirmed = true;
+    state.profile.gender = state.profile.gender || __obGender;
     save();
 
-    $('#onboardingStepAge').hidden = true;
-    $('#onboardingStep3').hidden = false;
+    showOnboardingStep('done');
     $('#obGreeting').textContent = `Привет, ${state.profile.name}!`;
 
     renderAll();
@@ -1951,6 +2004,12 @@ function maybeStartOnboarding() {
 
   $('#obSkip')?.addEventListener('click', () => {
     dlg.close();
+  });
+
+  // Гость может закрыть диалог (вернётся на экран регистрации), а вошедшего с
+  // незаполненной анкетой закрыть нельзя: без пола лента показывала бы обоих.
+  dlg.addEventListener('cancel', (e) => {
+    if (accountInfo?.id && !onboardingDataComplete()) e.preventDefault();
   });
 
   dlg.addEventListener('close', () => renderAll());
@@ -2352,7 +2411,7 @@ function renderAccountDialogBody() {
   wireAccountDialogBody();
   $('#btnOpenRegister')?.addEventListener('click', () => {
     haptic('light');
-    openRegisterDialog();
+    startRegistrationFlow();
   });
 }
 
@@ -2765,7 +2824,7 @@ async function cancelSubscription() {
 async function startPayment(planId) {
   if (!accountInfo?.id) {
     toast('Войдите, чтобы купить подписку');
-    openRegisterDialog();
+    startRegistrationFlow();
     return;
   }
 
@@ -4882,10 +4941,11 @@ function renderDating() {
     if (!p || !String(p.name || '').trim()) return false;
     if (!String(p.gender || '').trim()) return false;
     if (!(p.photos || []).length) return false;
-    if (myGender) {
-      const g = String(p.gender || '');
-      if (g === myGender) return false;
-    }
+    // Без своего пола не понятно, кого показывать: раньше фильтр отключался
+    // и лента выдавала обоих сразу. Такое возможно только при недозаполненной
+    // анкете — её онбординг допрашивает при входе.
+    if (!myGender) return false;
+    if (String(p.gender || '') === myGender) return false;
     if (myName && normText(p.name || '') === myName) return false;
 
     if (!matchesTreeFilters(p, filters.tree)) return false;
@@ -5025,7 +5085,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v196</div>
+        <div class="muted app-version">v197</div>
     </div>
   `;
 
@@ -5564,9 +5624,9 @@ function renderStats() {
 
   $('#view-stats').querySelector('#btnOpenAccount')?.addEventListener('click', () => {
     haptic('light');
-    // Гость: сразу окно регистрации, без промежуточного «Аккаунт».
+    // Гость: без промежуточного «Аккаунт» — сначала данные анкеты, потом форма.
     if (!accountInfo?.email) {
-      openRegisterDialog();
+      startRegistrationFlow();
       return;
     }
     openAccountDialog();
@@ -6595,7 +6655,7 @@ function formatEventDate(iso) {
 
 function switchTab(tab) {
   if (tab === 'account') {
-    openRegisterDialog();
+    startRegistrationFlow();
     return;
   }
   const btn = document.querySelector(`.tab[data-tab="${tab}"]`);
@@ -6606,7 +6666,7 @@ function switchTab(tab) {
 function requireRegistration(message) {
   toast(message);
   haptic('warning');
-  openRegisterDialog();
+  startRegistrationFlow();
 }
 
 function toast(msg) {
