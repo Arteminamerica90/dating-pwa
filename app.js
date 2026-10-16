@@ -1860,7 +1860,6 @@ function showOnboardingStep(which) {
   set('#onboardingStep1', which === 'gender');
   set('#onboardingStep2', which === 'name');
   set('#onboardingStepAge', which === 'age');
-  set('#onboardingStep3', which === 'done');
 
   if (which === 'name') {
     const inp = document.querySelector('#obNameInput');
@@ -1989,21 +1988,13 @@ function wireOnboardingDialog(dlg) {
     state.profile.gender = state.profile.gender || __obGender;
     save();
 
-    showOnboardingStep('done');
-    $('#obGreeting').textContent = `Привет, ${state.profile.name}!`;
-
     renderAll();
     scheduleCloudSync();
-  });
 
-  $('#obRegister')?.addEventListener('click', () => {
+    // Пол/имя/возраст собраны — сразу открываем форму регистрации, без
+    // промежуточного экрана-поздравления «Давай знакомиться!».
     dlg.close();
-    if (accountInfo?.email) return;
-    openRegisterDialog();
-  });
-
-  $('#obSkip')?.addEventListener('click', () => {
-    dlg.close();
+    if (!accountInfo?.email) openRegisterDialog();
   });
 
   // Гость может закрыть диалог (вернётся на экран регистрации), а вошедшего с
@@ -2103,8 +2094,6 @@ function wireRegisterDialogOnce() {
     if (__regBusy) return;
     const creds = readCreds();
     if (!creds) return;
-    const age = $('#regAgeConfirm');
-    if (age && !age.checked) return __regMsg('Подтвердите, что вам исполнилось 18 лет', 0);
     const tp = $('#regThirdPartyConfirm');
     if (tp && !tp.checked) return __regMsg('Необходимо дать согласие на передачу данных третьим лицам', 0);
     const pd = $('#regPersonalDataConfirm');
@@ -5085,7 +5074,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v197</div>
+        <div class="muted app-version">v198</div>
     </div>
   `;
 

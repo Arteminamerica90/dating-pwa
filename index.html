@@ -9,7 +9,7 @@
     <title>xystar</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=197" />
+    <link rel="stylesheet" href="./styles.css?v=198" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script defer src="https://widget.cloudpayments.ru/bundles/cloudpayments.js"></script>
@@ -117,7 +117,7 @@
     <dialog id="dlgOnboarding" class="dialog">
       <div class="dialog-card questionnaire-dialog">
         <div class="dialog-head" style="justify-content:center">
-          <div class="dialog-title">Давай знакомиться!</div>
+          <div class="dialog-title">Немного о вас</div>
         </div>
         <div id="onboardingStep1">
           <div class="muted" style="text-align:center;margin-bottom:16px">Кого вы ищете?</div>
@@ -152,17 +152,6 @@
             <div class="muted" style="font-size:11px">Нажимая «Подтвердить», вы подтверждаете, что достигли возраста 18 лет и принимаете <a href="./legal.html#offer" target="_blank" rel="noopener" style="color:var(--brand)">условия оферты</a></div>
           </div>
         </div>
-        <div id="onboardingStep3" hidden>
-          <div style="text-align:center">
-            <div style="font-size:48px;margin-bottom:12px">👋</div>
-            <div style="font-weight:700;font-size:18px;margin-bottom:8px" id="obGreeting"></div>
-            <div class="muted" style="margin-bottom:20px">Хотите зарегистрироваться, чтобы сохранить анкету и найти пару?</div>
-            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-              <button class="btn" id="obRegister" type="button">Зарегистрироваться</button>
-              <button class="btn ghost" id="obSkip" type="button">Пока нет</button>
-            </div>
-          </div>
-        </div>
       </div>
     </dialog>
 
@@ -182,12 +171,6 @@
           <div class="row auth-field">
             <label class="label" for="regPassword">Пароль</label>
             <input id="regPassword" name="password" class="input" type="password" autocomplete="new-password" placeholder="минимум 6 символов" style="width:100%;max-width:360px" />
-          </div>
-          <div class="row reg-consent" style="margin-bottom:4px">
-            <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
-              <input type="checkbox" id="regAgeConfirm" style="margin-top:3px;width:16px;height:16px;accent-color:var(--brand)" />
-              <span>Мне исполнилось 18 лет. Я подтверждаю, что достиг возраста совершеннолетия и принимаю <a href="./legal.html#offer" target="_blank" rel="noopener" style="color:var(--brand)">условия оферты</a> и <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:var(--brand)">политику конфиденциальности</a>.</span>
-            </label>
           </div>
           <div class="row reg-consent" style="margin-bottom:4px">
             <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
@@ -415,7 +398,7 @@
 
       window.__xystarImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=197')
+      import('./app.js?v=198')
         .then(() => {
           window.__xystarImportOk = true;
         })
