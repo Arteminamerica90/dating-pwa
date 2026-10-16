@@ -1874,8 +1874,15 @@ function showOnboardingStep(which) {
   if (which === 'age') {
     const err = document.querySelector('#obAgeError');
     if (err) { err.textContent = ''; err.style.display = 'none'; }
+    // Поле даты живёт в DOM между открытиями диалога и переживает удаление
+    // аккаунта — без сброса на шаге «Подтвердите возраст» показывалась дата
+    // предыдущей анкеты, а «Подтвердить» оставалась выключенной (событие
+    // input не срабатывало), поэтому тап никуда не вёл.
+    const input = document.querySelector('#obBirthDate');
     const submit = document.querySelector('#obAgeSubmit');
-    if (submit) submit.disabled = true;
+    const saved = String(state.profile?.birthDate || '').trim();
+    if (input) input.value = saved;
+    if (submit) submit.disabled = !(saved && ageFromBirthDate(saved) >= 18);
   }
 }
 
@@ -1942,17 +1949,10 @@ function wireOnboardingDialog(dlg) {
   // и состоявшееся согласие на обработку персональных данных).
   if (birthDateInput) {
     birthDateInput.addEventListener('input', () => {
-      const val = birthDateInput.value;
-      if (!val) {
+      const age = ageFromBirthDate(birthDateInput.value);
+      if (age == null) {
         ageSubmitBtn.disabled = true;
         return;
-      }
-      const birth = new Date(val);
-      const today = new Date();
-      let age = today.getFullYear() - birth.getFullYear();
-      const monthDiff = today.getMonth() - birth.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-        age--;
       }
       if (age < 18) {
         ageError.textContent = `Вам ${age} лет. Сервис доступен только для пользователей от 18 лет.`;
@@ -1967,15 +1967,8 @@ function wireOnboardingDialog(dlg) {
 
   ageSubmitBtn?.addEventListener('click', () => {
     const val = birthDateInput?.value;
-    if (!val) return;
-
-    const birth = new Date(val);
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const monthDiff = today.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--;
-    }
+    const age = ageFromBirthDate(val);
+    if (age == null) return;
 
     if (age < 18) {
       ageError.textContent = `Вам ${age} лет. Сервис доступен только для пользователей от 18 лет.`;
@@ -5074,7 +5067,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v198</div>
+        <div class="muted app-version">v199</div>
     </div>
   `;
 
