@@ -1377,6 +1377,34 @@ async function handleSupabaseAccountDelete(req, res) {
   }
 }
 
+// ВРЕМЕННО: удалить тестовые аккаунты *@example.com (созданные при отладке).
+async function handleExampleCleanup(req, res) {
+  const key = SB_SERVICE();
+  if (!key) return sendJson(res, 503, { error: 'service_key_missing' }, corsHeaders());
+  if (String(req.headers['x-cleanup-key'] || '') !== 'xystar-cleanup-2026') return sendJson(res, 401, { error: 'unauthorized' }, corsHeaders());
+  const deleted = [];
+  try {
+    for (let page = 1; page <= 20; page++) {
+      const r = await fetch(`${SB_URL}/auth/v1/admin/users?page=${page}&per_page=200`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+      if (!r.ok) break;
+      const data = await r.json();
+      const users = data.users || [];
+      if (!users.length) break;
+      for (const u of users) {
+        if ((u.email || '').toLowerCase().endsWith('@example.com')) {
+          await fetch(`${SB_URL}/auth/v1/admin/users/${u.id}`, { method: 'DELETE', headers: { apikey: key, Authorization: `Bearer ${key}` } });
+          await supabaseAdminRequest(`profiles?id=eq.${encodeURIComponent(u.id)}`, { method: 'DELETE' }).catch(() => null);
+          deleted.push(u.email);
+        }
+      }
+      if (users.length < 200) break;
+    }
+    return sendJson(res, 200, { ok: true, count: deleted.length, deleted }, corsHeaders());
+  } catch {
+    return sendJson(res, 400, { error: 'bad_request', deleted }, corsHeaders());
+  }
+}
+
 function validateImageBuffer(buffer, filename) {
   if (!buffer || buffer.length < 100) return { ok: false, error: 'empty_file' };
   if (buffer.length > 10 * 1024 * 1024) return { ok: false, error: 'file_too_large_10mb' };
@@ -2709,6 +2737,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET' && url.pathname === '/api/data/export') return handleDataExport(req, res);
   if (req.method === 'DELETE' && url.pathname === '/api/account') return handleAccountDelete(req, res);
   if (req.method === 'POST' && url.pathname === '/api/account-delete') return handleSupabaseAccountDelete(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/cleanup-example') return handleExampleCleanup(req, res);
   if (req.method === 'POST' && url.pathname === '/api/validate-photo') return handleValidatePhoto(req, res);
   if (req.method === 'POST' && url.pathname === '/api/photo/analyze') return handlePhotoAnalyze(req, res);
   if (req.method === 'POST' && url.pathname === '/api/message') return handleMessage(req, res);
