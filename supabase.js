@@ -219,7 +219,6 @@ const PUBLIC_PROFILE_COLUMNS = [
   'stepCount',
   'meetingIntent',
   'meetingPlaces',
-  'photos',
   'interests',
   'communication',
   'values',
@@ -249,6 +248,29 @@ export async function supabaseListPublicProfiles({ excludeUserId, limit = 50 } =
     }
     return flat;
   });
+}
+
+// Фото грузим отдельно от списка: пользовательские фото хранятся как base64
+// data-url (до ~300 КБ каждое), и выборка photos по всем анкетам раздувает
+// ответ с 364 байт до ~158 КБ — на мобильной сети такой список «висит», и лента
+// выглядит пустой. Догружаем фото точечно, только для показанных карточек.
+export async function supabaseLoadProfilePhotos(userIds) {
+  const ids = (userIds || []).filter(Boolean);
+  if (!ids.length || !isSupabaseConfigured()) return {};
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id,payload->profile->photos')
+    .in('id', ids);
+  if (error) throw new Error(error.message);
+  const map = {};
+  for (const row of data || []) {
+    const photos = Array.isArray(row.photos)
+      ? row.photos
+      : (Array.isArray(row['payload->profile->photos']) ? row['payload->profile->photos'] : []);
+    if (photos.length) map[row.id] = photos;
+  }
+  return map;
 }
 
 // Ответы анкеты и сводные ветки одного участника — тяжёлые, грузим только для

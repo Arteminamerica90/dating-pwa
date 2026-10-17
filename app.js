@@ -30,6 +30,7 @@ import {
   supabaseGetMessages,
   supabaseListPublicProfiles,
   supabaseLoadProfile,
+  supabaseLoadProfilePhotos,
   supabaseLoadProfileTreeData,
   supabaseMarkMatchSeen,
   supabaseOnAuth,
@@ -49,7 +50,7 @@ import {
   supabaseSaveConsent,
   supabaseSaveConsentsBulk,
   supabaseGetConsents
-} from './supabase.js?v=108';
+} from './supabase.js?v=109';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
@@ -693,6 +694,34 @@ async function hydrateCandidateTrees(profiles) {
   return changed;
 }
 
+const candidatePhotosCache = new Map();
+
+// Фото грузим отдельно от списка (см. supabaseListPublicProfiles): выборка
+// photos по всем анкетам раздувала ответ до ~158 КБ, и лента «висла». Догружаем
+// фото точечно — только для показанных карточек, как и ответы анкеты.
+async function hydrateCandidatePhotos(profiles) {
+  const need = (profiles || [])
+    .filter((p) => p && p.id && !(p.photos || []).length && !candidatePhotosCache.get(p.id)?.tried)
+    .slice(0, 6);
+  if (!need.length) return false;
+  let changed = false;
+  try {
+    const map = await supabaseLoadProfilePhotos(need.map((p) => p.id));
+    for (const p of need) {
+      candidatePhotosCache.set(p.id, { tried: true });
+      const photos = map[p.id];
+      if (!photos || !photos.length) continue;
+      const canonical = liveProfiles.find((x) => x.id === p.id) || p;
+      canonical.photos = photos;
+      if (canonical !== p) p.photos = photos;
+      changed = true;
+    }
+  } catch (err) {
+    // нет сети — не помечаем tried, чтобы повторить при следующей отрисовке
+  }
+  return changed;
+}
+
 async function loadLiveProfiles() {
   if (loadingLiveProfiles || liveProfilesLoaded) return;
   loadingLiveProfiles = true;
@@ -711,6 +740,8 @@ async function loadLiveProfiles() {
   // У кого-то в базе сохранена только сводка persona — догружаем ответы анкеты,
   // иначе в карточке будет «дерево: нет данных».
   if (await hydrateCandidateTrees(liveProfiles)) renderAll();
+  // Фото тоже догружаем отдельно: в списке их нет (иначе ответ ~158 КБ).
+  if (await hydrateCandidatePhotos(liveProfiles)) renderAll();
   if (!liveProfilesLoaded) {
     // Supabase был недоступен (например, проект заморожен) — пробуем снова позже.
     setTimeout(() => {
@@ -4919,10 +4950,11 @@ function renderDating() {
   const candidatePool = dedupeProfilesByIdentity(liveProfiles);
   const maxIncome = maxIncomeForPlan(mySubscription);
   const baseMatch = (p) => {
-    // Незаполненные анкеты (тестовые аккаунты, записи без пола и фото) в ленте не показываем.
+    // Незаполненные анкеты (тестовые аккаунты, записи без пола/имени) в ленте
+    // не показываем. Фото в списке больше не приходит (грузится лениво), поэтому
+    // профиль без фото не отсеиваем — карточка покажет заглушку.
     if (!p || !String(p.name || '').trim()) return false;
     if (!String(p.gender || '').trim()) return false;
-    if (!(p.photos || []).length) return false;
     // Без своего пола не понятно, кого показывать: раньше фильтр отключался
     // и лента выдавала обоих сразу. Такое возможно только при недозаполненной
     // анкете — её онбординг допрашивает при входе.
@@ -5067,7 +5099,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v199</div>
+        <div class="muted app-version">v200</div>
     </div>
   `;
 
@@ -5222,6 +5254,11 @@ ${visible.length
     // Ответы анкеты нужны для «N из M вопросов совпало» — догружаем их
     // для первых карточек ленты (остальные подтянутся при свайпе).
     hydrateCandidateTrees(visible.slice(0, 3)).then((changed) => {
+      if (changed) renderAll();
+    });
+    // Фото карточек тоже догружаем отдельно (в списке их нет) и перерисовываем
+    // ленту, когда они приехали.
+    hydrateCandidatePhotos(visible.slice(0, 3)).then((changed) => {
       if (changed) renderAll();
     });
     $('#view-dating').querySelector('[data-tinder="like"]')?.addEventListener('click', () => tinder?.swipe('right'));
