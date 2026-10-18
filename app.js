@@ -2355,12 +2355,14 @@ function wireAccountDialogBody() {
         // сносит данные service-ключом и удаляет пользователя из auth.users.
         // Без этого вход и анкета восстанавливались при следующем входе.
         let serverDeleted = false;
+        let unauthorized = false;
         try {
           const sbToken = await supabaseAccessToken();
           if (sbToken) {
             const data = await requestAccountDelete(sbToken);
             serverDeleted = !!data?.ok;
-            if (data && !data.authDeleted) console.warn('delete: auth user not deleted');
+            unauthorized = !!data?.unauthorized;
+            if (serverDeleted && !data?.authDeleted) console.warn('delete: auth user not deleted');
           }
         } catch (err) {
           console.warn('delete server', err?.message);
@@ -2380,7 +2382,15 @@ function wireAccountDialogBody() {
         save();
         renderAll();
         $('#dlgAccount')?.close();
-        toast('Аккаунт удалён. Прощайте!');
+        if (serverDeleted) {
+          toast('Аккаунт удалён. Прощайте!');
+        } else {
+          // Честно говорим, что именно не удалось: иначе пользователь снова
+          // получает «удалено», а затем обнаруживает, что может войти по email.
+          showAuthNotice(unauthorized
+            ? 'Сессия истекла: анкета удалена, но аккаунт входа остался. Войдите снова и повторите удаление — либо напишите в поддержку для полного стирания.'
+            : 'Серверное удаление аккаунта недоступно (нет связи с бэкендом). Вы вышли из аккаунта, но вход по этому email может остаться активным — повторите удаление позже или напишите в поддержку.');
+        }
       } catch (err) {
         toast(err?.message || 'Не удалось удалить аккаунт');
       }
@@ -2402,14 +2412,21 @@ async function requestAccountDelete(sbToken) {
   for (const host of hosts) {
     if (seen.has(host)) continue;
     seen.add(host);
+    // Таймаут обязателен: если хст бэкенда не отвечает, fetch без abort()
+    // висит вечно — кнопка «Удалить аккаунт» навсегда остаётся в состоянии
+    // «Одну секунду…» и удаление не происходит вовсе.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
     try {
       const resp = await fetch(`${host}/api/account-delete`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${sbToken}` }
+        headers: { Authorization: `Bearer ${sbToken}` },
+        signal: controller.signal
       });
       if (resp.ok) return await resp.json().catch(() => ({}));
-      if (resp.status === 401) return null;
-    } catch { /* пробуем следующий хост */ }
+      if (resp.status === 401) return { ok: false, unauthorized: true };
+    } catch { /* таймаут/недоступен — пробуем следующий хост */ }
+    finally { clearTimeout(timer); }
   }
   return null;
 }
@@ -5122,7 +5139,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v201</div>
+        <div class="muted app-version">v202</div>
     </div>
   `;
 
