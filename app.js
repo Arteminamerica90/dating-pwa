@@ -1271,11 +1271,14 @@ function boot() {
       // определения сессии сами показываем либо экран регистрации, либо интерфейс.
       refreshAccountInfo().then(() => {
         updateGuestGate();
-        // Вопросы анкеты (пол/имя/возраст) задаём только после входа или по кнопке
-        // «Зарегистрироваться» — на первом экране гостя их быть не должно.
-        if (accountInfo?.id) maybeStartOnboarding();
       }).catch(() => updateGuestGate());
-      syncProfileAfterAuth();
+      // Сначала тянем анкету с сервера, и только потом решаем, спрашивать ли
+      // пол/имя/возраст: раньше проверка шла по локальному (пустому) состоянию,
+      // и у пользователя с уже сохранённой анкетой при каждом входе снова
+      // появлялся вопрос про пол и имя.
+      syncProfileAfterAuth().then(() => {
+        if (accountInfo?.id) maybeStartOnboarding();
+      });
     } else if (event === 'PASSWORD_RECOVERY') {
       state.cloud.pendingPasswordReset = false;
       save();
@@ -1424,6 +1427,7 @@ async function syncProfileAfterAuth() {
   try {
     const user = await supabaseCurrentUser();
     if (!user) return;
+    if (!accountInfo && user.id) accountInfo = { id: user.id, email: user.email };
     const accountSwitched = !!(lastAccountId && lastAccountId !== user.id);
     if (accountSwitched) {
       lastAccountId = user.id;
@@ -1443,6 +1447,16 @@ async function syncProfileAfterAuth() {
             delete remote.questionnaireAnswers;
             delete remote.portrait;
           }
+          // Пустые значения с сервера (старые/тестовые анкеты с name:'Вы' и
+          // пустым полом) не должны затирать уже введённые данные — иначе после
+          // каждого входа приложение снова спрашивает пол и имя, хотя
+          // пользователь их уже выбрал.
+          for (const key of ['name', 'gender', 'birthDate', 'city', 'cityOverride']) {
+            const v = remote[key];
+            if (v === undefined || v === null || !String(v).trim() || String(v).trim() === 'Вы') delete remote[key];
+          }
+          // Подтверждение 18+ не «сбрасываем» пустым значением с сервера.
+          if (!remote.ageConfirmed) delete remote.ageConfirmed;
           state.profile = { ...state.profile, ...remote };
         }
       } else if (accountSwitched) {
@@ -1891,6 +1905,15 @@ function showOnboardingStep(which) {
   set('#onboardingStep1', which === 'gender');
   set('#onboardingStep2', which === 'name');
   set('#onboardingStepAge', which === 'age');
+
+  const progress = document.querySelector('#obProgress');
+  if (progress) {
+    progress.textContent =
+      which === 'gender' ? 'Шаг 1 из 3 · Пол'
+      : which === 'name' ? 'Шаг 2 из 3 · Имя'
+      : which === 'age' ? 'Шаг 3 из 3 · Возраст'
+      : '';
+  }
 
   if (which === 'name') {
     const inp = document.querySelector('#obNameInput');
@@ -5099,7 +5122,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v200</div>
+        <div class="muted app-version">v201</div>
     </div>
   `;
 
