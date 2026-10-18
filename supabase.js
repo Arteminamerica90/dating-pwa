@@ -168,6 +168,18 @@ export async function supabaseAccessToken() {
   return data?.session?.access_token || null;
 }
 
+// Полное удаление аккаунта одной транзакцией на стороне Supabase:
+// SQL-функция public.delete_my_account (SECURITY DEFINER) сносит строки
+// приложения и запись из auth.users. Не зависит от Vercel — сервисный ключ
+// остаётся внутри базы, поэтому удаление работает всегда.
+export async function supabaseDeleteMyAccount() {
+  if (!isSupabaseConfigured()) return null;
+  const supabase = await getSupabase();
+  const { data, error } = await supabase.rpc('delete_my_account');
+  if (error) throw new Error(error.message);
+  return data || null;
+}
+
 export async function supabaseLoadProfile(userId) {
   const supabase = await getSupabase();
   const { data, error } = await supabase

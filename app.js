@@ -43,6 +43,7 @@ import {
   supabaseSavePlans,
   supabaseSaveProfile,
   supabaseDeleteProfile,
+  supabaseDeleteMyAccount,
   supabaseSignIn,
   supabaseSignOut,
   supabaseSignUp,
@@ -50,7 +51,7 @@ import {
   supabaseSaveConsent,
   supabaseSaveConsentsBulk,
   supabaseGetConsents
-} from './supabase.js?v=109';
+} from './supabase.js?v=110';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
@@ -2363,30 +2364,17 @@ function wireAccountDialogBody() {
     const btn = $('#btnDeleteAccount');
     runWithButton($('#btnDeleteAccount'), 'Удалить аккаунт', async () => {
       try {
-        // Настоящее удаление — на сервере: он проверяет наш Supabase-токен,
-        // сносит данные service-ключом и удаляет пользователя из auth.users.
-        // Без этого вход и анкета восстанавливались при следующем входе.
-        let serverDeleted = false;
-        let unauthorized = false;
-        try {
-          const sbToken = await withTimeout(supabaseAccessToken(), 5000, 'token');
-          if (sbToken) {
-            // Общий предел на перебор хостов: сколько бы бэкендов ни висело,
-            // пользователь не должен ждать дольше ~15 секунд.
-            const data = await withTimeout(requestAccountDelete(sbToken), 10000, 'server');
-            serverDeleted = !!data?.ok;
-            unauthorized = !!data?.unauthorized;
-            if (serverDeleted && !data?.authDeleted) console.warn('delete: auth user not deleted');
-          }
-        } catch (err) {
-          console.warn('delete server', err?.message);
-        }
-        // Подстраховка, если сервер недоступен: чистим строки клиентом.
-        if (!serverDeleted && accountInfo?.id) {
-          try { await withTimeout(supabaseDeleteProfile(accountInfo.id), 6000, 'delete profile'); }
-          catch (err) { console.warn('delete supabase', err?.message); }
-        }
-        // Выход тоже может висеть (восстановление сессии в Supabase) — ограничиваем.
+// Настоящее удаление — на сервере: он проверяет наш Supabase-токен,
+// сносит данные service-ключом и удаляет пользователя из auth.users.
+// Без этого вход и анкета восстанавливались при следующем входе.
+        const result = await performAccountDelete();
+        const serverDeleted = result.deleted;
+        const unauthorized = result.unauthorized;
+        if (serverDeleted) console.info('delete route', result.route);
+        // Если удалить аккаунт не удалось, НЕ стираем анкету на сервере:
+        // иначе пользователь снова входит по email уже с пустой анкетой и
+        // заново заполняет имя/пол/дату. Данные остаются до успешной попытки.
+        // Выход ограничиваем по времени — восстановление сессии тоже может висеть.
         try { await withTimeout(supabaseSignOut(), 6000, 'signout'); } catch { /* не критично */ }
         // Уничтожаем локальное состояние (152-ФЗ ст. 21).
         const fresh = defaultState();
@@ -2404,8 +2392,8 @@ function wireAccountDialogBody() {
           // Честно говорим, что именно не удалось: иначе пользователь снова
           // получает «удалено», а затем обнаруживает, что может войти по email.
           showAuthNotice(unauthorized
-            ? 'Сессия истекла: анкета удалена, но аккаунт входа остался. Войдите снова и повторите удаление — либо напишите в поддержку для полного стирания.'
-            : 'Серверное удаление аккаунта недоступно (нет связи с бэкендом). Вы вышли из аккаунта, но вход по этому email может остаться активным — повторите удаление позже или напишите в поддержку.');
+            ? 'Сессия истекла: удалить аккаунт не удалось, анкета осталась на сервере. Войдите снова и повторите удаление.'
+            : 'Не удалось связаться с сервером удаления: анкета осталась на сервере, вы вышли из аккаунта. Повторите удаление позже или напишите в поддержку.');
         }
       } catch (err) {
         toast(err?.message || 'Не удалось удалить аккаунт');
@@ -2419,6 +2407,43 @@ function wireAccountDialogBody() {
 // Приложение живёт на статике (xystar.ru / GitHub Pages), поэтому запрос идёт
 // на Vercel-проект, где развёрнута /api. Перебираем известные хосты: у статики
 // собственного /api нет, поэтому нужен абсолютный адрес бэкенда.
+// Удаление аккаунта. Основной путь — SQL-функция в самом Supabase
+// (public.delete_my_account): она сносит и строки приложения, и запись из
+// auth.users, поэтому не зависит от доступности Vercel. Vercel-хосты и клиент
+// остаются запасными вариантами на случай, если функция ещё не создана.
+async function performAccountDelete() {
+  const result = { deleted: false, unauthorized: false, route: null };
+
+  try {
+    const rpc = await withTimeout(supabaseDeleteMyAccount(), 12000, 'rpc');
+    if (rpc?.ok) {
+      result.deleted = true;
+      result.route = 'supabase';
+      return result;
+    }
+    if (rpc?.error === 'not_authenticated') result.unauthorized = true;
+  } catch (err) {
+    console.warn('delete rpc', err?.message);
+  }
+
+  try {
+    const sbToken = await withTimeout(supabaseAccessToken(), 5000, 'token');
+    if (sbToken) {
+      const data = await withTimeout(requestAccountDelete(sbToken), 10000, 'server');
+      if (data?.ok) {
+        result.deleted = true;
+        result.route = 'vercel';
+        return result;
+      }
+      if (data?.unauthorized) result.unauthorized = true;
+    }
+  } catch (err) {
+    console.warn('delete server', err?.message);
+  }
+
+  return result;
+}
+
 async function requestAccountDelete(sbToken) {
   const local = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(location.origin);
   const hosts = local
@@ -5155,7 +5180,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v203</div>
+        <div class="muted app-version">v204</div>
     </div>
   `;
 
