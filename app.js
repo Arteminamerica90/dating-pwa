@@ -1627,6 +1627,18 @@ function hideAuthErrorMessage() {
   if (el) el.hidden = true;
 }
 
+// Жёсткий предел ожидания: без него любой зависший сетевой вызов (Supabase
+// auth/restore, удаление строки, выход) держит интерфейс вечно.
+function withTimeout(promise, ms, label) {
+  let timer;
+  return Promise.race([
+    Promise.resolve(promise).finally(() => clearTimeout(timer)),
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(label || 'timeout')), ms);
+    })
+  ]);
+}
+
 async function runWithButton(btn, label, fn) {
   if (!btn || btn.dataset.busy) return;
   btn.dataset.busy = '1';
@@ -2357,9 +2369,11 @@ function wireAccountDialogBody() {
         let serverDeleted = false;
         let unauthorized = false;
         try {
-          const sbToken = await supabaseAccessToken();
+          const sbToken = await withTimeout(supabaseAccessToken(), 5000, 'token');
           if (sbToken) {
-            const data = await requestAccountDelete(sbToken);
+            // Общий предел на перебор хостов: сколько бы бэкендов ни висело,
+            // пользователь не должен ждать дольше ~15 секунд.
+            const data = await withTimeout(requestAccountDelete(sbToken), 10000, 'server');
             serverDeleted = !!data?.ok;
             unauthorized = !!data?.unauthorized;
             if (serverDeleted && !data?.authDeleted) console.warn('delete: auth user not deleted');
@@ -2369,9 +2383,11 @@ function wireAccountDialogBody() {
         }
         // Подстраховка, если сервер недоступен: чистим строки клиентом.
         if (!serverDeleted && accountInfo?.id) {
-          try { await supabaseDeleteProfile(accountInfo.id); } catch (err) { console.warn('delete supabase', err?.message); }
+          try { await withTimeout(supabaseDeleteProfile(accountInfo.id), 6000, 'delete profile'); }
+          catch (err) { console.warn('delete supabase', err?.message); }
         }
-        await supabaseSignOut().catch(() => {});
+        // Выход тоже может висеть (восстановление сессии в Supabase) — ограничиваем.
+        try { await withTimeout(supabaseSignOut(), 6000, 'signout'); } catch { /* не критично */ }
         // Уничтожаем локальное состояние (152-ФЗ ст. 21).
         const fresh = defaultState();
         state.profile = fresh.profile;
@@ -2416,7 +2432,7 @@ async function requestAccountDelete(sbToken) {
     // висит вечно — кнопка «Удалить аккаунт» навсегда остаётся в состоянии
     // «Одну секунду…» и удаление не происходит вовсе.
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), 4000);
     try {
       const resp = await fetch(`${host}/api/account-delete`, {
         method: 'POST',
@@ -5139,7 +5155,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v202</div>
+        <div class="muted app-version">v203</div>
     </div>
   `;
 
