@@ -51,7 +51,7 @@ import {
   supabaseSaveConsent,
   supabaseSaveConsentsBulk,
   supabaseGetConsents
-} from './supabase.js?v=110';
+} from './supabase.js?v=111';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
@@ -2233,10 +2233,10 @@ function wireRegisterDialogOnce() {
     if (fb) { fb.disabled = true; fb.textContent = 'Отправляем…'; }
     try {
       state.cloud.pendingPasswordReset = true;
-      state.cloud.email = email;
-      save();
-      await supabaseResetPassword(email);
-      __regMsg('Письмо для сброса пароля отправлено на ' + email + '. Перейдите по ссылке в письме — откроется форма нового пароля.', 1);
+state.cloud.email = email;
+        save();
+        await supabaseResetPassword(email);
+        __regMsg('Если аккаунт с таким email существует, мы отправили на него письмо для сброса пароля. Проверьте папку «Спам». Если письма нет — напишите в поддержку.', 1);
     } catch (err) {
       state.cloud.pendingPasswordReset = false;
       save();
@@ -5215,7 +5215,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v206</div>
+        <div class="muted app-version">v207</div>
     </div>
   `;
 

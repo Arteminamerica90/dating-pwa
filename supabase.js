@@ -103,10 +103,19 @@ export async function supabaseSignOut() {
 
 export async function supabaseResetPassword(email) {
   const supabase = await getSupabase();
-  const { error } = await withNetRetry(() => supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: siteRedirect()
-  }));
-  if (error) throw new Error(error.message);
+  // Ограничиваем ожидание: восстановление сессии в Supabase иногда подвисает,
+  // и кнопка «Забыли пароль?» оставалась в состоянии «Отправляем…».
+  let timer;
+  try {
+    await Promise.race([
+      withNetRetry(() => supabase.auth.resetPasswordForEmail(email, { redirectTo: siteRedirect() })),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('timeout')), 12000);
+      })
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function supabaseChangePassword(newPassword) {
