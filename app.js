@@ -2658,9 +2658,10 @@ function openLoginDialog() {
   setTimeout(() => $('#regEmail')?.focus(), 120);
 }
 
-function openChangePasswordDialog() {
+function openChangePasswordDialog(forced = false) {
   const dlg = $('#dlgChangePassword');
   if (!dlg) return;
+  window.__cpForced = !!forced;
   if (dlg.open) return;
   if (!window.__cpBound) {
     window.__cpBound = true;
@@ -2682,6 +2683,7 @@ function openChangePasswordDialog() {
       try {
         await supabaseChangePassword(p1);
         state.cloud.pendingPasswordReset = false;
+        window.__cpForced = false;
         save();
         dlg.close();
         toast('Пароль обновлён');
@@ -2707,6 +2709,12 @@ function openChangePasswordDialog() {
     dlg.addEventListener('close', () => {
       $('#cpPassword') && ($('#cpPassword').value = '');
       $('#cpPassword2') && ($('#cpPassword2').value = '');
+      if (window.__cpForced) return;
+    });
+    // При переходе по ссылке восстановления окно обязательно: без нового
+    // пароля вход закрываем, чтобы в аккаунт нельзя было попасть со старым.
+    dlg.addEventListener('cancel', (e) => {
+      if (window.__cpForced) e.preventDefault();
     });
   }
   dlg.showModal();
@@ -2716,11 +2724,15 @@ function openChangePasswordDialog() {
 // Дублирующий путь для восстановления пароля: если событие PASSWORD_RECOVERY
 // прилетело раньше, чем зарегистрирован обработчик, — ловим по флагу и коду в URL.
 async function checkPendingPasswordReset() {
-  if (state.cloud?.pendingPasswordReset !== true) return;
-  if (!URL_HAD_AUTH_CODE) {
-    state.cloud.pendingPasswordReset = false;
+  // Токен восстановления в самой ссылки — главный признак, что пришли по ссылке
+  // из письма. Раньше требовался ещё и локальный флаг «я тут нажал Забыли
+  // пароль», из-за чего при открытии письма в другом браузере (или на другом
+  // устройстве) приложение просто пускало в аккаунт, не спрашивая новый пароль.
+  const fromRecoveryLink = URL_HAD_AUTH_CODE;
+  if (state.cloud?.pendingPasswordReset !== true && !fromRecoveryLink) return;
+  if (fromRecoveryLink) {
+    state.cloud.pendingPasswordReset = true;
     save();
-    return;
   }
   const deadline = Date.now() + 8000;
   // Первый вызов инициализирует SDK и обрабатывает recovery-токен из URL-хэша.
@@ -2734,8 +2746,9 @@ async function checkPendingPasswordReset() {
         save();
         await refreshAccountInfo().catch(() => {});
         syncProfileAfterAuth();
-        openChangePasswordDialog();
-        toast('Введите новый пароль');
+        // Пришли по ссылке из письма — новый пароль обязателен.
+        openChangePasswordDialog(!!fromRecoveryLink);
+        toast('Придумайте новый пароль');
         return;
       }
     } catch {
@@ -5215,7 +5228,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v207</div>
+        <div class="muted app-version">v208</div>
     </div>
   `;
 
