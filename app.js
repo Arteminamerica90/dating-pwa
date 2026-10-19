@@ -4058,7 +4058,7 @@ function renderChatScreen(profileId) {
           .join('')}
       </div>
       <div class="chat-composer">
-        <textarea id="chatInput" class="input" rows="7" placeholder="Написать сообщение..."></textarea>
+        <textarea id="chatInput" class="input chat-input" rows="1" placeholder="Написать сообщение..."></textarea>
         <button class="btn" type="button" data-action="sendChat">Отправить</button>
       </div>
     </div>
@@ -4251,6 +4251,16 @@ function wireHomeContentHandlers(rootSelector) {
       loadRemoteChat(matchId);
     });
   });
+  // Поле ввода: одна строка, но растёт по мере набора текста.
+  const chatInput = root.querySelector('#chatInput');
+  if (chatInput) {
+    const grow = () => {
+      chatInput.style.height = 'auto';
+      chatInput.style.height = `${chatInput.scrollHeight}px`;
+    };
+    chatInput.addEventListener('input', grow);
+    requestAnimationFrame(grow);
+  }
   root.querySelector('[data-action="sendChat"]')?.addEventListener('click', async () => {
     const input = root.querySelector('#chatInput');
     const text = String(input?.value || '').trim();
@@ -4308,6 +4318,7 @@ function wireHomeContentHandlers(rootSelector) {
     thread.messages.push({ from: 'me', text: finalText.slice(0, 300), ts: Date.now() });
     thread.unread = false;
     input.value = '';
+    input.style.height = 'auto';
     save();
     renderAll();
     if (isRealChat(activeId)) {
@@ -5204,7 +5215,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v205</div>
+        <div class="muted app-version">v206</div>
     </div>
   `;
 
