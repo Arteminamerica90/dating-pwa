@@ -534,6 +534,19 @@ a { color: inherit; }
   flex: 1;
 }
 
+/* Поле сообщения: изначально 7 строк, дальше тянется по высоте. */
+.chat-composer {
+  align-items: flex-end;
+}
+
+.chat-composer textarea.input {
+  resize: vertical;
+  min-height: 132px;
+  line-height: 1.45;
+  font-family: inherit;
+  padding: 10px 12px;
+}
+
 .chat-screen {
   display: flex;
   flex-direction: column;

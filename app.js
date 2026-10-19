@@ -770,6 +770,9 @@ async function syncMatchesFromSupabase() {
   const fresh = rows.filter((r) => !r.otherUnmatched).map((r) => r.other);
   const demo = (state.dating.matches || []).filter((id) => !fresh.includes(id));
   state.dating.matches = [...fresh, ...demo];
+  // Отдельный список подтверждённых сервером мэтчей: getMutualMatches() берёт
+  // матчи отсюда, поэтому они не исчезают после перезахода.
+  state.dating.serverMatches = [...fresh];
   const known = new Set(lastPushedMatchIds);
   const newOnes = fresh.filter((id) => !known.has(id));
   lastPushedMatchIds = fresh;
@@ -1458,6 +1461,10 @@ async function syncProfileAfterAuth() {
           }
           // Подтверждение 18+ не «сбрасываем» пустым значением с сервера.
           if (!remote.ageConfirmed) delete remote.ageConfirmed;
+          // Фото, загруженные на этом устройстве, считаем актуальными: иначе
+          // серверная копия подменяла новую фотографию старой.
+          if ((state.profile.photos || []).length) delete remote.photos;
+          if ((state.profile.photosPending || []).length) delete remote.photosPending;
           state.profile = { ...state.profile, ...remote };
         }
       } else if (accountSwitched) {
@@ -3905,6 +3912,15 @@ function getMutualMatches() {
   const qualified = (id) => likes[id] === 'like' && profileLikesYou(id);
   const out = [];
   const seen = new Set();
+  // Матчи, подтверждённые сервером, считаем матчами всегда. Раньше они
+  // пересчитывались только из строк лайков, и после повторного входа мэтч
+  // пропадал, пока строки лайков не восстановились.
+  for (const id of state.dating.serverMatches || []) {
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
   for (const id of state.dating.matches || []) {
     if (qualified(id) && !seen.has(id)) {
       seen.add(id);
@@ -4025,11 +4041,9 @@ function renderChatScreen(profileId) {
         <div class="chat-thread-user">
           <img class="chat-thread-avatar" src="${profile.photos?.[0] || './assets/profile/avatar-square.jpg'}" alt="${escapeHtml(profile.name)}" />
           <div>
-            <div class="chat-thread-name">${escapeHtml(profile.name)}, ${profile.age}</div>
-            <div class="chat-thread-meta">${cityLabel(profile.city)} • ${escapeHtml(profile.jobTitle || '')}${mutual ? ' • Общий метч с «' + escapeHtml(profile.name) + '»' : ''}</div>
+            <div class="chat-thread-name">${escapeHtml(profile.name)}${profile.age ? ', ' + profile.age : ''}</div>
           </div>
         </div>
-        ${secured ? '<div class="pill" title="AES-GCM 256, ключ пары через PBKDF2">🔒 зашифровано</div>' : ''}
       </div>
       <div class="chat-thread-body">
         ${messages
@@ -4044,7 +4058,7 @@ function renderChatScreen(profileId) {
           .join('')}
       </div>
       <div class="chat-composer">
-        <input id="chatInput" class="input" placeholder="Написать сообщение..." />
+        <textarea id="chatInput" class="input" rows="7" placeholder="Написать сообщение..."></textarea>
         <button class="btn" type="button" data-action="sendChat">Отправить</button>
       </div>
     </div>
@@ -4056,6 +4070,16 @@ function renderHomeMessagesHtml() {
   const threadIds = getMessageThreadIds();
 
   state.messages = state.messages || { activeThreadId: null, threads: {} };
+
+  // Фото матчей и переписок грузим отдельно от списка анкет (см.
+  // supabaseListPublicProfiles): без этого карточки мэтчей и аватарки чата
+  // показывали заглушку вместо фото человека.
+  hydrateCandidatePhotos([
+    ...matches.map((id) => resolveChatProfile(id)),
+    ...threadIds.map((id) => resolveChatProfile(id))
+  ]).then((changed) => {
+    if (changed) renderAll();
+  });
 
   const openChat = state.messages.openChat && threadIds.includes(state.messages.openChat) ? state.messages.openChat : null;
   if (openChat) return renderChatScreen(openChat);
@@ -4246,13 +4270,14 @@ function wireHomeContentHandlers(rootSelector) {
     const localProfanity = containsProfanity(text);
     let finalText = text;
     if (isRealChat(activeId)) {
+      let moderated = false;
       try {
         const apiBase = normalizeServerUrl(state.cloud?.serverUrl || location.origin);
-        const resp = await fetch(`${apiBase}/api/message`, {
+        const resp = await withTimeout(fetch(`${apiBase}/api/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.cloud?.token}` },
           body: JSON.stringify({ text })
-        });
+        }), 8000, 'moderation');
         if (resp.status === 403) {
           const data = await resp.json().catch(() => ({}));
           const reasons = (data.reasons || []).join(', ');
@@ -4261,22 +4286,21 @@ function wireHomeContentHandlers(rootSelector) {
           return;
         }
         if (resp.ok) {
+          moderated = true;
           const data = await resp.json().catch(() => ({}));
           if (data.censored && data.censoredText) {
             finalText = data.censoredText;
             toast('Запрещённые слова заменены звёздочками');
             haptic('light');
           }
-        } else {
-          toast('Ошибка проверки сообщения');
-          haptic('error');
-          return;
         }
       } catch (e) {
-        toast('Не удалось проверить сообщение. Отправка отменена.');
-        haptic('error');
-        return;
+        console.warn('moderation', e?.message);
       }
+      // Серверная модерация недоступна (статика без /api) — раньше это
+      // полностью отменяло отправку, из-за чего переписка не работала вовсе.
+      // Теперь цензуруем локально и всё равно отправляем.
+      if (!moderated && localProfanity) finalText = censorTextLocal(text);
     } else if (localProfanity) {
       finalText = censorTextLocal(text);
     }
@@ -5180,7 +5204,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v204</div>
+        <div class="muted app-version">v205</div>
     </div>
   `;
 
