@@ -766,15 +766,53 @@ function scheduleLikesResync(delay = 2500) {
   }, delay);
 }
 
+// Удаляем локальные «сироты»: id матчей/чатов, которых нет среди серверных
+// матчей, анкет которых не найти, а лайков с ними не сохранено. Обычно это
+// эхо тестовых или удалённых аккаунтов — без чистки после удаления их анкет
+// на устройстве навсегда висят карточки «Участник» и чаты «Профиль».
+function purgeOrphanMatches() {
+  const server = new Set(state.dating?.serverMatches || []);
+  const profileIds = new Set(DATING_PROFILES.map((x) => x.id));
+  for (const p of liveProfiles) profileIds.add(p.id);
+  // Реальный матч держится на серверной строке, сирота — только в локальном
+  // стейте; различаем именно этим.
+  const known = (id) => id && (server.has(id) || profileIds.has(id));
+  const before = (state.dating.matches || []).length;
+  let threadsRemoved = 0;
+  state.dating.matches = (state.dating.matches || []).filter(known);
+  if (state.messages?.threads) {
+    for (const id of Object.keys(state.messages.threads)) {
+      if (!known(id)) {
+        delete state.messages.threads[id];
+        threadsRemoved++;
+      }
+    }
+  }
+  if ((state.dating.matches || []).length !== before || threadsRemoved) renderAll();
+}
+
 async function syncLikesFromSupabase() {
   try {
     if (!accountInfo?.id || !isSupabaseConfigured()) return;
     const { mine, likedMe } = await supabaseGetMyLikes(accountInfo.id);
-    state.dating.likes = { ...state.dating.likes, ...mine };
-    state.dating.likedMe = { ...(state.dating.likedMe || {}), ...likedMe };
+    // Сервер — источник истины: лайки/мэтчи удалённых аккаунтов не должны
+    // вечность висеть в локальном состоянии (мёрж добавлял их обратно).
+    state.dating.likes = mine;
+    state.dating.likedMe = likedMe;
     await syncMatchesFromSupabase();
+    purgeOrphanMatches();
     likesResyncAttempts = 0;
     save();
+    if (localStorage.getItem('wd-debug') === '1') {
+      console.log('[WD]', JSON.stringify({
+        t: Date.now(),
+        likes: Object.keys(state.dating.likes || {}),
+        likedMe: Object.keys(state.dating.likedMe || {}),
+        matches: state.dating.matches,
+        serverMatches: state.dating.serverMatches,
+        threads: Object.keys(state.messages?.threads || {})
+      }));
+    }
   } catch (err) {
     console.warn('sync likes', err?.message);
     // Сбой (обычно сетевой) — не оставляем пользователя без матчей до
@@ -5276,7 +5314,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v209</div>
+        <div class="muted app-version">v211</div>
     </div>
   `;
 
