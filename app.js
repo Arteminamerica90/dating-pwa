@@ -4125,6 +4125,11 @@ function formatMessageTime(ts) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+function profileAge(profile) {
+  if (!profile) return '';
+  return profile.age || ageFromBirthDate(profile.birthDate) || '';
+}
+
 function resolveChatProfile(profileId) {
   return (
     DATING_PROFILES.find((x) => x.id === profileId) ||
@@ -4153,7 +4158,7 @@ function renderChatScreen(profileId) {
           <div class="chat-thread-user">
             <img class="chat-thread-avatar" src="${profile.photos?.[0] || './assets/profile/avatar-square.jpg'}" alt="${escapeHtml(profile.name)}" />
             <div>
-              <div class="chat-thread-name">${escapeHtml(profile.name)}, ${profile.age}</div>
+              <div class="chat-thread-name">${escapeHtml(profile.name)}${profileAge(profile) ? ', ' + profileAge(profile) : ''}</div>
             </div>
           </div>
         </div>
@@ -4246,7 +4251,7 @@ function renderHomeMessagesHtml() {
               </div>
               <div class="chat-main">
                 <div class="chat-topline">
-                  <div class="chat-name">${escapeHtml(profile.name)}, ${profile.age}${secured ? ' 🔒' : ''}</div>
+                  <div class="chat-name">${escapeHtml(profile.name)}${profileAge(profile) ? ', ' + profileAge(profile) : ''}${secured ? ' 🔒' : ''}</div>
                   <div class="chat-time">${lastMsg ? formatMessageTime(lastMsg.ts) : ''}</div>
                 </div>
                 <div class="chat-preview">${lastMsg ? escapeHtml(lastMsg.text) : (mutual ? 'Общий метч с ' + escapeHtml(profile.name) : escapeHtml(profile.about || 'Новое совпадение'))}</div>
@@ -5348,7 +5353,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v214</div>
+        <div class="muted app-version">v215</div>
     </div>
   `;
 
@@ -5628,7 +5633,7 @@ function renderStats() {
             ${photos.length
               ? photos
                   .slice(0, 3)
-                  .map((src, idx) => `<button class="photo-thumb ${idx === 0 ? 'main' : ''}" type="button" data-photo-index="${idx}" title="${idx === 0 ? 'Главное фото' : 'Сделать главным (нажмите)'}"><img alt="photo ${idx + 1}" src="${src}" /></button>`)
+                  .map((src, idx) => `<button class="photo-thumb ${idx === 0 ? 'main' : ''}" type="button" data-photo-index="${idx}" title="${idx === 0 ? 'Главное фото' : 'Сделать главным (нажмите)'}"><img alt="photo ${idx + 1}" src="${src}" /><span class="photo-del" data-del-photo="${idx}" title="Удалить фото">✕</span></button>`)
                   .join('')
               : ''}
             ${photos.length ? '<div class="muted photo-hint" style="text-align:center;font-size:10px">Нажмите на фото, чтобы сделать его главным</div>' : ''}
@@ -5753,9 +5758,23 @@ function renderStats() {
   });
 
   $('#view-stats').querySelectorAll('[data-photo-index]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const idx = Number(btn.dataset.photoIndex);
+    btn.addEventListener('click', (event) => {
+      const del = event.target.closest('[data-del-photo]');
       const photos = Array.isArray(state.profile?.photos) ? state.profile.photos.slice() : [];
+      if (del) {
+        const delIdx = Number(del.dataset.delPhoto);
+        if (!photos[delIdx]) return;
+        photos.splice(delIdx, 1);
+        state.profile.photos = photos.slice(0, 3);
+        syncProfileFormFields();
+        save();
+        pushPublicProfileNow().catch(() => {});
+        toast('Фото удалено');
+        haptic('light');
+        renderAll();
+        return;
+      }
+      const idx = Number(btn.dataset.photoIndex);
       if (!photos[idx] || idx === 0) return;
       const [moved] = photos.splice(idx, 1);
       photos.unshift(moved);

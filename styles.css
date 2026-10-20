@@ -1551,6 +1551,22 @@ a { color: inherit; }
   display: block;
 }
 
+.photo-del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+  pointer-events: auto;
+  z-index: 2;
+}
+
 .photo-pending-strip {
   display: flex;
   gap: 8px;

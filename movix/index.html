@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Movix</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ TITLE / MENU BAR ============ -->
+  <header class="menubar">
+    <div class="app-logo">M<span>ovix</span></div>
+    <nav class="mainmenu" id="mainmenu">
+      <div class="menu" data-menu="file"><button>File</button>
+        <div class="dropdown">
+          <a data-cmd="new-comp">New Composition…<kbd>Ctrl+N</kbd></a>
+          <a data-cmd="import">Import File…<kbd>Ctrl+I</kbd></a>
+          <a data-cmd="open">Open Project…</a>
+          <a data-cmd="save">Save Project<kbd>Ctrl+S</kbd></a>
+          <a data-cmd="save-file">Save Project File…<kbd>Ctrl+Shift+S</kbd></a>
+          <hr/>
+          <a data-cmd="export-frame">Export Frame (PNG)</a>
+          <a data-cmd="export-video">Export Video (MP4)</a>
+          <hr/>
+          <a data-cmd="reset">New / Reset Project</a>
+        </div>
+      </div>
+      <div class="menu" data-menu="edit"><button>Edit</button>
+        <div class="dropdown">
+          <a data-cmd="undo">Undo<kbd>Ctrl+Z</kbd></a>
+          <a data-cmd="redo">Redo<kbd>Ctrl+Shift+Z</kbd></a>
+          <hr/>
+          <a data-cmd="duplicate">Duplicate<kbd>Ctrl+D</kbd></a>
+          <a data-cmd="delete">Delete<kbd>Del</kbd></a>
+          <a data-cmd="selectall">Select All<kbd>Ctrl+A</kbd></a>
+          <hr/>
+          <a data-cmd="split">Split Layer<kbd>Ctrl+Shift+D</kbd></a>
+        </div>
+      </div>
+      <div class="menu" data-menu="composition"><button>Composition</button>
+        <div class="dropdown">
+          <a data-cmd="new-comp">New Composition…</a>
+          <a data-cmd="comp-settings">Composition Settings…</a>
+          <a data-cmd="bg-color">Background Color…</a>
+          <hr/>
+          <a data-cmd="add-solid">New Solid…<kbd>Ctrl+Y</kbd></a>
+          <a data-cmd="add-null">New Null Object</a>
+          <a data-cmd="add-adjustment">New Adjustment Layer</a>
+          <a data-cmd="add-camera">New Camera</a>
+          <a data-cmd="add-light">New Light</a>
+        </div>
+      </div>
+      <div class="menu" data-menu="layer"><button>Layer</button>
+        <div class="dropdown">
+          <a data-cmd="add-text">New Text</a>
+          <a data-cmd="add-shape">New Shape</a>
+          <a data-cmd="add-image">From Imported Footage</a>
+          <hr/>
+          <a data-cmd="duplicate">Duplicate</a>
+          <a data-cmd="split">Split Layer</a>
+          <a data-cmd="delete">Delete</a>
+          <hr/>
+          <a data-cmd="bring-forward">Bring Layer Forward</a>
+          <a data-cmd="send-backward">Send Layer Backward</a>
+          <a data-cmd="bring-front">Bring Layer to Front</a>
+          <a data-cmd="send-back">Send Layer to Back</a>
+          <hr/>
+          <a data-cmd="fit-comp">Fit to Comp (Ctrl+Alt+F)</a>
+          <hr/>
+          <a data-cmd="precompose">Pre-compose…<kbd>Ctrl+Shift+C</kbd></a>
+          <a data-cmd="toggle-3d">Toggle 3D Layer</a>
+          <a data-cmd="add-mask-rect">Add Rectangle Mask</a>
+          <a data-cmd="add-mask-ellipse">Add Ellipse Mask</a>
+        </div>
+      </div>
+      <div class="menu" data-menu="effect"><button>Effect</button>
+        <div class="dropdown" id="effect-menu"></div>
+      </div>
+      <div class="menu" data-menu="animation"><button>Animation</button>
+        <div class="dropdown">
+          <a data-cmd="add-kf">Add Keyframe<kbd>Alt+Shift+K</kbd></a>
+          <a data-cmd="toggle-stopwatch">Toggle Stopwatch</a>
+          <a data-cmd="ease-linear">Keyframe Interpolation: Linear</a>
+          <a data-cmd="ease-ease">Keyframe Interpolation: Ease In/Out</a>
+          <a data-cmd="ease-hold">Keyframe Interpolation: Hold</a>
+          <hr/>
+          <a data-cmd="graph-editor">Open Graph Editor…</a>
+          <hr/>
+          <a data-cmd="clear-kf">Remove All Keyframes on Selected</a>
+        </div>
+      </div>
+      <div class="menu" data-menu="view"><button>View</button>
+        <div class="dropdown">
+          <a data-cmd="zoom-in"><kbd>.</kbd> Zoom In</a>
+          <a data-cmd="zoom-out"><kbd>,</kbd> Zoom Out</a>
+          <a data-cmd="zoom-fit">Fit to Window<kbd>Shift+/</kbd></a>
+          <a data-cmd="zoom-100">100%</a>
+          <a data-cmd="toggle-checker">Toggle Transparency Grid</a>
+        </div>
+      </div>
+      <div class="menu" data-menu="window"><button>Window</button>
+        <div class="dropdown" id="window-menu"></div>
+      </div>
+      <div class="menu" data-menu="help"><button>Help</button>
+        <div class="dropdown">
+          <a data-cmd="help-shortcuts">Keyboard Shortcuts</a>
+          <a data-cmd="help-about">About Movix</a>
+        </div>
+      </div>
+    </nav>
+    <div class="menu-right">
+      <span class="dirty" id="dirty-dot" title="Unsaved changes"></span>
+      <span id="project-name">Untitled Project</span>
+    </div>
+  </header>
+
+  <!-- ============ TOOLBAR ============ -->
+  <div class="toolbar" id="toolbar">
+    <!-- tool buttons injected by JS -->
+    <div class="toolbar-sep"></div>
+    <div class="tool-color" id="fill-swatch" title="Fill"></div>
+    <button class="swap" id="swap-colors" title="Swap fill/stroke">⇄</button>
+    <div class="tool-color" id="stroke-swatch" title="Stroke"></div>
+    <div class="toolbar-sep"></div>
+    <div class="tb-group" id="mask-modes"></div>
+    <div class="spacer"></div>
+    <div class="tb-group" id="view-modes"></div>
+  </div>
+
+  <!-- ============ MAIN WORKSPACE ============ -->
+  <div class="workspace">
+
+    <!-- LEFT COLUMN -->
+    <div class="col col-left">
+      <section class="panel" data-panel="project">
+        <header class="panel-head"><span>Project</span>
+          <div class="panel-tools">
+            <button title="New Composition" data-cmd="new-comp">▤+</button>
+            <button title="New Folder">📁</button>
+            <button title="Import" data-cmd="import">＋</button>
+            <button title="Delete" data-cmd="delete">🗑</button>
+          </div>
+        </header>
+        <div class="panel-body" id="project-body"></div>
+      </section>
+
+      <section class="panel" data-panel="effects">
+        <header class="panel-head"><span>Effects &amp; Presets</span>
+          <div class="panel-tools">
+            <input id="fx-search" placeholder="Search…" spellcheck="false"/>
+          </div>
+        </header>
+        <div class="panel-body" id="fx-list"></div>
+      </section>
+    </div>
+
+    <!-- CENTER COLUMN -->
+    <div class="col col-center">
+      <section class="panel viewer" data-panel="viewer">
+        <header class="panel-head viewer-tabs">
+          <div class="tabs">
+            <button class="tab active" data-view="composition">Composition</button>
+            <button class="tab" data-view="layer">Layer</button>
+            <button class="tab" data-view="flowchart">Flowchart</button>
+          </div>
+          <div class="panel-tools">
+            <select id="comp-select" title="Active composition"></select>
+            <select id="resolution" title="Resolution">
+              <option value="full">Full</option>
+              <option value="half">Half</option>
+              <option value="third">Third</option>
+              <option value="quarter">Quarter</option>
+            </select>
+            <span class="zoom-ctl">
+              <button data-cmd="zoom-out">−</button>
+              <span id="zoom-label">100%</span>
+              <button data-cmd="zoom-in">＋</button>
+            </span>
+          </div>
+        </header>
+        <div class="viewer-stage" id="viewer-stage">
+          <div class="comp-frame" id="comp-frame">
+            <canvas id="comp-canvas" width="1280" height="720"></canvas>
+            <div class="safe-area" id="safe-area"></div>
+            <div class="overlay" id="viewer-overlay"></div>
+          </div>
+        </div>
+        <footer class="viewer-footer">
+          <button id="play-btn" class="round" data-cmd="play">▶</button>
+          <button class="round" data-cmd="to-start">⏮</button>
+          <button class="round" data-cmd="prev-kf">◀|</button>
+          <button class="round" data-cmd="next-kf">|▶</button>
+          <button class="round" data-cmd="to-end">⏭</button>
+          <button class="round" data-cmd="loop" id="loop-btn" title="Loop">🔁</button>
+          <span class="time-readout" id="time-readout">0:00:00:00</span>
+          <div class="viewer-status" id="viewer-status"></div>
+        </footer>
+      </section>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="col col-right">
+      <section class="panel" data-panel="info">
+        <header class="panel-head"><span>Info</span></header>
+        <div class="panel-body info-body" id="info-body">
+          <div class="info-row"><span>R:</span><b id="info-r">0</b><span>G:</span><b id="info-g">0</b><span>B:</span><b id="info-b">0</b></div>
+          <div class="info-row"><span>X:</span><b id="info-x">0</b><span>Y:</span><b id="info-y">0</b></div>
+        </div>
+      </section>
+
+      <section class="panel grow" data-panel="properties">
+        <header class="panel-head"><span id="prop-title">Timeline</span>
+          <div class="panel-tools">
+            <button title="Show/Hide" data-cmd="toggle-all-props">≡</button>
+          </div>
+        </header>
+        <div class="panel-body" id="prop-body"></div>
+      </section>
+
+      <section class="panel" data-panel="render">
+        <header class="panel-head"><span>Render Queue</span></header>
+        <div class="panel-body" id="render-body">
+          <div class="render-row">
+            <label>Format
+              <select id="render-format">
+                <option value="mp4">MP4 Video</option>
+                <option value="webm">WebM Video</option>
+                <option value="png">PNG Frame</option>
+              </select>
+            </label>
+          </div>
+          <div class="render-row"><button class="btn primary" data-cmd="export">Render</button>
+            <progress id="render-progress" max="100" value="0"></progress></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============ TIMELINE ============ -->
+  <section class="timeline-panel" id="timeline-panel">
+    <header class="panel-head timeline-head">
+      <span class="tl-title">Timeline</span>
+      <div class="tl-search"><input id="layer-search" placeholder="Search layers…" spellcheck="false"/></div>
+      <div class="tl-btns">
+        <button id="add-layer-btn" class="btn small" data-cmd="add-layer-menu">+ Layer ▾</button>
+        <div class="dropdown right" id="add-layer-menu">
+          <a data-cmd="add-text">Text</a>
+          <a data-cmd="add-solid">Solid</a>
+          <a data-cmd="add-shape-rect">Rectangle</a>
+          <a data-cmd="add-shape-ellipse">Ellipse</a>
+          <a data-cmd="add-shape-polygon">Polygon</a>
+          <a data-cmd="add-shape-star">Star</a>
+          <a data-cmd="add-adjustment">Adjustment Layer</a>
+          <a data-cmd="add-null">Null Object</a>
+          <a data-cmd="add-camera">Camera</a>
+          <a data-cmd="add-light">Light</a>
+          <hr/>
+          <a data-cmd="add-image">From Footage…</a>
+        </div>
+      </div>
+      <div class="tl-playback">
+        <button data-cmd="to-start">⏮</button>
+        <button data-cmd="prev-frame">◀◀</button>
+        <button id="play-btn2" data-cmd="play">▶</button>
+        <button data-cmd="next-frame">▶▶</button>
+        <button data-cmd="to-end">⏭</button>
+      </div>
+    </header>
+    <div class="timeline-body">
+      <div class="tl-left" id="tl-left">
+        <div class="tl-left-head">
+          <span class="col-name">Layer Name</span>
+        </div>
+        <div class="tl-layers" id="tl-layers"></div>
+      </div>
+      <div class="tl-right" id="tl-right">
+        <div class="tl-ruler" id="tl-ruler"></div>
+        <div class="tl-tracks" id="tl-tracks">
+          <div class="tl-playhead" id="tl-playhead"><span class="ph-head"></span></div>
+        </div>
+      </div>
+    </div>
+    <footer class="tl-footer">
+      <span id="tl-info">No composition</span>
+      <button class="btn" data-cmd="graph-editor" title="Open graph editor">∿ Graph Editor</button>
+      <div class="tl-zoom"><button data-cmd="tl-zoom-out">−</button><button data-cmd="tl-zoom-in">＋</button></div>
+    </footer>
+  </section>
+</div>
+
+<!-- ============ MODAL ============ -->
+<div class="modal-backdrop" id="modal" hidden>
+  <div class="modal" id="modal-box"></div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<div id="context-menu" class="context-menu" hidden></div>
+
+<script src="js/core.js"></script>
+<script src="js/effects.js"></script>
+<script src="js/effects2.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/viewer.js"></script>
+<script src="js/panels.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/interactions.js"></script>
+<script src="js/export.js"></script>
+</body>
+</html>
