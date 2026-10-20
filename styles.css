@@ -558,6 +558,16 @@ a { color: inherit; }
   padding: 18px 16px calc(128px + env(safe-area-inset-bottom));
 }
 
+/* Десктоп: карточка чата дотягивается почти до нижней панели табов, а поле
+   ввода «прилипает» к ней с небольшим зазором (раньше композер висел в
+   воздухе за ~180px до табов). */
+@media (min-width: 561px) {
+  .chat-screen {
+    height: calc(100dvh - 199px);
+    padding: 18px 16px 16px;
+  }
+}
+
 .chat-screen-head {
   display: flex;
   gap: 12px;
