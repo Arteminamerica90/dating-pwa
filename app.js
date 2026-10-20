@@ -753,6 +753,8 @@ async function loadLiveProfiles() {
 
 let likesResyncTimer = null;
 let likesResyncAttempts = 0;
+// id, для которых самолечение лайка уже запускалось в этой сессии
+const likesRepairAttempted = new Set();
 
 // Отложенный повторный синк лайков/матчей. Синхронизация стартует один раз при
 // входе и один раз после загрузки анкет: если первый запрос словил сетевой
@@ -795,6 +797,22 @@ async function syncLikesFromSupabase() {
   try {
     if (!accountInfo?.id || !isSupabaseConfigured()) return;
     const { mine, likedMe } = await supabaseGetMyLikes(accountInfo.id);
+    // Самолечение: раньше во «взаимной» ветке лайка свой лайк не сохранялся и
+    // матч существовал только локально (второй аккаунт ничего не видел).
+    // Если локально есть взаимный лайк, а серверной строки своего лайка нет —
+    // восстанавливаем её и создаём матч.
+    const repairIds = [];
+    try {
+      const prev = state.dating?.likes || {};
+      const prevLikedMe = state.dating?.likedMe || {};
+      const demoIds = new Set(DATING_PROFILES.map((x) => x.id));
+      for (const [id, dir] of Object.entries(prev)) {
+        if (dir === 'like' && prevLikedMe[id] && mine[id] !== 'like' && !demoIds.has(id) && id !== accountInfo.id && !likesRepairAttempted.has(id)) {
+          repairIds.push(id);
+          likesRepairAttempted.add(id);
+        }
+      }
+    } catch {}
     // Сервер — источник истины: лайки/мэтчи удалённых аккаунтов не должны
     // вечность висеть в локальном состоянии (мёрж добавлял их обратно).
     state.dating.likes = mine;
@@ -803,6 +821,22 @@ async function syncLikesFromSupabase() {
     purgeOrphanMatches();
     likesResyncAttempts = 0;
     save();
+    if (repairIds.length) {
+      for (const id of repairIds) {
+        supabaseSaveLike(accountInfo.id, id, 'like')
+          .then(() => supabaseEnsureMatch(accountInfo.id, id))
+          .then((row) => {
+            if (row) {
+              state.dating.matches = (state.dating.matches || []).filter((x) => x !== id);
+              state.dating.matches.unshift(id);
+              save();
+              renderAll();
+            }
+          })
+          .catch(() => {});
+      }
+      scheduleLikesResync(2500);
+    }
     if (localStorage.getItem('wd-debug') === '1') {
       console.log('[WD]', JSON.stringify({
         t: Date.now(),
@@ -5314,7 +5348,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v211</div>
+        <div class="muted app-version">v212</div>
     </div>
   `;
 
@@ -6298,7 +6332,27 @@ function onLike(id) {
   if (mutual && treeOk) state.dating.matches.unshift(id);
 
   if (mutual && treeOk) {
-    if (accountInfo?.id) supabaseEnsureMatch(accountInfo.id, id).catch(() => { scheduleLikesResync(2000); });
+    // Критично: даже во «взаимной» ветке свой лайк ОБЯЗАТЕЛЬНО сохраняем на
+    // сервере. Раньше он не записывался, сервер не видел взаимности и матч
+    // существовал только локально: у лайкнувшего он был, у второго — «нет
+    // метчей», и сообщения не доходили.
+    if (accountInfo?.id) {
+      supabaseSaveLike(accountInfo.id, id, 'like')
+        .then(() => supabaseEnsureMatch(accountInfo.id, id))
+        .then((row) => {
+          if (row) {
+            state.dating.matches = (state.dating.matches || []).filter((x) => x !== id);
+            state.dating.matches.unshift(id);
+          } else {
+            // взаимность ещё не видна серверу — досинк дотянется позже
+            scheduleLikesResync(1500);
+          }
+          haptic('match');
+          save();
+          renderAll();
+        })
+        .catch(() => { scheduleLikesResync(2000); });
+    }
     haptic('match');
     toast('Есть матч! Вопросы подтвердило совместимость. Переписка — в табе «Сообщение».');
     save();
@@ -6307,6 +6361,9 @@ function onLike(id) {
   }
 
   if (mutual && !treeOk && tree.known.length) {
+    // Свой лайк всё равно фиксируем на сервере: это факт, а матч не создаём —
+    // совместимость по анкете не подтверждена.
+    if (accountInfo?.id) supabaseSaveLike(accountInfo.id, id, 'like').catch(() => { scheduleLikesResync(2000); });
     toast('Взаимный лайк, но дерево решений не подтверждает совместимость');
     haptic('skip');
     save();
