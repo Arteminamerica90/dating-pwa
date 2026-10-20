@@ -751,6 +751,21 @@ async function loadLiveProfiles() {
   }
 }
 
+let likesResyncTimer = null;
+let likesResyncAttempts = 0;
+
+// Отложенный повторный синк лайков/матчей. Синхронизация стартует один раз при
+// входе и один раз после загрузки анкет: если первый запрос словил сетевой
+// сбой, матч больше не появлялся до перезагрузки страницы — второй аккаунт
+// в такой момент видит «У вас ещё нет метчей», хотя матч на сервере есть.
+function scheduleLikesResync(delay = 2500) {
+  if (likesResyncTimer) return;
+  likesResyncTimer = setTimeout(() => {
+    likesResyncTimer = null;
+    syncLikesFromSupabase();
+  }, delay);
+}
+
 async function syncLikesFromSupabase() {
   try {
     if (!accountInfo?.id || !isSupabaseConfigured()) return;
@@ -758,9 +773,16 @@ async function syncLikesFromSupabase() {
     state.dating.likes = { ...state.dating.likes, ...mine };
     state.dating.likedMe = { ...(state.dating.likedMe || {}), ...likedMe };
     await syncMatchesFromSupabase();
+    likesResyncAttempts = 0;
     save();
   } catch (err) {
     console.warn('sync likes', err?.message);
+    // Сбой (обычно сетевой) — не оставляем пользователя без матчей до
+    // перезагрузки: пробуем снова с нарастающей задержкой, максимум 5 раз.
+    if (likesResyncAttempts < 5) {
+      likesResyncAttempts++;
+      scheduleLikesResync(1500 * likesResyncAttempts);
+    }
   }
 }
 
@@ -1307,6 +1329,16 @@ function boot() {
   // Гео-трекинг и датчики отключены (UI убран); город выбирается вручную в настройках.
   save();
 
+  // Лайки/матчи досинхронизируются, когда пользователь возвращается в приложение
+  // или раз в минуту: иначе матч, сделанный во втором аккаунте другим
+  // устройством, появлялся только после перезагрузки страницы.
+  window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && accountInfo?.id) scheduleLikesResync(800);
+  });
+  setInterval(() => {
+    if (document.visibilityState === 'visible' && accountInfo?.id) scheduleLikesResync(0);
+  }, 60_000);
+
   // Периодическая подгрузка новых сообщений в открытом реальном чате.
   setInterval(() => {
     const open = state?.messages?.openChat;
@@ -1435,6 +1467,19 @@ async function syncProfileAfterAuth() {
     const accountSwitched = !!(lastAccountId && lastAccountId !== user.id);
     if (accountSwitched) {
       lastAccountId = user.id;
+      // Второй аккаунт на том же устройстве (вход без выхода) не должен видеть
+      // лайки/матчи/чаты предыдущего: чистим dating-состояние, сервер сам
+      // доставит актуальные данные этому аккаунту.
+      state.dating.likes = {};
+      state.dating.likedMe = {};
+      state.dating.matches = [];
+      state.dating.serverMatches = [];
+      state.dating.seenMatches = {};
+      state.messages = { activeThreadId: null, openChat: null, threads: {} };
+      // Кэш анкет пересобираем: список для прошлого аккаунта исключал его
+      // собственную анкету, из-за чего матч с ней показывался «Участник»/«Профиль».
+      liveProfiles = [];
+      liveProfilesLoaded = false;
     } else if (!lastAccountId) {
       lastAccountId = user.id;
     }
@@ -1554,6 +1599,9 @@ function wireTabs() {
       }
       haptic('tab');
       fadeTab();
+      // Открывая «Сообщения», дотягиваем свежие лайки/матчи: если синк при входе
+      // проспал свой первый запрос, вкладка без досинка показывала пустоту.
+      if (tab === 'home' && accountInfo?.id) scheduleLikesResync(400);
       renderAll();
     });
   });
@@ -5228,7 +5276,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v208</div>
+        <div class="muted app-version">v209</div>
     </div>
   `;
 
@@ -6153,7 +6201,19 @@ function renderProfileCard(p) {
 
 function renderMatchCard(id, { seen } = {}) {
   const p = DATING_PROFILES.find((x) => x.id === id) || liveProfiles.find((x) => x.id === id);
-  if (!p) return '';
+  // Лайки/фото с сервера догружаются позже списка анкет: раньше карточка
+  // просто не рендерилась и «Матчи» выглядели пустыми. Показываем плейсхолдер.
+  if (!p) {
+    return `
+      <div class="match-card ${seen ? 'seen' : 'new'}" data-match-id="${escapeHtml(id)}" role="button" tabindex="0" aria-label="Матч">
+        <div class="match-photo-wrap">
+          <img class="match-photo" alt="Участник" src="./assets/profile/avatar-square.jpg" />
+        </div>
+        <div class="match-name">Участник</div>
+        <div class="match-meta">—</div>
+      </div>
+    `;
+  }
   const photo = p.photos?.[0] || './assets/profile/avatar-square.jpg';
   const meta = p.city ? cityLabel(p.city) : '—';
   return `
@@ -6200,7 +6260,7 @@ function onLike(id) {
   if (mutual && treeOk) state.dating.matches.unshift(id);
 
   if (mutual && treeOk) {
-    if (accountInfo?.id) supabaseEnsureMatch(accountInfo.id, id).catch(() => {});
+    if (accountInfo?.id) supabaseEnsureMatch(accountInfo.id, id).catch(() => { scheduleLikesResync(2000); });
     haptic('match');
     toast('Есть матч! Вопросы подтвердило совместимость. Переписка — в табе «Сообщение».');
     save();
@@ -6228,7 +6288,7 @@ function onLike(id) {
         save();
         renderAll();
       })
-      .catch(() => {});
+      .catch(() => { scheduleLikesResync(2000); });
   }
   haptic('like');
   toast('Лайк отправлен');
