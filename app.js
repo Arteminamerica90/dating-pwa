@@ -5348,7 +5348,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v213</div>
+        <div class="muted app-version">v214</div>
     </div>
   `;
 
@@ -5614,7 +5614,8 @@ function renderStats() {
         <div class="photo-hero-wrap">
           <button class="photo-hero-main ${photos[0] ? '' : 'empty'}" type="button" data-action="pickPhoto" ${photos.length >= 3 ? 'disabled' : ''}>
             ${photos[0] ? `<img alt="profile photo" src="${photos[0]}" />` : `<div class="photo-empty">Фото профиля</div>`}
-            ${photos[0] ? `<span class="photo-name">${escapeHtml(name || '')}</span>` : ''}
+            ${photos[0] ? `<span class="photo-name">${escapeHtml(name || '')}${state.profile?.birthDate && ageFromBirthDate(state.profile.birthDate) != null ? `, ${ageFromBirthDate(state.profile.birthDate)}` : ''}</span>` : ''}
+            ${photos[0] && state.profile?.city ? `<span class="photo-city">${escapeHtml(cityLabel(state.profile.city))}</span>` : ''}
             ${photos[0] && interests.length ? `<span class="photo-tags">${interests.slice(0, 5).map((t) => `<span class="pill">${interestLabel(t)}</span>`).join('')}</span>` : ''}
           </button>
         </div>

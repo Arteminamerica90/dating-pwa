@@ -1399,6 +1399,20 @@ a { color: inherit; }
   pointer-events: none;
 }
 
+/* Возраст и город на карточке анкеты в третьем табе */
+.photo-city {
+  position: absolute;
+  left: 14px;
+  bottom: 34px;
+  z-index: 2;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+  opacity: 0.95;
+  pointer-events: none;
+}
+
 .photo-tags {
   position: absolute;
   left: 14px;
