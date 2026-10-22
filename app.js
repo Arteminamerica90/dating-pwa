@@ -5418,7 +5418,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v235</div>
+        <div class="muted app-version">v236</div>
     </div>
   `;
 
@@ -6453,22 +6453,15 @@ function openMatchActionSheet(matchId, name) {
       haptic('light');
     });
   });
-  wrap.querySelector('[data-mas-block]').addEventListener('click', async (e) => {
-    const btn = e.currentTarget;
+  wrap.querySelector('[data-mas-block]').addEventListener('click', () => {
     if (!chosen) return;
-    btn.disabled = true;
-    const ok = await submitReport(matchId, 'profile', chosen, '');
-    if (ok) {
-      trackReportSubmission(matchId, chosen);
-      toast('Пользователь заблокирован, матч удалён');
-      haptic('medium');
-      close();
-      deleteMatchFlow(matchId);
-    } else {
-      btn.disabled = false;
-      toast('Не удалось отправить. Проверьте подключение.');
-      haptic('error');
-    }
+    // Как в Tinder/Mamba: блок и удаление матча — мгновенно, жалоба уходит в фоне.
+    trackReportSubmission(matchId, chosen);
+    toast('Пользователь заблокирован');
+    haptic('medium');
+    close();
+    deleteMatchFlow(matchId);
+    submitReport(matchId, 'profile', chosen, '').catch(() => {});
   });
 }
 
