@@ -5409,7 +5409,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v232</div>
+        <div class="muted app-version">v233</div>
     </div>
   `;
 
@@ -7354,7 +7354,6 @@ function renderTinderInner(p) {
               : ''}</div>
           ${tags ? `<div class="tinder-tags">${tags}</div>` : ''}
         </div>
-        ${qmBadge}
         <div class="tinder-about">${escapeHtml(p.about)}</div>
         <div class="tinder-badges">${comm}</div>
         <div class="tinder-badges">${vals}</div>
