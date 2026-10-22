@@ -51,7 +51,7 @@ import {
   supabaseSaveConsent,
   supabaseSaveConsentsBulk,
   supabaseGetConsents
-} from './supabase.js?v=111';
+} from './supabase.js?v=112';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
@@ -2647,8 +2647,7 @@ function refreshAccountDialogIfOpen() {
 function renderConsentDialogBody() {
   const body = $('#consentDialogBody');
   if (!body) return;
-  const accepted = !!(state.consent?.agreement && state.consent?.personalData && state.consent?.newsletters && state.consent?.cookies && state.consent?.thirdPartyData);
-  body.innerHTML = `
+  const accepted = !!(state.consent?.agreement && state.consent?.personalData && state.consent?.newsletters && state.consent?.cookies && state.consent?.thirdPartyData);  body.innerHTML = `
     <div class="consent-inline" style="font-size:12px">
       <div class="muted">Ознакомьтесь с документами по ссылкам и подтвердите согласие.</div>
       <div class="consent-list">
@@ -2678,6 +2677,10 @@ function renderConsentDialogBody() {
           <input type="checkbox" id="consentProfiling" ${state.consent?.profiling !== false ? 'checked' : ''} style="margin-top:2px;width:14px;height:14px;accent-color:var(--brand)" />
           <span>Согласен на <b>профилирование</b> для подбора партнёров (алгоритм «дерево решений») — можно отключить</span>
         </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-top:6px">
+          <input type="checkbox" id="consentCrossBorder" ${state.consent?.crossBorder ? 'checked' : ''} style="margin-top:2px;width:14px;height:14px;accent-color:var(--brand)" />
+          <span>Даю согласие на <b>трансграничную передачу</b> ПДн (ст. 12 152-ФЗ): данные анкеты и переписка хранятся в дата-центрах Supabase вне территории РФ <a href="./legal.html#crossborder" target="_blank" rel="noopener" style="color:var(--brand)">(подробнее)</a></span>
+        </label>
       </div>
       <div class="muted" style="margin-top:6px">Продолжая пользоваться данным приложением вы даёте согласие с правилами пользования сервиса.</div>
     </div>
@@ -2706,6 +2709,7 @@ function wireConsentDialogBody() {
     state.consent.newsletters = on;
     state.consent.cookies = on;
     state.consent.thirdPartyData = on;
+    state.consent.crossBorder = on;
     save();
     if (accountInfo?.id) {
       try {
@@ -2743,6 +2747,15 @@ function wireConsentDialogBody() {
     save();
     if (accountInfo?.id) {
       try { await supabaseSaveConsent(accountInfo.id, 'profiling', e.target.checked); } catch {}
+    }
+    haptic('light');
+  });
+
+  $('#consentCrossBorder')?.addEventListener('change', async (e) => {
+    state.consent.crossBorder = e.target.checked;
+    save();
+    if (accountInfo?.id) {
+      try { await supabaseSaveConsent(accountInfo.id, 'crossBorder', e.target.checked); } catch {}
     }
     haptic('light');
   });
@@ -5350,7 +5363,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v219</div>
+        <div class="muted app-version">v220</div>
     </div>
   `;
 
