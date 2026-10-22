@@ -2508,7 +2508,9 @@ a { color: inherit; }
   transition: width 260ms ease;
 }
 .qn-counter { font-size: 12px; text-align: right; }
-.qn-stage { position: relative; min-height: 260px; overflow: visible; touch-action: pan-y; }
+.qn-stage { position: relative; min-height: 200px; overflow: hidden; touch-action: pan-y; display: flex; }
+.questionnaire-dialog { max-height: calc(100vh - 32px); }
+.qn-stage .qn-card { width: 100%; max-height: min(54vh, 460px); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .qn-card {
   background: rgba(15, 23, 42, 0.045);
   border: 1px solid rgba(15, 23, 42, 0.12);
@@ -3075,3 +3077,19 @@ textarea.input {
   color: #5b6675;
 }
 .match-card { touch-action: pan-y; }
+
+/* Исчезновение матч-карточки при удалении/блокировке */
+.match-card.match-out {
+  transition: transform 340ms cubic-bezier(0.45, 0, 0.35, 1), opacity 340ms ease;
+  transform: translateX(-60%) scale(0.6) rotate(-8deg);
+  opacity: 0;
+  pointer-events: none;
+}
+.chat-item.chat-item-out {
+  transition: max-height 340ms ease, opacity 300ms ease, transform 340ms cubic-bezier(0.45, 0, 0.35, 1);
+  max-height: 0 !important;
+  opacity: 0;
+  transform: translateX(-30%);
+  overflow: hidden;
+  pointer-events: none;
+}

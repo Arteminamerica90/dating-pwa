@@ -5418,7 +5418,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v236</div>
+        <div class="muted app-version">v237</div>
     </div>
   `;
 
@@ -6393,10 +6393,20 @@ function purgeMatchLocally(matchId) {
   renderAll();
 }
 
+function animateMatchOut(matchId) {
+  const card = document.querySelector(`[data-match-id="${String(matchId).replaceAll('"', '')}"]`);
+  if (!card) return null;
+  card.classList.add('match-out');
+  const row = card.closest('.chat-item');
+  if (row) row.classList.add('chat-item-out');
+  return new Promise((resolve) => setTimeout(resolve, 340));
+}
+
 async function deleteMatchFlow(matchId) {
+  haptic('medium');
+  await animateMatchOut(matchId);
   purgeMatchLocally(matchId);
   toast('Матч удалён');
-  haptic('medium');
   if (accountInfo?.id) supabaseDeleteMatch(accountInfo.id, matchId).catch(() => {});
 }
 
