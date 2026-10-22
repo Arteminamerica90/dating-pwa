@@ -4079,13 +4079,6 @@ function getMutualMatches() {
   return out;
 }
 
-function getMessageThreadIds() {
-  const ids = new Set(getMutualMatches());
-  const threads = state.messages?.threads ? Object.keys(state.messages.threads) : [];
-  for (const id of threads) if (id) ids.add(id);
-  return [...ids];
-}
-
 function ensureMessageThread(profileId) {
   state.messages = state.messages || { activeThreadId: null, threads: {} };
   state.messages.threads = state.messages.threads || {};
@@ -4215,9 +4208,23 @@ function renderChatScreen(profileId) {
 
 function renderHomeMessagesHtml() {
   const matches = getMutualMatches();
-  const threadIds = getMessageThreadIds();
 
   state.messages = state.messages || { activeThreadId: null, threads: {} };
+  state.messages.threads = state.messages.threads || {};
+
+  // Матч уезжает из ленты метчей в список чатов только когда в далоге
+  // появились сообщения (кто-то из пары написал). Открыли и не написали —
+  // матч остаётся в ленте метчей.
+  const hasConversation = (id) => {
+    const t = ensureMessageThread(id);
+    return !!(t.messages?.length);
+  };
+  const chatIds = [...new Set([
+    ...Object.keys(state.messages.threads).filter((id) => id && hasConversation(id)),
+    ...matches.filter(hasConversation)
+  ])];
+  const stripMatchIds = matches.filter((id) => !chatIds.includes(id));
+  const threadIds = chatIds;
 
   // Фото матчей и переписок грузим отдельно от списка анкет (см.
   // supabaseListPublicProfiles): без этого карточки мэтчей и аватарки чата
@@ -4229,7 +4236,7 @@ function renderHomeMessagesHtml() {
     if (changed) renderAll();
   });
 
-  const openChat = state.messages.openChat && threadIds.includes(state.messages.openChat) ? state.messages.openChat : null;
+  const openChat = state.messages.openChat && (threadIds.includes(state.messages.openChat) || stripMatchIds.includes(state.messages.openChat)) ? state.messages.openChat : null;
   if (openChat) return renderChatScreen(openChat);
 
   if (!threadIds.includes(state.messages.activeThreadId)) {
@@ -4239,8 +4246,8 @@ function renderHomeMessagesHtml() {
   const gateNeeded = !accountInfo?.id;
 
   const seenMatches = state.dating.seenMatches || {};
-  const matchesStrip = matches.length
-    ? `<div class="matches-strip">${matches
+  const matchesStrip = stripMatchIds.length
+    ? `<div class="matches-strip">${stripMatchIds
         .map((id) => renderMatchCard(id, { seen: !!seenMatches[id] }))
         .join('')}</div>`
     : `<div class="muted">У вас ещё нет метчей. Матч появляется, когда вы оба поставите друг другу лайк.</div>`;
@@ -5363,7 +5370,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v220</div>
+        <div class="muted app-version">v221</div>
     </div>
   `;
 
