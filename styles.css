@@ -1527,6 +1527,12 @@ a { color: inherit; }
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.photo-hint {
+  flex: 0 0 100%;
+  width: 100%;
 }
 
 .photo-thumb {

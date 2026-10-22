@@ -3594,7 +3594,7 @@ function renderQuestionnaireCategories(profile = state.profile) {
       <button type="button" class="cat-progress-item ${done ? 'cat-progress-done' : ''}" data-open-cat="${c}">
         <div class="cat-progress-name">${escapeHtml(CATEGORY_LABELS[c] || c)}</div>
         <div class="cat-progress-bar"><div class="cat-progress-fill" style="width:${pct}%"></div></div>
-        <div class="cat-progress-count">${info.answered}/${info.total} — открыть</div>
+        <div class="cat-progress-count">${info.answered}/${info.total}</div>
       </button>
     `;
   }).join('');
@@ -3605,7 +3605,7 @@ function renderQuestionnaireCategories(profile = state.profile) {
     <button type="button" class="cat-progress-item ${psychAnswered >= psychTotal ? 'cat-progress-done' : ''}" data-open-cat="__psych">
       <div class="cat-progress-name">ПСИХОЛОГИЯ</div>
       <div class="cat-progress-bar"><div class="cat-progress-fill" style="width:${psychPct}%"></div></div>
-      <div class="cat-progress-count">${psychAnswered}/${psychTotal} — открыть</div>
+      <div class="cat-progress-count">${psychAnswered}/${psychTotal}</div>
     </button>
   `;
   return `<div class="cat-progress-grid">${items}${psychItem}</div>`;
@@ -5368,7 +5368,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v224</div>
+        <div class="muted app-version">v225</div>
     </div>
   `;
 
