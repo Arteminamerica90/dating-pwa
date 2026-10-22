@@ -5399,7 +5399,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v228</div>
+        <div class="muted app-version">v229</div>
     </div>
   `;
 
@@ -5670,11 +5670,6 @@ function renderStats() {
             ${photos[0] && interests.length ? `<span class="photo-tags">${interests.slice(0, 5).map((t) => `<span class="pill">${interestLabel(t)}</span>`).join('')}</span>` : ''}
           </button>
         </div>
-          <div class="photo-hero-actions">
-            <button class="btn" type="button" data-action="pickPhoto" ${photos.length >= 3 ? 'disabled' : ''}>Загрузить фото</button>
-            <input id="profilePhotoInput" type="file" accept="image/*" hidden />
-            <button class="btn ghost" type="button" data-action="clearPhotos" ${photos.length ? '' : 'disabled'}>Удалить все</button>
-          </div>
           <div id="profilePhotosPreview" class="photo-strip">
             ${photos.length
               ? `<div class="photo-thumbs">${photos
@@ -5692,6 +5687,11 @@ function renderStats() {
                     .join('')}
                 </div>`
               : ''}
+          </div>
+          <div class="photo-hero-actions">
+            <button class="btn" type="button" data-action="pickPhoto" ${photos.length >= 3 ? 'disabled' : ''}>Загрузить фото</button>
+            <input id="profilePhotoInput" type="file" accept="image/*" hidden />
+            <button class="btn ghost" type="button" data-action="clearPhotos" ${photos.length ? '' : 'disabled'}>Удалить все</button>
           </div>
         </div>
 
