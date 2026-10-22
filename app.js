@@ -5368,7 +5368,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v225</div>
+        <div class="muted app-version">v226</div>
     </div>
   `;
 
@@ -5646,10 +5646,10 @@ function renderStats() {
           </div>
           <div id="profilePhotosPreview" class="photo-strip">
             ${photos.length
-              ? photos
+              ? `<div class="photo-thumbs">${photos
                   .slice(0, 3)
                   .map((src, idx) => `<button class="photo-thumb ${idx === 0 ? 'main' : ''}" type="button" data-photo-index="${idx}" title="${idx === 0 ? 'Главное фото' : 'Сделать главным (нажмите)'}"><img alt="photo ${idx + 1}" src="${src}" /><span class="photo-del" data-del-photo="${idx}" title="Удалить фото">✕</span></button>`)
-                  .join('')
+                  .join('')}</div>`
               : ''}
             ${photos.length ? '<div class="muted photo-hint" style="text-align:center;font-size:10px">Нажмите на фото, чтобы сделать его главным</div>' : ''}
             ${photos.length < 3 && accountInfo?.id ? '<div class="muted photo-hint" style="text-align:center;font-size:10px">Можно загрузить до 3 фото</div>' : ''}

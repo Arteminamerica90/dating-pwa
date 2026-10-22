@@ -1530,6 +1530,22 @@ a { color: inherit; }
   align-items: center;
 }
 
+/* Три квадратные ячейки-миниатюры под главным фото (третий таб) */
+.photo-thumbs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+.photo-thumbs .photo-thumb {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
 .photo-hint {
   flex: 0 0 100%;
   width: 100%;
