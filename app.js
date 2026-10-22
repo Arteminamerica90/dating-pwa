@@ -4246,11 +4246,9 @@ function renderHomeMessagesHtml() {
   const gateNeeded = !accountInfo?.id;
 
   const seenMatches = state.dating.seenMatches || {};
-  const matchesStrip = stripMatchIds.length
-    ? `<div class="matches-strip">${stripMatchIds
-        .map((id) => renderMatchCard(id, { seen: !!seenMatches[id] }))
-        .join('')}</div>`
-    : `<div class="muted">У вас ещё нет метчей. Матч появляется, когда вы оба поставите друг другу лайк.</div>`;
+  const matchesStrip = `<div class="matches-strip">${stripMatchIds
+    .map((id) => renderMatchCard(id, { seen: !!seenMatches[id] }))
+    .join('')}</div>`;
 
   const list = threadIds.length
     ? threadIds
@@ -4285,10 +4283,10 @@ function renderHomeMessagesHtml() {
     : `<div class="muted">Пока нет чатов. Поставьте лайк — диалог появится при взаимном лайке.</div>`;
 
   const cards = `
-    <div class="card">
+    ${stripMatchIds.length ? `<div class="card">
       <div class="card-title">Матчи</div>
       ${matchesStrip}
-    </div>
+    </div>` : ''}
 
     <div class="card">
       <div class="card-title">Чаты</div>
@@ -5370,7 +5368,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v223</div>
+        <div class="muted app-version">v224</div>
     </div>
   `;
 
