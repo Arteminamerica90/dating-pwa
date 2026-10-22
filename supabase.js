@@ -444,6 +444,24 @@ export async function supabaseGetMessages(me, other, limit = 200) {
   }));
 }
 
+// Кому я хоть раз писал (или кто мне писал) — по данным сервера.
+// Служит для фильтра «матч vs чат»: переписка начинается с первого сообщения.
+export async function supabaseGetMessagePartners(me) {
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from('messages')
+    .select('from_user, to_user')
+    .or(`from_user.eq.${me},to_user.eq.${me}`)
+    .limit(1000);
+  if (error) throw new Error(error.message);
+  const partnerIds = new Set();
+  for (const row of data || []) {
+    const partnerId = row.from_user === me ? row.to_user : row.from_user;
+    if (partnerId && partnerId !== me) partnerIds.add(partnerId);
+  }
+  return [...partnerIds];
+}
+
 export async function supabaseSavePlans(userId, day, plans) {
   const supabase = await getSupabase();
   const dayRows = (plans || []).map((p) => ({

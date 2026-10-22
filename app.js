@@ -50,8 +50,9 @@ import {
   warmupSupabase,
   supabaseSaveConsent,
   supabaseSaveConsentsBulk,
-  supabaseGetConsents
-} from './supabase.js?v=112';
+  supabaseGetConsents,
+  supabaseGetMessagePartners
+} from './supabase.js?v=113';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
@@ -4214,10 +4215,12 @@ function renderHomeMessagesHtml() {
 
   // Матч уезжает из ленты метчей в список чатов только когда в далоге
   // появились сообщения (кто-то из пары написал). Открыли и не написали —
-  // матч остаётся в ленте метчей.
+  // матч остаётся в ленте метчей. Переписка с сервера (chatPartners) тоже
+  // признак чата: локальные threads могут не знать о сообщениях.
   const hasConversation = (id) => {
     const t = ensureMessageThread(id);
-    return !!(t.messages?.length);
+    if (t.messages?.length || t.hasMessages) return true;
+    return (state.dating.chatPartners || []).includes(id);
   };
   const chatIds = [...new Set([
     ...Object.keys(state.messages.threads).filter((id) => id && hasConversation(id)),
@@ -4236,6 +4239,23 @@ function renderHomeMessagesHtml() {
     if (changed) renderAll();
   });
 
+  // Собеседники по переписке с сервера: матч становится чатом, как только
+  // у пары есть хоть одно сообщение в базе (для чистого устройства тоже).
+  if (accountInfo?.id) {
+    supabaseGetMessagePartners(accountInfo.id)
+      .then((partners) => {
+        const prev = new Set(state.dating.chatPartners || []);
+        const fresh = [...new Set([...(state.dating.chatPartners || []), ...partners])];
+        const gained = fresh.some((id) => !prev.has(id));
+        if (gained) {
+          state.dating.chatPartners = fresh;
+          save();
+          renderAll();
+        }
+      })
+      .catch(() => {});
+  }
+
   const openChat = state.messages.openChat && (threadIds.includes(state.messages.openChat) || stripMatchIds.includes(state.messages.openChat)) ? state.messages.openChat : null;
   if (openChat) return renderChatScreen(openChat);
 
@@ -4246,7 +4266,7 @@ function renderHomeMessagesHtml() {
   const gateNeeded = !accountInfo?.id;
 
   const seenMatches = state.dating.seenMatches || {};
-  const matchesStrip = `<div class="matches-strip">${stripMatchIds
+  const matchesStrip = `<div class="matches-strip" id="matchesStrip">${stripMatchIds
     .map((id) => renderMatchCard(id, { seen: !!seenMatches[id] }))
     .join('')}</div>`;
 
@@ -4279,17 +4299,21 @@ function renderHomeMessagesHtml() {
     : `<div class="muted">Пока нет чатов. Поставьте лайк — диалог появится при взаимном лайке.</div>`;
 
   const chatBody = threadIds.length
-    ? `<div class="messages-list">${list}</div>`
+    ? `<div class="messages-list" id="chatsList">${list}</div>`
     : `<div class="muted">Пока нет чатов. Поставьте лайк — диалог появится при взаимном лайке.</div>`;
 
   const cards = `
     ${stripMatchIds.length ? `<div class="card">
       <div class="card-title">Матчи</div>
-      ${matchesStrip}
+      <div class="strip-scroller">
+        ${stripMatchIds.length > 3 ? '<button class="strip-arrow" type="button" data-strip-prev aria-label="Прокрутить назад">‹</button>' : ''}
+        ${matchesStrip}
+        ${stripMatchIds.length > 3 ? '<button class="strip-arrow" type="button" data-strip-next aria-label="Прокрутить вперёд">›</button>' : ''}
+      </div>
     </div>` : ''}
 
     <div class="card">
-      <div class="card-title">Чаты</div>
+      <div class="card-title">Чаты${threadIds.length > 4 ? ' <button class="strip-arrow up" type="button" data-chats-prev aria-label="Прокрутить вверх">↑</button> <button class="strip-arrow up" type="button" data-chats-next aria-label="Прокрутить вниз">↓</button>' : ''}</div>
       ${chatBody}
     </div>
   `;
@@ -4313,6 +4337,12 @@ function renderHomeMessagesHtml() {
 function wireHomeContentHandlers(rootSelector) {
   const root = $(rootSelector);
   if (!root) return;
+  const strip = root.querySelector('#matchesStrip');
+  root.querySelector('[data-strip-prev]')?.addEventListener('click', () => strip?.scrollBy({ left: -(strip.clientWidth * 0.9), behavior: 'smooth' }));
+  root.querySelector('[data-strip-next]')?.addEventListener('click', () => strip?.scrollBy({ left: strip.clientWidth * 0.9, behavior: 'smooth' }));
+  const chats = root.querySelector('#chatsList');
+  root.querySelector('[data-chats-prev]')?.addEventListener('click', () => chats?.scrollBy({ top: -Math.max(200, chats.clientHeight * 0.8), behavior: 'smooth' }));
+  root.querySelector('[data-chats-next]')?.addEventListener('click', () => chats?.scrollBy({ top: Math.max(200, chats.clientHeight * 0.8), behavior: 'smooth' }));
   root.querySelectorAll('[data-open-tab]').forEach((b) => {
     b.addEventListener('click', () => switchTab(b.dataset.openTab));
   });
@@ -4538,6 +4568,7 @@ async function loadRemoteChat(chatId) {
     messages.sort((a, b) => a.ts - b.ts);
     const thread = ensureMessageThread(chatId);
     thread.messages = messages;
+    if (messages.length) thread.hasMessages = true;
     save();
     renderAll();
   } catch (err) {
@@ -5368,7 +5399,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v226</div>
+        <div class="muted app-version">v227</div>
     </div>
   `;
 

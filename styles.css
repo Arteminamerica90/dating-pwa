@@ -393,6 +393,53 @@ a { color: inherit; }
   display: flex;
   flex-direction: column;
   gap: 10px;
+  max-height: 62vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Листалки: матчи (горизонт) и чаты (вертикаль) */
+.strip-scroller {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.strip-scroller .matches-strip {
+  flex: 1 1 auto;
+  min-width: 0;
+  scroll-snap-type: x proximity;
+}
+.strip-scroller .match-card {
+  scroll-snap-align: start;
+}
+.strip-arrow {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: var(--glass-strong);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.strip-arrow.up {
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+  border: none;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: var(--muted);
+  margin-left: 6px;
+}
+.strip-arrow:active { transform: scale(0.92); }
 }
 
 .matches-strip {

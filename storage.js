@@ -92,6 +92,7 @@ export function defaultState() {
       likes: {},
       matches: [],
       seenMatches: {},
+      chatPartners: [],
       filters: {
         meetingIntent: [],
         stepsBucket: '',
