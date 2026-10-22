@@ -416,6 +416,17 @@ export async function supabaseUnmatch(me, other) {
   await supabase.from('matches').update({ [col]: true }).eq('a_user', a_user).eq('b_user', b_user);
 }
 
+export async function supabaseDeleteMatch(me, other) {
+  const supabase = await getSupabase();
+  const [a_user, b_user] = me < other ? [me, other] : [other, me];
+  const { error } = await supabase
+    .from('matches')
+    .delete()
+    .eq('a_user', a_user)
+    .eq('b_user', b_user);
+  if (error) throw new Error(error.message);
+}
+
 export async function supabaseSaveMessage(fromUserId, toUserId, cipher) {
   const supabase = await getSupabase();
   const { error } = await supabase.from('messages').insert({
