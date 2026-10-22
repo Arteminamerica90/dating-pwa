@@ -2253,7 +2253,7 @@ function wireRegisterDialogOnce() {
       toast('Вход выполнен');
       setTimeout(() => {
         refreshSubscription().then(() => {
-          if (mySubscription.planId === 'free') openSubscriptionDialog();
+          if (mySubscription.planId === 'free') setTimeout(() => openSubscriptionDialog(), SUBSCRIPTION_AUTO_OPEN_DELAY_MS);
         });
       }, 800);
     } catch (err) {
@@ -2312,12 +2312,12 @@ function wireRegisterDialogOnce() {
           const consentDlg = $('#dlgConsent');
           const openSubAfterConsent = () => {
             consentDlg?.removeEventListener('close', openSubAfterConsent);
-            setTimeout(() => openSubscriptionDialog(), 600);
+            setTimeout(() => openSubscriptionDialog(), SUBSCRIPTION_AUTO_OPEN_DELAY_MS);
           };
           consentDlg?.addEventListener('close', openSubAfterConsent);
         }, 600);
       } else {
-        setTimeout(() => openSubscriptionDialog(), 1500);
+        setTimeout(() => openSubscriptionDialog(), SUBSCRIPTION_AUTO_OPEN_DELAY_MS);
       }
     } catch (err) {
       __regMsg(friendlyAuthError(err) || 'Ошибка', 0);
@@ -2880,6 +2880,10 @@ function openSubscriptionDialog(highlightFeature) {
   renderSubscriptionContent(highlightFeature);
   $('#btnSubClose')?.addEventListener('click', () => dlg.close(), { once: true });
 }
+
+// Автопоказ платного окна не происходит сразу после регистрации/входа — даём пользователю
+// 3 минуты спокойно осмотреться, прежде чем предлагать подписку.
+const SUBSCRIPTION_AUTO_OPEN_DELAY_MS = 3 * 60 * 1000;
 
 function renderSubscriptionContent(highlightFeature) {
   const current = getActivePlan(mySubscription);
@@ -5346,7 +5350,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v217</div>
+        <div class="muted app-version">v218</div>
     </div>
   `;
 
