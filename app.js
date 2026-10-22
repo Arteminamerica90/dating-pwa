@@ -5370,7 +5370,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v222</div>
+        <div class="muted app-version">v223</div>
     </div>
   `;
 
@@ -5682,7 +5682,6 @@ function renderStats() {
         <div class="profile-field">
           <label class="label">Дата рождения</label>
           <input id="profileBirthInput" class="input" type="date" value="${escapeHtml(state.profile?.birthDate || '')}" />
-          <div class="muted" style="font-size:12px;margin-top:4px">Возраст показывается на карточке во втором табе.</div>
         </div>
         <div class="profile-field">
           <label class="label">Описание</label>
@@ -5719,9 +5718,6 @@ function renderStats() {
         <button id="btnOpenConsent" class="btn" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block">
           📄 Согласие${allLegalConsentsAccepted ? ' ✓' : ''}
         </button>
-        <div class="muted" style="text-align:center;margin-top:6px;font-size:12px">
-          ${allLegalConsentsAccepted ? 'Согласия оформлены' : 'Документы и согласия на обработку данных'}
-        </div>
       </div>
 
     </div>

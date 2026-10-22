@@ -1,4 +1,4 @@
-const CACHE_NAME = 'walkdate-v222';
+const CACHE_NAME = 'walkdate-v223';
 const CORE = [
   './',
   './index.html',
