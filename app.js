@@ -5346,7 +5346,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v216</div>
+        <div class="muted app-version">v217</div>
     </div>
   `;
 
@@ -7303,9 +7303,9 @@ function renderTinderInner(p) {
     <div class="tinder-photo-heart" aria-hidden="true">♥</div>` : ''}
     <div class="tinder-scrim"></div>
     <div class="tinder-top">
-      ${locText ? `<div class="tinder-loc"><span class="tinder-loc-ico" aria-hidden="true">🏙</span><span>${escapeHtml(locText)}</span></div>` : '<span></span>'}
+      ${locText ? `<div class="tinder-loc"><span class="tinder-loc-ico" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-location"/></svg></span><span>${escapeHtml(locText)}</span></div>` : '<span></span>'}
       <div class="tinder-top-right">
-        <span class="tinder-goal">🎯 ${escapeHtml(goal)}</span>
+        <span class="tinder-goal"><svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-goal"/></svg> ${escapeHtml(goal)}</span>
       </div>
     </div>
     <div class="tinder-foot">
@@ -7334,9 +7334,9 @@ function renderTinderInner(p) {
       </div>
     </div>
     <div class="tinder-photo-actions">
-      <button class="tbtn nope" type="button" data-tinder="nope" aria-label="Не нравится">&#10005;</button>
-      <button class="tbtn like" type="button" data-tinder="like" aria-label="Нравится">&#10084;</button>
-      ${(state.dating.swipeHistory || []).length ? `<button class="tbtn back" type="button" data-tinder-back aria-label="Назад" title="Вернуть предыдущую анкету"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg></button>` : ''}
+      <button class="tbtn nope" type="button" data-tinder="nope" aria-label="Не нравится"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-xmark"/></svg></button>
+      <button class="tbtn like" type="button" data-tinder="like" aria-label="Нравится"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-heart"/></svg></button>
+      ${(state.dating.swipeHistory || []).length ? `<button class="tbtn back" type="button" data-tinder-back aria-label="Назад" title="Вернуть предыдущую анкету"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="#i-uturn"/></svg></button>` : ''}
     </div>
     <div class="tinder-menu-wrap tinder-menu-bottom">
       <button class="tinder-dots" type="button" data-tinder-menu aria-label="Ещё">&#8943;</button>

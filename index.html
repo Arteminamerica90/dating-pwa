@@ -9,7 +9,7 @@
     <title>xystar</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=216" />
+    <link rel="stylesheet" href="./styles.css?v=217" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script defer src="https://widget.cloudpayments.ru/bundles/cloudpayments.js"></script>
@@ -72,15 +72,25 @@
         <button class="btn ghost" type="button" id="authGateLogin">Войти</button>
       </div>
 
+      <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+        <symbol id="i-message" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3c5.38 0 9.75 3.56 9.75 7.95 0 4.4-4.37 7.96-9.75 7.96-1.05 0-2.07-.15-3.04-.4-.9.67-2.08 1.3-3.52 1.63-.41.1-.77-.33-.6-.72.38-.83.63-1.76.69-2.64C3.6 15.4 2.25 13.32 2.25 10.95 2.25 6.56 6.62 3 12 3Z"/></symbol>
+        <symbol id="i-heart" viewBox="0 0 24 24"><path fill="currentColor" d="M12 21.4 10.5 20C5.35 15.3 2 12.3 2 8.55 2 5.46 4.42 3 7.5 3c1.75 0 3.42.82 4.5 2.1A5.99 5.99 0 0 1 16.5 3C19.58 3 22 5.46 22 8.55c0 3.75-3.35 6.75-8.5 11.45L12 21.4Z"/></symbol>
+        <symbol id="i-person" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm0 4.75a3.25 3.25 0 1 1 0 6.5 3.25 3.25 0 0 1 0-6.5Zm0 13.75c-2.4 0-4.55-1-6.08-2.6.75-2.24 3.24-3.9 6.08-3.9s5.33 1.66 6.08 3.9A8 8 0 0 1 12 20.5Z"/></symbol>
+        <symbol id="i-xmark" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></symbol>
+        <symbol id="i-location" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a7.5 7.5 0 0 0-7.5 7.5c0 5.4 6.6 11.6 6.88 11.86a.9.9 0 0 0 1.24 0c.28-.26 6.88-6.46 6.88-11.86A7.5 7.5 0 0 0 12 2Zm0 10a2.75 2.75 0 1 1 0-5.5 2.75 2.75 0 0 1 0 5.5Z"/></symbol>
+        <symbol id="i-goal" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 3.2a6.8 6.8 0 1 1 0 13.6 6.8 6.8 0 0 1 0-13.6Zm0 3.3a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Z"/></symbol>
+        <symbol id="i-uturn" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="M17 6v5a4 4 0 0 1-4 4H7"/><path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="M10.5 11 6.5 15l4 4"/></symbol>
+      </svg>
+
       <nav class="tabs" aria-label="Разделы">
         <button class="tab" data-tab="home" type="button" aria-label="Сообщения">
-          <span class="tab-ico" aria-hidden="true">💬</span>
+          <span class="tab-ico" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24"><use href="#i-message"/></svg></span>
         </button>
         <button class="tab active" data-tab="dating" type="button" aria-label="Общение">
-          <span class="tab-ico" aria-hidden="true">💞</span>
+          <span class="tab-ico" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24"><use href="#i-heart"/></svg></span>
         </button>
         <button class="tab" data-tab="stats" type="button" aria-label="Профиль">
-          <span class="tab-ico" aria-hidden="true">👤</span>
+          <span class="tab-ico" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24"><use href="#i-person"/></svg></span>
         </button>
       </nav>
 
@@ -399,7 +409,7 @@
 
       window.__xystarImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=216')
+      import('./app.js?v=217')
         .then(() => {
           window.__xystarImportOk = true;
         })
