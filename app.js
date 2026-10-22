@@ -3506,7 +3506,22 @@ function pickTopEntry(bucket) {
   return best;
 }
 
-  // Элементы дерева решений из UX убраны: сводные плашки и счётчик ответов не показываем.
+function renderQuestionnaireSummary(profile = state.profile) {
+  const portrait = profile?.portrait || buildQuestionnairePortrait(profile?.questionnaireAnswers || {});
+  const labels = portrait.labels || [];
+  const snippet = labels.length
+    ? labels.slice(0, 4).map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ')
+    : '';
+  const answered = portrait.answered || 0;
+  const total = portrait.total || ALL_QUESTIONS.length;
+  return `
+    <div class="muted">Дерево решений считается по ответам обоих участников пары.</div>
+    <div class="row-inline" style="margin-top:12px;gap:12px;align-items:center;flex-wrap:wrap">
+      <div class="muted" style="white-space:nowrap">Ответов: ${answered} / ${total}</div>
+    </div>
+    ${snippet ? `<div class="row-inline" style="margin-top:10px">${snippet}</div>` : ''}
+  `;
+}
 
 function renderQuestionnaireBlocks(profile = state.profile) {
   const answers = getQuestionnaireAnswers(profile);
@@ -5409,7 +5424,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v233</div>
+        <div class="muted app-version">v234</div>
     </div>
   `;
 
@@ -5706,6 +5721,7 @@ function renderStats() {
         </div>
 
       <div class="card">
+        ${renderQuestionnaireSummary(state.profile)}
         <button class="accordion-head narrow" type="button" data-tree-toggle aria-expanded="${state.ui?.treeOpen ? 'true' : 'false'}">
           <span class="accordion-title">Анкета совместимости</span>
           <span class="pill">${catsProgress.done}/${CATEGORY_ORDER.length}</span>
@@ -7310,6 +7326,26 @@ function renderTinderInner(p) {
   const zodiac = p.zodiac ? `<span class="pill">${escapeHtml(p.zodiac)}</span>` : '';
   const job = p.jobTitle ? `<span class="pill">${escapeHtml(p.jobTitle)}</span>` : '';
   const edu = p.education ? `<span class="pill">${escapeHtml(p.education)}</span>` : '';
+  const compat = p.compatibility || { label: 'портрет ещё строится', shared: [], differences: [], neutral: [] };
+  const circle = getCircleRecommendationStatus(circleKey(p.name || ''));
+  const circleHighlights = getCircleRecommendationHighlights(circleKey(p.name || ''));
+  // Каждый ответ по вопросам анкеты — отдельной строкой: у каждой строки своя
+  // горизонтальная прокрутка, ответы не едут «в общем» с остальной анкетой.
+  const sharedRows = (Array.isArray(compat.shared) ? compat.shared : []).slice(0, 4)
+    .map((x) => `<div class="tinder-badges"><span class="pill">${escapeHtml(x)}</span></div>`).join('');
+  const diffRows = (Array.isArray(compat.differences) ? compat.differences : []).slice(0, 3)
+    .map((x) => `<div class="tinder-badges"><span class="pill muted-pill">${escapeHtml(x)}</span></div>`).join('');
+  const neutralRows = (Array.isArray(compat.neutral) ? compat.neutral : []).slice(0, 3)
+    .map((x) => `<div class="tinder-badges"><span class="pill muted-pill">${escapeHtml(x)}</span></div>`).join('');
+  const tree = treeMatchCompatibility(state.profile, p);
+  const myTreeBranches = Object.keys(treeDims(buildUserTree(state.profile))).length;
+  const treeBadge = !tree.enabled
+    ? '<span class="pill muted-pill">дерево: отключено в фильтрах</span>'
+    : myTreeBranches === 0
+      ? '<span class="pill muted-pill">дерево: вы ещё не ответили на вопросы анкеты</span>'
+      : tree.known.length === 0
+        ? '<span class="pill muted-pill">дерево: у анкеты нет веток для сравнения</span>'
+        : `<span class="pill status-pill ${tree.compatible ? 'good' : 'bad'}">дерево: ${Math.round(tree.pct * 100)}% совпадений${tree.conflicts.length ? ` • ${tree.conflicts.length} конфликт` : ''}</span>`;
   const pid = p.id || p.name || '';
   const reportRec = state.moderation?.reports?.[pid];
   const reportStatus = reportRec
@@ -7324,6 +7360,15 @@ function renderTinderInner(p) {
     : selIntents.length
       ? goalLabel(selIntents[0])
       : 'Знакомство';
+  let interestTags = tags;
+  if (!interestTags) {
+    const sharedTraits = Array.isArray(compat.shared) && compat.shared.length ? compat.shared.slice(0, 3) : [];
+    interestTags = sharedTraits.map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ');
+  }
+  const qm = countQuestionnaireMatches(state.profile, p);
+  const qmBadge = qm.total > 0
+    ? `<span class="pill status-pill good match-badge">${qm.matched} из ${qm.total} вопросов анкеты совпало</span>`
+    : '';
   const myCityKey = currentCityKey();
   const cityStr = cityName(p.city);
   const distKm = (myCityKey && p.city && state.consent?.geo) ? cityDistanceKm(myCityKey, p.city) : null;
@@ -7352,12 +7397,20 @@ function renderTinderInner(p) {
             : p.birthDate
               ? `, ${ageFromBirthDate(p.birthDate) ?? ''}`
               : ''}</div>
-          ${tags ? `<div class="tinder-tags">${tags}</div>` : ''}
+          ${interestTags ? `<div class="tinder-tags">${interestTags}</div>` : ''}
+          ${compat.label ? `<div class="tinder-sub"><span class="verdict ${compat.tone || 'warn'}">${verdictEmoji(compat.tone || 'warn')}</span> ${escapeHtml(compat.label)}</div>` : ''}
         </div>
+        ${qmBadge}
         <div class="tinder-about">${escapeHtml(p.about)}</div>
         <div class="tinder-badges">${comm}</div>
         <div class="tinder-badges">${vals}</div>
         <div class="tinder-badges">${zodiac} ${job} ${edu}</div>
+        ${circle.tone !== 'muted' ? `<div class="tinder-badges"><span class="pill status-pill ${circle.tone === 'good' ? 'good' : circle.tone === 'bad' ? 'bad' : circle.tone === 'warn' ? 'warn' : 'muted'}">${circle.label}</span></div>` : ''}
+        ${circleHighlights.values.length ? `<div class="tinder-badges">${circleHighlights.values.slice(0, 2).map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ')}</div>` : ''}
+        <div class="tinder-badges">${treeBadge}</div>
+        ${sharedRows}
+        ${diffRows}
+        ${neutralRows}
         ${reportStatus}
       </div>
     </div>
