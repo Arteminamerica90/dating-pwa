@@ -3513,7 +3513,7 @@ function renderQuestionnaireSummary(profile = state.profile) {
   const answered = portrait.answered || 0;
   const total = portrait.total || ALL_QUESTIONS.length;
   return `
-    <div class="muted">Ответы строят портрет и помогают подбирать пару. Они сохраняются на сервере — дерево решений считается по ответам обоих участников пары.</div>
+    <div class="muted">Дерево решений считается по ответам обоих участников пары.</div>
     <div class="row-inline" style="margin-top:12px;gap:12px;align-items:center;flex-wrap:wrap">
       <div class="muted" style="white-space:nowrap">Ответов: ${answered} / ${total}</div>
     </div>
@@ -5370,7 +5370,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v221</div>
+        <div class="muted app-version">v222</div>
     </div>
   `;
 
