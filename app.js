@@ -4416,9 +4416,26 @@ function wireHomeContentHandlers(rootSelector) {
     });
   });
   root.querySelectorAll('[data-match-id]').forEach((el) => {
+    // Свайп влево по карточке открывает меню «Удалить / Заблокировать» (как в iOS).
+    let gesture = null;
+    let sheetOpened = false;
+    el.addEventListener('pointerdown', (e) => {
+      gesture = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      sheetOpened = false;
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!gesture || e.pointerId !== gesture.id) return;
+      const dx = e.clientX - gesture.x;
+      const dy = e.clientY - gesture.y;
+      if (!sheetOpened && dx < -40 && Math.abs(dx) > Math.abs(dy) * 1.6) {
+        sheetOpened = true;
+        openMatchActionSheet(el.dataset.matchId, el.querySelector('.match-name')?.textContent || '');
+      }
+    });
+    el.addEventListener('pointerup', () => { gesture = null; });
+    el.addEventListener('pointercancel', () => { gesture = null; });
     el.addEventListener('click', (e) => {
-      // Иконки удаления/жалобы вложены в карточку: пусть живут своей жизнью.
-      if (e.target.closest('[data-match-delete], [data-report]')) return;
+      if (sheetOpened) { sheetOpened = false; return; }
       const matchId = el.dataset.matchId;
       if (!matchId) return;
       if (!accountInfo?.id) {
@@ -4434,29 +4451,6 @@ function wireHomeContentHandlers(rootSelector) {
       save();
       renderAll();
       loadRemoteChat(matchId);
-    });
-  });
-  root.querySelectorAll('[data-match-delete]').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const matchId = btn.dataset.matchDelete;
-      if (!matchId || !accountInfo?.id) return;
-      state.dating.serverMatches = (state.dating.serverMatches || []).filter((id) => id !== matchId);
-      state.dating.matches = (state.dating.matches || []).filter((id) => id !== matchId);
-      delete (state.dating.seenMatches || {})[matchId];
-      if (state.messages?.openChat === matchId) state.messages.openChat = null;
-      delete state.messages?.threads?.[matchId];
-      save();
-      renderAll();
-      toast('Матч удалён');
-      haptic('light');
-      supabaseDeleteMatch(accountInfo.id, matchId).catch(() => {});
-    });
-  });
-  root.querySelectorAll('[data-report]').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      showReportDialog(btn.dataset.report, 'profile');
     });
   });
   // Поле ввода: одна строка, но растёт по мере набора текста.
@@ -5424,7 +5418,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v234</div>
+        <div class="muted app-version">v235</div>
     </div>
   `;
 
@@ -6382,15 +6376,100 @@ function renderMatchCard(id, { seen } = {}) {
     <div class="match-card ${seen ? 'seen' : 'new'}" data-match-id="${p.id}" role="button" tabindex="0" aria-label="Матч ${escapeHtml(p.name)}">
       <div class="match-photo-wrap">
         <img class="match-photo" alt="${escapeHtml(p.name)}" src="${photo}" />
-        <div class="match-card-actions" role="group" aria-label="Действия с матчем">
-          <button class="mact-btn report" type="button" data-report="${escapeHtml(p.id)}" title="Пожаловаться" aria-label="Пожаловаться"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V4"/><path d="M4 5h11l-2 3 2 3H4"/></svg></button>
-          <button class="mact-btn del" type="button" data-match-delete="${escapeHtml(p.id)}" title="Удалить матч" aria-label="Удалить матч"><svg width="15" height="15" viewBox="0 0 24 24"><use href="#i-xmark"/></svg></button>
-        </div>
       </div>
       <div class="match-name">${escapeHtml(p.name)}</div>
       <div class="match-meta">${meta}</div>
     </div>
   `;
+}
+
+function purgeMatchLocally(matchId) {
+  state.dating.serverMatches = (state.dating.serverMatches || []).filter((id) => id !== matchId);
+  state.dating.matches = (state.dating.matches || []).filter((id) => id !== matchId);
+  delete (state.dating.seenMatches || {})[matchId];
+  if (state.messages?.openChat === matchId) state.messages.openChat = null;
+  delete state.messages?.threads?.[matchId];
+  save();
+  renderAll();
+}
+
+async function deleteMatchFlow(matchId) {
+  purgeMatchLocally(matchId);
+  toast('Матч удалён');
+  haptic('medium');
+  if (accountInfo?.id) supabaseDeleteMatch(accountInfo.id, matchId).catch(() => {});
+}
+
+function openMatchActionSheet(matchId, name) {
+  const old = document.getElementById('matchActionSheet');
+  if (old) old.remove();
+  const reasons = ['Спам', 'Оскорбления', 'Фейковый профиль', 'Неприемлемый контент', 'Дискриминация', 'Мошенничество', 'Другое'];
+  const wrap = document.createElement('div');
+  wrap.id = 'matchActionSheet';
+  wrap.innerHTML = `
+    <div class="mas-backdrop"></div>
+    <div class="mas-sheet" role="dialog" aria-label="Действия с матчем">
+      <div class="mas-head">
+        <div class="mas-title">${escapeHtml(name || 'Участник')}</div>
+        <div class="mas-sub">Выберите действие</div>
+      </div>
+      <button class="mas-row danger" type="button" data-mas-delete>Удалить</button>
+      <div class="mas-label">Заблокировать по причине</div>
+      <div class="mas-reasons">
+        ${reasons.map((r) => `<button class="mas-row reason" type="button" data-reason="${escapeHtml(r)}">${escapeHtml(r)}<span class="mas-check" aria-hidden="true"></span></button>`).join('')}
+      </div>
+      <button class="mas-row confirm" type="button" data-mas-block disabled>Заблокировать</button>
+      <button class="mas-row cancel" type="button" data-mas-cancel>Отмена</button>
+    </div>
+  `;
+  document.body.appendChild(wrap);
+  const sheet = wrap.querySelector('.mas-sheet');
+  const backdrop = wrap.querySelector('.mas-backdrop');
+  let chosen = '';
+  requestAnimationFrame(() => {
+    backdrop.classList.add('open');
+    sheet.classList.add('open');
+  });
+  haptic('light');
+  const close = () => {
+    backdrop.classList.remove('open');
+    sheet.classList.remove('open');
+    setTimeout(() => wrap.remove(), 340);
+  };
+  backdrop.addEventListener('click', close);
+  wrap.querySelector('[data-mas-cancel]').addEventListener('click', close);
+  wrap.querySelector('[data-mas-delete]').addEventListener('click', () => {
+    close();
+    deleteMatchFlow(matchId);
+  });
+  wrap.querySelectorAll('[data-reason]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      wrap.querySelectorAll('[data-reason]').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      chosen = btn.dataset.reason;
+      const confirm = wrap.querySelector('[data-mas-block]');
+      confirm.disabled = false;
+      confirm.textContent = `Заблокировать: ${chosen}`;
+      haptic('light');
+    });
+  });
+  wrap.querySelector('[data-mas-block]').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    if (!chosen) return;
+    btn.disabled = true;
+    const ok = await submitReport(matchId, 'profile', chosen, '');
+    if (ok) {
+      trackReportSubmission(matchId, chosen);
+      toast('Пользователь заблокирован, матч удалён');
+      haptic('medium');
+      close();
+      deleteMatchFlow(matchId);
+    } else {
+      btn.disabled = false;
+      toast('Не удалось отправить. Проверьте подключение.');
+      haptic('error');
+    }
+  });
 }
 
 function renderGeoItem(p) {
