@@ -5350,7 +5350,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v218</div>
+        <div class="muted app-version">v219</div>
     </div>
   `;
 
@@ -5700,7 +5700,7 @@ function renderStats() {
           📄 Согласие${allLegalConsentsAccepted ? ' ✓' : ''}
         </button>
         <div class="muted" style="text-align:center;margin-top:6px;font-size:12px">
-          ${allLegalConsentsAccepted ? 'Все согласия приняты — документы, геолокация, спецкатегории, профилирование' : 'Документы и согласия на обработку данных'}
+          ${allLegalConsentsAccepted ? 'Согласия оформлены' : 'Документы и согласия на обработку данных'}
         </div>
       </div>
 
