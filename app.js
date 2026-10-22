@@ -5399,7 +5399,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v230</div>
+        <div class="muted app-version">v231</div>
     </div>
   `;
 
@@ -5818,8 +5818,11 @@ function renderStats() {
       }
       const idx = Number(btn.dataset.photoIndex);
       if (!photos[idx] || idx === 0) return;
-      const [moved] = photos.splice(idx, 1);
-      photos.unshift(moved);
+      // Не перемещаем список целиком (иначе все превью «переезжают» после
+      // клика): просто обмениваем содержимое главного и выбранного фото.
+      const prevMain = photos[0];
+      photos[0] = photos[idx];
+      photos[idx] = prevMain;
       state.profile.photos = photos.slice(0, 3);
       syncProfileFormFields();
       save();
