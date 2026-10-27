@@ -48,7 +48,7 @@ export function isNetworkError(err) {
   );
 }
 
-async function withNetRetry(fn, attempts = 3) {
+async function withNetRetry(fn, attempts = 4) {
   let lastErr;
   for (let i = 0; i < attempts; i++) {
     try {
@@ -56,10 +56,65 @@ async function withNetRetry(fn, attempts = 3) {
     } catch (err) {
       lastErr = err;
       if (!isNetworkError(err) || i === attempts - 1) throw err;
-      await new Promise((r) => setTimeout(r, 400 + i * 600));
+      // Экспоненциальная пауза с небольшим разбросом: короткие обрывы
+      // мобильной сети переживаем сами, не показывая ошибку пользователю.
+      const wait = Math.min(3000, 500 * 2 ** i) + Math.round(Math.random() * 250);
+      await new Promise((r) => setTimeout(r, wait));
     }
   }
   throw lastErr;
+}
+
+// Лёгкая проверка доступности Supabase для экрана «нет связи».
+// Запрос идёт в режиме no-cors: без preflight и чтения ответа — важно только,
+// что сеть и сервер приняли соединение. Opaque-ответ тоже считается успехом.
+export async function supabasePing(timeoutMs = 5000) {
+  if (!isSupabaseConfigured()) return true;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    await fetch(`${SUPABASE_URL}/auth/v1/health`, {
+      mode: 'no-cors',
+      cache: 'no-store',
+      signal: ctrl.signal
+    });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Проверка «есть ли вообще интернет»: HEAD на свой же домен.
+// HEAD не перехватывается service worker'ом (он обрабатывает только GET),
+// поэтому ответ честно означает, что сеть жива.
+async function sameOriginReachable(timeoutMs = 4000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${location.origin}${location.pathname}?netprobe=${Date.now()}`, {
+      method: 'HEAD',
+      cache: 'no-store',
+      signal: ctrl.signal
+    });
+    return res.status < 500;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Диагноз для экрана потери связи:
+//   'ok'       — сервер отвечает, экран можно закрывать;
+//   'offline'  — не работает сеть у пользователя;
+//   'blocked'  — сайт открывается, а Supabase нет: VPN, блокировщик или
+//                фильтрация трафика на стороне провайдера.
+export async function probeConnectivity() {
+  if (await supabasePing()) return 'ok';
+  if (!navigator.onLine) return 'offline';
+  return (await sameOriginReachable()) ? 'blocked' : 'offline';
 }
 
 export function warmupSupabase() {

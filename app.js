@@ -52,8 +52,10 @@ import {
   supabaseSaveConsent,
   supabaseSaveConsentsBulk,
   supabaseGetConsents,
-  supabaseGetMessagePartners
-} from './supabase.js?v=114';
+  supabaseGetMessagePartners,
+  isNetworkError,
+  probeConnectivity
+} from './supabase.js?v=116';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
@@ -1352,6 +1354,7 @@ function boot() {
   wireSwipes();
   wireQuestionnaire();
   wireAuthGate();
+  wireNetGate();
   if (!isSupabaseConfigured()) authResolved = true;
   renderAll();
   // Cookie-баннер показываем сразу на первом экране: онбординг теперь не
@@ -1729,6 +1732,96 @@ function friendlyAuthError(err) {
     return 'Не удалось связаться с сервером. Проверьте интернет-соединение и повторите попытку.';
   }
   return msg;
+}
+
+// Полноэкранный экран «нет связи»: по центру только логотип и кнопка повтора.
+// Открываем как <dialog>, чтобы он был поверх уже открытых модалок входа.
+let netGateProbeTimer = null;
+let netGateProbing = false;
+
+const NET_GATE_COPY = {
+  checking: {
+    title: 'Нет связи с сервером',
+    sub: 'Проверяем соединение. Экран закроется сам, как только связь восстановится.'
+  },
+  offline: {
+    title: 'Нет подключения к интернету',
+    sub: 'Проверьте Wi-Fi или мобильную сеть. Экран закроется сам, как только связь появится.'
+  },
+  blocked: {
+    title: 'Сервер не отвечает',
+    sub: 'Интернет работает, но сервер знакомств недоступен. Отключите VPN или блокировщик рекламы и нажмите «Повторить».'
+  }
+};
+
+function netGateIsOpen() {
+  return !!document.getElementById('netGate')?.open;
+}
+
+function setNetGateMode(mode) {
+  const dlg = document.getElementById('netGate');
+  if (!dlg) return;
+  const copy = NET_GATE_COPY[mode] || NET_GATE_COPY.checking;
+  dlg.dataset.state = mode;
+  const title = dlg.querySelector('.net-gate-title');
+  const sub = dlg.querySelector('.net-gate-sub');
+  if (title && title.textContent !== copy.title) title.textContent = copy.title;
+  if (sub && sub.textContent !== copy.sub) sub.textContent = copy.sub;
+}
+
+function showNetGate(mode = 'checking') {
+  const dlg = document.getElementById('netGate');
+  if (!dlg) return;
+  setNetGateMode(mode);
+  if (!dlg.open) {
+    try {
+      dlg.showModal();
+    } catch {
+      return;
+    }
+  }
+  scheduleNetProbe(mode === 'offline' ? 2500 : 1200);
+}
+
+function hideNetGate() {
+  const dlg = document.getElementById('netGate');
+  clearTimeout(netGateProbeTimer);
+  netGateProbeTimer = null;
+  if (dlg?.open) dlg.close();
+}
+
+function scheduleNetProbe(delay) {
+  clearTimeout(netGateProbeTimer);
+  netGateProbeTimer = setTimeout(probeNetGate, delay);
+}
+
+async function probeNetGate() {
+  if (!netGateIsOpen() || netGateProbing) return;
+  netGateProbing = true;
+  const state = await probeConnectivity().catch(() => 'offline');
+  netGateProbing = false;
+  if (!netGateIsOpen()) return;
+  if (state === 'ok') {
+    hideNetGate();
+    return;
+  }
+  setNetGateMode(state);
+  scheduleNetProbe(state === 'offline' ? 4000 : 8000);
+}
+
+function wireNetGate() {
+  const dlg = document.getElementById('netGate');
+  if (!dlg || dlg.dataset.wired) return;
+  dlg.dataset.wired = '1';
+  document.getElementById('netGateRetry')?.addEventListener('click', () => {
+    setNetGateMode('checking');
+    scheduleNetProbe(0);
+  });
+  window.addEventListener('offline', () => showNetGate('offline'));
+  window.addEventListener('online', () => {
+    if (netGateIsOpen()) scheduleNetProbe(0);
+  });
+  if (!navigator.onLine) showNetGate('offline');
 }
 
 function showAuthErrorMessage(msg) {
@@ -2259,6 +2352,7 @@ function wireRegisterDialogOnce() {
         });
       }, 800);
     } catch (err) {
+      if (isNetworkError(err)) showNetGate();
       const msg = String(err?.message || '');
       const friendly = /invalid/i.test(msg)
         ? 'Неверный email или пароль. Если аккаунт создавался ранее — нажмите «Зарегистрироваться»: оно отправит письмо подтверждения.'
@@ -2322,6 +2416,7 @@ function wireRegisterDialogOnce() {
         setTimeout(() => openSubscriptionDialog(), SUBSCRIPTION_AUTO_OPEN_DELAY_MS);
       }
     } catch (err) {
+      if (isNetworkError(err)) showNetGate();
       __regMsg(friendlyAuthError(err) || 'Ошибка', 0);
     } finally {
       __regBusy = false;
@@ -2355,6 +2450,7 @@ state.cloud.email = email;
     } catch (err) {
       state.cloud.pendingPasswordReset = false;
       save();
+      if (isNetworkError(err)) showNetGate();
       __regMsg(friendlyAuthError(err) || 'Не удалось отправить письмо', 0);
     } finally {
       if (fb) { fb.disabled = false; fb.textContent = orig; }
@@ -2818,6 +2914,7 @@ function openChangePasswordDialog(forced = false) {
         renderAll();
       } catch (err) {
         console.error('changePassword raw error:', err);
+        if (isNetworkError(err)) showNetGate();
         if (errEl) {
           errEl.hidden = false;
           errEl.textContent = friendlyAuthError(err) || 'Не удалось обновить пароль';
@@ -5418,7 +5515,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v237</div>
+        <div class="muted app-version">v240</div>
     </div>
   `;
 

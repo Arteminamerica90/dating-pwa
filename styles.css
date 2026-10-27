@@ -102,6 +102,56 @@ a { color: inherit; }
 .auth-gate-sub { color: var(--muted); font-size: 14px; line-height: 1.45; margin-bottom: 10px; max-width: 320px; }
 .auth-gate .btn { width: 100%; max-width: 320px; }
 
+/* Экран потери связи: логотип по центру, пока сервер не ответит */
+dialog.net-gate {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 24px;
+  border: 0;
+  background:
+    radial-gradient(1200px 700px at 15% 10%, rgba(167, 139, 250, 0.06), transparent 55%),
+    radial-gradient(900px 600px at 90% 10%, rgba(34, 211, 238, 0.045), transparent 50%),
+    radial-gradient(700px 500px at 60% 90%, rgba(251, 113, 133, 0.04), transparent 55%),
+    var(--bg);
+  color: var(--text);
+}
+dialog.net-gate[open] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+dialog.net-gate::backdrop {
+  background: rgba(244, 245, 250, 0.96);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.net-gate-logo {
+  width: clamp(96px, 26vw, 136px);
+  height: clamp(96px, 26vw, 136px);
+  display: block;
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  animation: netGatePulse 1.8s ease-in-out infinite;
+}
+@keyframes netGatePulse {
+  0%, 100% { transform: scale(1); opacity: 0.92; }
+  50% { transform: scale(1.04); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .net-gate-logo { animation: none; }
+}
+.net-gate-title { font-weight: 800; font-size: 17px; margin-top: 4px; }
+.net-gate-sub { color: var(--muted); font-size: 13px; line-height: 1.45; max-width: 320px; }
+.net-gate .btn { min-width: 170px; margin-top: 4px; }
+
 .tabs {
   position: fixed;
   left: 50%;
@@ -798,6 +848,34 @@ a { color: inherit; }
   border-radius: 12px;
   padding: 12px 16px;
   text-align: center;
+}
+
+/* Окно подписки: шапка и крестик закреплены, прокручивается только список планов */
+.dialog-card.subscription-dialog {
+  width: 100%;
+  max-width: 520px;
+  max-height: min(90vh, 900px);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.subscription-dialog .subscription-head {
+  position: static;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.98);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+.subscription-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 16px 18px 20px;
 }
 
 .consent-doc {
@@ -1819,6 +1897,20 @@ a { color: inherit; }
     backdrop-filter: blur(12px);
     border-bottom: 1px solid rgba(15, 23, 42, 0.06);
     z-index: 2;
+  }
+
+  .dialog-card.subscription-dialog {
+    height: 100%;
+    max-height: 100dvh;
+    border-radius: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  .subscription-dialog .subscription-head {
+    padding: 16px 18px;
+  }
+  .subscription-scroll {
+    padding-bottom: calc(28px + env(safe-area-inset-bottom));
   }
 
   .profile-editor {

@@ -1,9 +1,9 @@
-const CACHE_NAME = 'walkdate-v237';
+const CACHE_NAME = 'walkdate-v240';
 const CORE = [
   './',
   './index.html',
-  './styles.css?v=214',
-  './app.js?v=214',
+  './styles.css?v=240',
+  './app.js?v=240',
   './storage.js?v=70',
   './idb.js?v=70',
   './encryption.js?v=70',
@@ -12,8 +12,8 @@ const CORE = [
   './events.js?v=70',
   './questionnaire-data.js?v=70',
   './partner-filter-text.js?v=70',
-  './supabase.js?v=114',
-  './supabase-config.js?v=100',
+  './supabase.js?v=116',
+  './supabase-config.js?v=46',
   './vendor/supabase-js-2.49.4.mjs',
   './subscriptions.js?v=95',
   './manifest.webmanifest',

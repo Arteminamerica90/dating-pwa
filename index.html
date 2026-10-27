@@ -9,7 +9,9 @@
     <title>xystar</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=237" />
+    <link rel="preconnect" href="https://mdabznllmqnhddgwontq.supabase.co" crossorigin />
+    <link rel="dns-prefetch" href="https://mdabznllmqnhddgwontq.supabase.co" />
+    <link rel="stylesheet" href="./styles.css?v=240" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script defer src="https://widget.cloudpayments.ru/bundles/cloudpayments.js"></script>
@@ -71,6 +73,13 @@
         <button class="btn" type="button" id="authGateRegister">Зарегистрироваться</button>
         <button class="btn ghost" type="button" id="authGateLogin">Войти</button>
       </div>
+
+      <dialog id="netGate" class="net-gate">
+        <img class="net-gate-logo" src="./icons/icon.svg" alt="xystar" width="120" height="120" />
+        <div class="net-gate-title">Нет связи с сервером</div>
+        <div class="net-gate-sub">Проверяем соединение. Экран закроется сам, как только связь восстановится.</div>
+        <button class="btn ghost" type="button" id="netGateRetry">Повторить</button>
+      </dialog>
 
       <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
         <symbol id="i-message" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3c5.38 0 9.75 3.56 9.75 7.95 0 4.4-4.37 7.96-9.75 7.96-1.05 0-2.07-.15-3.04-.4-.9.67-2.08 1.3-3.52 1.63-.41.1-.77-.33-.6-.72.38-.83.63-1.76.69-2.64C3.6 15.4 2.25 13.32 2.25 10.95 2.25 6.56 6.62 3 12 3Z"/></symbol>
@@ -244,34 +253,36 @@
     </dialog>
 
     <dialog id="dlgSubscription" class="dialog">
-      <div class="dialog-card questionnaire-dialog" style="max-height:90vh;overflow-y:auto">
-        <div class="dialog-head" style="justify-content:space-between">
+      <div class="dialog-card subscription-dialog">
+        <div class="dialog-head subscription-head" style="justify-content:space-between">
           <div class="dialog-title" id="subDialogTitle">Выберите подписку</div>
-          <button class="btn ghost" id="btnSubClose" type="button">✕</button>
+          <button class="btn ghost" id="btnSubClose" type="button" aria-label="Закрыть">✕</button>
         </div>
-        <div id="subHero" style="text-align:center;margin:8px 0 16px">
-          <div style="font-size:40px">💎</div>
-          <div class="muted" style="font-size:13px;margin-top:6px">Откройте полный потенциал общения и досуга по интересам</div>
-        </div>
-        <div id="subPlans" class="sub-plans"></div>
-        <div id="subAddons" hidden>
-          <div style="font-weight:700;margin:16px 0 8px;font-size:14px">Дополнительные пакеты</div>
-          <div id="subAddonsList" class="sub-plans"></div>
-        </div>
-        <div id="subCurrentPlan" style="margin:16px 0 12px"></div>
-        <div id="subManage" style="margin:0 0 12px"></div>
-        <div id="subPaywall" hidden>
-          <div style="background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);border-radius:12px;padding:16px;margin:12px 0">
-            <div style="font-weight:700;margin-bottom:8px">🔒 Эта функция доступна по подписке</div>
-            <div class="muted" id="subPaywallText"></div>
+        <div class="subscription-scroll">
+          <div id="subHero" style="text-align:center;margin:8px 0 16px">
+            <div style="font-size:40px">💎</div>
+            <div class="muted" style="font-size:13px;margin-top:6px">Откройте полный потенциал общения и досуга по интересам</div>
           </div>
-        </div>
-        <div id="subShare" style="text-align:center;margin-top:12px">
-          <div class="muted" style="font-size:11px;margin-bottom:6px">Нравится xystar? Расскажите друзьям</div>
-          <button class="link-btn" type="button" id="btnSubShareBottom" style="font-size:12px">📨 Поделиться с коллегой</button>
-        </div>
-        <div style="text-align:center;margin-top:12px;padding-top:8px;border-top:1px solid var(--border)">
-          <div class="muted" style="font-size:11px">Оплата через CloudPayments • Безопасно • Отмена в любой момент</div>
+          <div id="subPlans" class="sub-plans"></div>
+          <div id="subAddons" hidden>
+            <div style="font-weight:700;margin:16px 0 8px;font-size:14px">Дополнительные пакеты</div>
+            <div id="subAddonsList" class="sub-plans"></div>
+          </div>
+          <div id="subCurrentPlan" style="margin:16px 0 12px"></div>
+          <div id="subManage" style="margin:0 0 12px"></div>
+          <div id="subPaywall" hidden>
+            <div style="background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);border-radius:12px;padding:16px;margin:12px 0">
+              <div style="font-weight:700;margin-bottom:8px">🔒 Эта функция доступна по подписке</div>
+              <div class="muted" id="subPaywallText"></div>
+            </div>
+          </div>
+          <div id="subShare" style="text-align:center;margin-top:12px">
+            <div class="muted" style="font-size:11px;margin-bottom:6px">Нравится xystar? Расскажите друзьям</div>
+            <button class="link-btn" type="button" id="btnSubShareBottom" style="font-size:12px">📨 Поделиться с коллегой</button>
+          </div>
+          <div style="text-align:center;margin-top:12px;padding-top:8px;border-top:1px solid var(--border)">
+            <div class="muted" style="font-size:11px">Оплата через CloudPayments • Безопасно • Отмена в любой момент</div>
+          </div>
         </div>
       </div>
     </dialog>
@@ -409,7 +420,7 @@
 
       window.__xystarImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=237')
+      import('./app.js?v=240')
         .then(() => {
           window.__xystarImportOk = true;
         })
