@@ -862,12 +862,15 @@ dialog.net-gate::backdrop {
   border-radius: inherit;
 }
 .subscription-dialog .subscription-head {
-  position: static;
+  position: sticky;
+  top: 0;
+  z-index: 3;
   flex: 0 0 auto;
   margin: 0;
   padding: 16px 18px;
-  background: rgba(255, 255, 255, 0.98);
+  background: #fff;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 6px 14px -12px rgba(15, 23, 42, 0.5);
 }
 .subscription-scroll {
   flex: 1 1 auto;
@@ -1882,11 +1885,15 @@ dialog.net-gate::backdrop {
   .dialog {
     width: 100vw;
     height: 100vh;
+    /* 100dvh совпадает с видимой областью на iOS/Android: модалка не уезжает
+       за нижнюю кромку и в конце списка не остаётся пустого «хвоста». */
+    height: 100dvh;
     max-width: none;
     max-height: 100dvh;
     border-radius: 0;
     border-left: 0;
     border-right: 0;
+    overflow: hidden;
   }
   .dialog-card { height: 100%; overflow: auto; padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
   .dialog-head {
@@ -1901,16 +1908,16 @@ dialog.net-gate::backdrop {
 
   .dialog-card.subscription-dialog {
     height: 100%;
-    max-height: 100dvh;
+    max-height: 100%;
     border-radius: 0;
     padding: 0;
     overflow: hidden;
   }
   .subscription-dialog .subscription-head {
-    padding: 16px 18px;
+    padding: 14px 18px;
   }
   .subscription-scroll {
-    padding-bottom: calc(28px + env(safe-area-inset-bottom));
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
   }
 
   .profile-editor {

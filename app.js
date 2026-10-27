@@ -3034,12 +3034,12 @@ function renderSubscriptionContent(highlightFeature) {
       ? 'Автопродление вашей подписки активно. Отмените в любой момент — преимущества сохранятся до конца оплаченного периода.'
       : 'Управление подпиской — после подключения одного из планов (Стандарт, Премиум, VIP, Эксклюзив).';
     const manageBtn = onPaidPlan
-      ? `<button class="btn ghost" id="btnCancelSub" type="button" style="font-size:12px;color:#f43f5e">Отменить подписку</button>`
-      : `<button class="btn ghost" id="btnCancelSub" type="button" disabled style="font-size:12px;color:#f43f5e;opacity:0.45;cursor:not-allowed" title="Отмена доступна после подключения плана">Отменить подписку</button>`;
+      ? `<button class="btn ghost" id="btnCancelSub" type="button" style="display:block;margin:0 auto;min-width:200px;font-size:12px;color:#f43f5e">Отменить подписку</button>`
+      : `<button class="btn ghost" id="btnCancelSub" type="button" disabled style="display:block;margin:0 auto;min-width:200px;font-size:12px;color:#f43f5e;opacity:0.45;cursor:not-allowed" title="Отмена доступна после подключения плана">Отменить подписку</button>`;
     manageEl.innerHTML = `
-      <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 16px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-          <div class="muted" style="font-size:12px">${manageHint}</div>
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 16px 14px">
+        <div class="muted" style="font-size:12px">${manageHint}</div>
+        <div style="display:flex;justify-content:center;margin-top:12px">
           ${manageBtn}
         </div>
       </div>`;
@@ -5515,7 +5515,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v240</div>
+        <div class="muted app-version">v241</div>
     </div>
   `;
 
