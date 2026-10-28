@@ -20,7 +20,7 @@ function siteRedirect() {
 
 // Жёсткий таймаут на каждый запрос: без него «зависший» fetch (мобильная сеть,
 // засыпающий ноутбук, фильтрация трафика) держал кнопку «Войти» вечно.
-const REQUEST_TIMEOUT_MS = 8000;
+const REQUEST_TIMEOUT_MS = 12000;
 
 function fetchWithTimeout(input, init = {}) {
   const ctrl = new AbortController();
@@ -72,7 +72,7 @@ export function isNetworkError(err) {
 
 // Зависший запрос (таймаут) повторяем только один раз: ждать 4×8 секунд
 // пользователь не должен.
-function isTimeoutError(err) {
+export function isTimeoutError(err) {
   const msg = String(err?.message || err || '');
   return /abort|timed out|timeout|signal is aborted/i.test(msg);
 }
@@ -85,7 +85,9 @@ async function withNetRetry(fn, attempts = 4) {
     } catch (err) {
       lastErr = err;
       if (!isNetworkError(err) || i === attempts - 1) throw err;
-      if (isTimeoutError(err) && i >= 1) throw err;
+      // Зависший запрос не повторяем: сервер от этого быстрее не ответит,
+      // а пользователь уже ждёт.
+      if (isTimeoutError(err)) throw err;
       // Экспоненциальная пауза с небольшим разбросом: короткие обрывы
       // мобильной сети переживаем сами, не показывая ошибку пользователю.
       const wait = Math.min(3000, 500 * 2 ** i) + Math.round(Math.random() * 250);

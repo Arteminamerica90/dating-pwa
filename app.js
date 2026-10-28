@@ -55,8 +55,9 @@ import {
   supabaseGetConsents,
   supabaseGetMessagePartners,
   isNetworkError,
+  isTimeoutError,
   probeConnectivity
-} from './supabase.js?v=117';
+} from './supabase.js?v=118';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
@@ -2402,7 +2403,7 @@ function wireRegisterDialogOnce() {
         });
       }, 800);
     } catch (err) {
-      if (isNetworkError(err)) showNetGate();
+      if (isNetworkError(err) && !isTimeoutError(err)) showNetGate();
       const msg = String(err?.message || '');
       const friendly = /invalid/i.test(msg)
         ? 'Неверный email или пароль. Если аккаунт создавался ранее — нажмите «Зарегистрироваться»: оно отправит письмо подтверждения.'
@@ -2474,7 +2475,7 @@ function wireRegisterDialogOnce() {
         setTimeout(() => openSubscriptionDialog(), SUBSCRIPTION_AUTO_OPEN_DELAY_MS);
       }
     } catch (err) {
-      if (isNetworkError(err)) showNetGate();
+      if (isNetworkError(err) && !isTimeoutError(err)) showNetGate();
       __regMsg(friendlyAuthError(err) || 'Ошибка', 0);
     } finally {
       clearTimeout(guard);
@@ -2509,7 +2510,7 @@ state.cloud.email = email;
     } catch (err) {
       state.cloud.pendingPasswordReset = false;
       save();
-      if (isNetworkError(err)) showNetGate();
+      if (isNetworkError(err) && !isTimeoutError(err)) showNetGate();
       __regMsg(friendlyAuthError(err) || 'Не удалось отправить письмо', 0);
     } finally {
       if (fb) { fb.disabled = false; fb.textContent = orig; }
@@ -2973,7 +2974,7 @@ function openChangePasswordDialog(forced = false) {
         renderAll();
       } catch (err) {
         console.error('changePassword raw error:', err);
-        if (isNetworkError(err)) showNetGate();
+        if (isNetworkError(err) && !isTimeoutError(err)) showNetGate();
         if (errEl) {
           errEl.hidden = false;
           errEl.textContent = friendlyAuthError(err) || 'Не удалось обновить пароль';
@@ -5574,7 +5575,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v242</div>
+        <div class="muted app-version">v243</div>
     </div>
   `;
 
