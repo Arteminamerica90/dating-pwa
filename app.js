@@ -17,6 +17,7 @@ import { decryptJson, encryptJson } from './encryption.js?v=70';
 import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=70';
 import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=70';
 import { partnerFilterText } from './partner-filter-text.js?v=70';
+import { installIosScrollbars } from './ui-scrollbars.js?v=3';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -55,7 +56,7 @@ import {
   supabaseGetMessagePartners,
   isNetworkError,
   probeConnectivity
-} from './supabase.js?v=116';
+} from './supabase.js?v=117';
 import {
   PLANS, INCOME_ADDONS, getActivePlanId, getActivePlan, getFeatures,
   canLike, likesLeft, hasIncomeAccess, maxIncomeForPlan,
@@ -1167,19 +1168,45 @@ let authResolved = false;
 const URL_HAD_AUTH_CODE = /([?&#])(code|access_token)=/.test(location.href) || /([?&#])type=(recovery|magiclink)/.test(location.href);
 let mySubscription = { planId: 'free', likesThisMonth: 0, expiresAt: null, incomeAddons: [] };
 
-async function refreshAccountInfo() {
+// Сессия из localStorage без обращения к сети: нужна, чтобы при медленном
+// старте (или пропавшей связи) уже вошедший пользователь не видел экран
+// «Вход» и не ждал ответа сервера.
+function storedSessionUser() {
   try {
-    const prev = accountInfo?.id;
-    accountInfo = await supabaseCurrentUser();
-    if (accountInfo?.id && prev !== accountInfo.id) {
-      lastAccountId = accountInfo.id;
-    } else if (!lastAccountId && accountInfo?.id) {
-      lastAccountId = accountInfo.id;
-    } else if (!accountInfo) {
-      lastAccountId = null;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !/^sb-.*-auth-token/.test(key)) continue;
+      const data = JSON.parse(localStorage.getItem(key) || 'null');
+      const user = data?.user || data?.currentSession?.user || null;
+      if (user?.id) return user;
     }
   } catch {
-    accountInfo = null;
+    // повреждённое хранилище просто игнорируем — дальше решит сервер
+  }
+  return null;
+}
+
+async function refreshAccountInfo() {
+  const prev = accountInfo?.id;
+  let next = null;
+  try {
+    next = await supabaseCurrentUser();
+  } catch {
+    next = null;
+  }
+  if (!next) {
+    // Сервер не ответил (сеть/таймаут), но локальная сессия на месте — не
+    // выкидываем пользователя на экран «Вход». Реальный выход из аккаунта
+    // приходит событием SIGNED_OUT и очищает сессию.
+    const stored = storedSessionUser();
+    if (stored?.id) next = { id: stored.id, email: stored.email || '' };
+  }
+  accountInfo = next;
+  if (accountInfo?.id && prev !== accountInfo.id) {
+    lastAccountId = accountInfo.id;
+  } else if (!lastAccountId && accountInfo?.id) {
+    lastAccountId = accountInfo.id;
+  } else if (!accountInfo) {
     lastAccountId = null;
   }
   await refreshSubscription();
@@ -1344,6 +1371,7 @@ function showAuthNotice(message) {
 
 function boot() {
   installGlobalErrorOverlay();
+  installIosScrollbars();
   handleAuthErrorHash();
   syncLegalConsentFromStorage();
   warmupSupabase();
@@ -1355,6 +1383,17 @@ function boot() {
   wireQuestionnaire();
   wireAuthGate();
   wireNetGate();
+  // Возвращающийся пользователь видит свой интерфейс сразу: сессия уже есть
+  // локально, а сервер досверит её в фоне. Раньше медленный getSession()
+  // держал его на экране «Вход» — это и выглядело как зависание авторизации.
+  if (isSupabaseConfigured()) {
+    const localUser = storedSessionUser();
+    if (localUser?.id) {
+      accountInfo = { id: localUser.id, email: localUser.email || '' };
+      lastAccountId = localUser.id;
+      authResolved = true;
+    }
+  }
   if (!isSupabaseConfigured()) authResolved = true;
   renderAll();
   // Cookie-баннер показываем сразу на первом экране: онбординг теперь не
@@ -1728,6 +1767,9 @@ function wireSwipes() {
 
 function friendlyAuthError(err) {
   const msg = String(err?.message || '');
+  if (/abort|timed out|timeout|signal is aborted/i.test(msg)) {
+    return 'Сервер долго не отвечает. Проверьте связь и нажмите «Войти» ещё раз.';
+  }
   if (!msg || /failed to fetch|networkerror|network error|typeerror|load failed|net::|socket|timed out|timeout/i.test(msg)) {
     return 'Не удалось связаться с сервером. Проверьте интернет-соединение и повторите попытку.';
   }
@@ -2336,6 +2378,14 @@ function wireRegisterDialogOnce() {
     const loginBtn = $('#btnRegLogin');
     const regBtn = $('#btnRegSubmit');
     const origLogin = loginBtn?.textContent;
+    // Страховка: что бы ни случилось с сетью, кнопка не останется заблокированной.
+    const guard = setTimeout(() => {
+      if (!__regBusy) return;
+      __regBusy = false;
+      if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = origLogin; }
+      if (regBtn) regBtn.disabled = false;
+      __regMsg('Сервер не отвечает. Проверьте связь и нажмите «Войти» ещё раз.', 0);
+    }, 20000);
     if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Одну секунду…'; }
     if (regBtn) regBtn.disabled = true;
     try {
@@ -2359,6 +2409,7 @@ function wireRegisterDialogOnce() {
         : (friendlyAuthError(err) || 'Ошибка');
       __regMsg(friendly, 0);
     } finally {
+      clearTimeout(guard);
       __regBusy = false;
       if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = origLogin; }
       if (regBtn) regBtn.disabled = false;
@@ -2378,6 +2429,13 @@ function wireRegisterDialogOnce() {
     const regBtn = $('#btnRegSubmit');
     const loginBtn = $('#btnRegLogin');
     const origReg = regBtn?.textContent;
+    const guard = setTimeout(() => {
+      if (!__regBusy) return;
+      __regBusy = false;
+      if (regBtn) { regBtn.disabled = false; regBtn.textContent = origReg; }
+      if (loginBtn) loginBtn.disabled = false;
+      __regMsg('Сервер не отвечает. Проверьте связь и попробуйте ещё раз.', 0);
+    }, 20000);
     if (regBtn) { regBtn.disabled = true; regBtn.textContent = 'Одну секунду…'; }
     if (loginBtn) loginBtn.disabled = true;
     try {
@@ -2419,6 +2477,7 @@ function wireRegisterDialogOnce() {
       if (isNetworkError(err)) showNetGate();
       __regMsg(friendlyAuthError(err) || 'Ошибка', 0);
     } finally {
+      clearTimeout(guard);
       __regBusy = false;
       if (regBtn) { regBtn.disabled = false; regBtn.textContent = origReg; }
       if (loginBtn) loginBtn.disabled = false;
@@ -5515,7 +5574,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v241</div>
+        <div class="muted app-version">v242</div>
     </div>
   `;
 

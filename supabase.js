@@ -17,9 +17,31 @@ function siteRedirect() {
 // SDK лежит локально в vendor/ — без зависимости от CDN (тормоза/таймауты
 // сети до jsdelivr раньше превращались в «Не удалось связаться с сервером»
 // при смене пароля). Сборка статическая, деплоится вместе с приложением.
+
+// Жёсткий таймаут на каждый запрос: без него «зависший» fetch (мобильная сеть,
+// засыпающий ноутбук, фильтрация трафика) держал кнопку «Войти» вечно.
+const REQUEST_TIMEOUT_MS = 8000;
+
+function fetchWithTimeout(input, init = {}) {
+  const ctrl = new AbortController();
+  const external = init.signal;
+  const abort = () => ctrl.abort();
+  if (external) {
+    if (external.aborted) abort();
+    else external.addEventListener('abort', abort, { once: true });
+  }
+  const timer = setTimeout(abort, REQUEST_TIMEOUT_MS);
+  return fetch(input, { ...init, signal: ctrl.signal }).finally(() => {
+    clearTimeout(timer);
+    if (external) external.removeEventListener('abort', abort);
+  });
+}
+
 function createSupabaseClient() {
   return import('./vendor/supabase-js-2.49.4.mjs').then(({ createClient }) =>
-    createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { fetch: fetchWithTimeout }
+    })
   );
 }
 
@@ -39,13 +61,20 @@ export function getSupabase() {
 }
 
 // Сетевые сбои (QUIC/HTTP2 ping/CORS-обрывы) на Supabase бывают спорадически:
-// сервер отвечает 200, но fetch уже упал. Повторяем 3 раза с паузой.
+// сервер отвечает 200, но fetch уже упал. Повторяем несколько раз с паузой.
 export function isNetworkError(err) {
   const msg = String(err?.message || err || '');
   return (
     err instanceof TypeError ||
-    /failed to fetch|networkerror|network error|load failed|net::|ERR_/i.test(msg)
+    /failed to fetch|networkerror|network error|load failed|net::|ERR_|abort|timed out|timeout|signal is aborted/i.test(msg)
   );
+}
+
+// Зависший запрос (таймаут) повторяем только один раз: ждать 4×8 секунд
+// пользователь не должен.
+function isTimeoutError(err) {
+  const msg = String(err?.message || err || '');
+  return /abort|timed out|timeout|signal is aborted/i.test(msg);
 }
 
 async function withNetRetry(fn, attempts = 4) {
@@ -56,6 +85,7 @@ async function withNetRetry(fn, attempts = 4) {
     } catch (err) {
       lastErr = err;
       if (!isNetworkError(err) || i === attempts - 1) throw err;
+      if (isTimeoutError(err) && i >= 1) throw err;
       // Экспоненциальная пауза с небольшим разбросом: короткие обрывы
       // мобильной сети переживаем сами, не показывая ошибку пользователю.
       const wait = Math.min(3000, 500 * 2 ** i) + Math.round(Math.random() * 250);

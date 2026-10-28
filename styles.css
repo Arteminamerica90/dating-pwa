@@ -27,6 +27,26 @@
 
 * { box-sizing: border-box; }
 
+/* iOS-подобные полосы прокрутки: нативные скрываем, тонкий ползунок рисует
+   ui-scrollbars.js — он появляется только во время прокрутки и растворяется. */
+* { scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { width: 0; height: 0; }
+.ios-scrollbar {
+  position: fixed;
+  z-index: 9998;
+  width: 5px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.3);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 220ms ease;
+  will-change: top, height;
+}
+.ios-scrollbar.show { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .ios-scrollbar { transition: none; }
+}
+
 html, body {
   height: 100%;
   margin: 0;
@@ -445,7 +465,6 @@ dialog.net-gate::backdrop {
   gap: 10px;
   max-height: 62vh;
   overflow-y: auto;
-  scrollbar-width: thin;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -497,7 +516,6 @@ dialog.net-gate::backdrop {
   gap: 12px;
   overflow-x: auto;
   padding-bottom: 4px;
-  scrollbar-width: thin;
 }
 
 .matches-strip .match-card {
