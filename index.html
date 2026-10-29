@@ -11,7 +11,7 @@
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://mdabznllmqnhddgwontq.supabase.co" crossorigin />
     <link rel="dns-prefetch" href="https://mdabznllmqnhddgwontq.supabase.co" />
-    <link rel="stylesheet" href="./styles.css?v=243" />
+    <link rel="stylesheet" href="./styles.css?v=244" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script defer src="https://widget.cloudpayments.ru/bundles/cloudpayments.js"></script>
@@ -162,7 +162,11 @@
             <div class="muted" style="margin-bottom:16px;line-height:1.5">Для использования сервиса вам должно исполниться 18 лет. Укажите дату рождения:</div>
           </div>
           <div style="max-width:320px;margin:0 auto">
-            <input id="obBirthDate" class="input" type="date" max="2008-01-01" style="width:100%;max-width:320px" />
+            <button id="obBirthBtn" class="date-field" type="button" aria-haspopup="dialog">
+              <span id="obBirthLabel" class="date-field-value is-placeholder">Укажите дату рождения</span>
+              <svg class="date-field-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6"/></svg>
+            </button>
+            <input id="obBirthDate" type="hidden" />
             <div id="obAgeError" style="color:#e11d48;font-size:12px;margin-top:8px;text-align:center;display:none"></div>
           </div>
           <div style="text-align:center;margin-top:16px">
@@ -420,7 +424,7 @@
 
       window.__xystarImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=243')
+      import('./app.js?v=244')
         .then(() => {
           window.__xystarImportOk = true;
         })

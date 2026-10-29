@@ -18,6 +18,7 @@ import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.j
 import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=70';
 import { partnerFilterText } from './partner-filter-text.js?v=70';
 import { installIosScrollbars } from './ui-scrollbars.js?v=3';
+import { openDatePicker, formatRuDate } from './date-picker.js?v=1';
 import {
   isSupabaseConfigured,
   supabaseCurrentUser,
@@ -2166,6 +2167,18 @@ function startRegistrationFlow() {
 let __obWired = false;
 let __obGender = '';
 
+// Подпись поля даты: «12 марта 1995» вместо ISO и серый плейсхолдер,
+// пока дата не выбрана.
+function syncDateField(inputSel, labelSel, placeholder = 'Укажите дату рождения') {
+  const input = document.querySelector(inputSel);
+  const label = document.querySelector(labelSel);
+  if (!label) return;
+  const iso = String(input?.value || '').trim();
+  const text = iso ? formatRuDate(iso) : '';
+  label.textContent = text || placeholder;
+  label.classList.toggle('is-placeholder', !text);
+}
+
 function showOnboardingStep(which) {
   const set = (id, on) => {
     const el = document.querySelector(id);
@@ -2207,6 +2220,7 @@ function showOnboardingStep(which) {
     const submit = document.querySelector('#obAgeSubmit');
     const saved = String(state.profile?.birthDate || '').trim();
     if (input) input.value = saved;
+    syncDateField('#obBirthDate', '#obBirthLabel');
     if (submit) submit.disabled = !(saved && ageFromBirthDate(saved) >= 18);
   }
 }
@@ -2289,6 +2303,21 @@ function wireOnboardingDialog(dlg) {
       }
     });
   }
+
+  $('#obBirthBtn')?.addEventListener('click', () => {
+    openDatePicker({
+      value: birthDateInput?.value || '',
+      minAge: 18,
+      title: 'Дата рождения',
+      onDone: (iso) => {
+        if (!birthDateInput) return;
+        birthDateInput.value = iso;
+        birthDateInput.dispatchEvent(new Event('input', { bubbles: true }));
+        syncDateField('#obBirthDate', '#obBirthLabel');
+        haptic('light');
+      }
+    });
+  });
 
   ageSubmitBtn?.addEventListener('click', () => {
     const val = birthDateInput?.value;
@@ -5575,7 +5604,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v243</div>
+        <div class="muted app-version">v244</div>
     </div>
   `;
 
@@ -5814,6 +5843,7 @@ function plural(n, one, few, many) {
 function renderStats() {
   const name = state.profile?.name || '';
   const description = state.profile?.description || '';
+  const birthText = formatRuDate(state.profile?.birthDate || '');
   const interests = state.profile?.interests || [];
   const interestsText = interests.join(', ');
   const zodiac = state.profile?.zodiac || '';
@@ -5886,7 +5916,11 @@ function renderStats() {
       <div class="profile-editor">
         <div class="profile-field">
           <label class="label">Дата рождения</label>
-          <input id="profileBirthInput" class="input" type="date" value="${escapeHtml(state.profile?.birthDate || '')}" />
+          <button id="profileBirthBtn" class="date-field" type="button" aria-haspopup="dialog">
+            <span id="profileBirthLabel" class="date-field-value${birthText ? '' : ' is-placeholder'}">${birthText ? escapeHtml(birthText) : 'Укажите дату рождения'}</span>
+            <svg class="date-field-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6"/></svg>
+          </button>
+          <input id="profileBirthInput" type="hidden" value="${escapeHtml(state.profile?.birthDate || '')}" />
         </div>
         <div class="profile-field">
           <label class="label">Описание</label>
@@ -6050,6 +6084,36 @@ function renderStats() {
       save();
       pushPublicProfileNow().catch(() => {});
       renderAll();
+    });
+  });
+
+  $('#view-stats').querySelector('#profileBirthBtn')?.addEventListener('click', () => {
+    if (!accountInfo?.id) {
+      requireRegistration('Редактирование анкеты доступно только зарегистрированным пользователям');
+      return;
+    }
+    const input = $('#view-stats').querySelector('#profileBirthInput');
+    openDatePicker({
+      value: input?.value || '',
+      minAge: 18,
+      title: 'Дата рождения',
+      onDone: (iso) => {
+        // Перезапрашиваем элементы: пока пикер был открыт, экран мог
+        // перерисоваться (синхронизация, смена вкладки), и старая ссылка
+        // уже не в документе.
+        const inputNow = $('#view-stats').querySelector('#profileBirthInput');
+        if (inputNow) inputNow.value = iso;
+        const label = $('#view-stats').querySelector('#profileBirthLabel');
+        if (label) {
+          label.textContent = formatRuDate(iso);
+          label.classList.remove('is-placeholder');
+        }
+        // Дату запоминаем сразу: иначе фоновый renderAll вернул бы старую.
+        state.profile.birthDate = iso;
+        state.profile.ageConfirmed = true;
+        save();
+        haptic('light');
+      }
     });
   });
 
