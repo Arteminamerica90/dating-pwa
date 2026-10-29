@@ -22,6 +22,9 @@ export function installIosScrollbars() {
       return el && el.scrollHeight - el.clientHeight > 4 ? el : null;
     }
     if (!(node instanceof Element)) return null;
+    // Колёса iOS-пикера даты — не список: полоса прокрутки внутри них
+    // выглядела бы инородно (в iPhone её нет).
+    if (node.closest?.('.dp-wheel')) return null;
     const cs = getComputedStyle(node);
     if (!/(auto|scroll|overlay)/.test(cs.overflowY)) return null;
     if (node.scrollHeight - node.clientHeight < 4) return null;

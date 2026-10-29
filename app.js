@@ -17,7 +17,7 @@ import { decryptJson, encryptJson } from './encryption.js?v=70';
 import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=70';
 import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=70';
 import { partnerFilterText } from './partner-filter-text.js?v=70';
-import { installIosScrollbars } from './ui-scrollbars.js?v=3';
+import { installIosScrollbars } from './ui-scrollbars.js?v=4';
 import { openDatePicker, formatRuDate } from './date-picker.js?v=1';
 import {
   isSupabaseConfigured,
@@ -5604,7 +5604,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v244</div>
+        <div class="muted app-version">v246</div>
     </div>
   `;
 
