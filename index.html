@@ -11,7 +11,7 @@
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://mdabznllmqnhddgwontq.supabase.co" crossorigin />
     <link rel="dns-prefetch" href="https://mdabznllmqnhddgwontq.supabase.co" />
-    <link rel="stylesheet" href="./styles.css?v=247" />
+    <link rel="stylesheet" href="./styles.css?v=248" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script defer src="https://widget.cloudpayments.ru/bundles/cloudpayments.js"></script>
@@ -368,6 +368,9 @@
         el.textContent = lines.join('\n');
         // Show only if something is wrong.
         el.style.display = window.__xystarStarted ? 'none' : 'block';
+        // Если приложение всё-таки стартовало позже 1,5 с, убираем
+        // диагностическую плашку, чтобы она не пугала пользователя.
+        if (window.__xystarStarted) document.getElementById('xystarBootError')?.remove();
       };
 
       // Update debug overlay a few times during boot.
@@ -375,6 +378,7 @@
       setTimeout(() => {
         if (window.__xystarStarted) return;
         const el = document.createElement('div');
+        el.id = 'xystarBootError';
         el.style.position = 'fixed';
         el.style.left = '12px';
         el.style.right = '12px';
@@ -396,7 +400,7 @@
           'Откройте DevTools -> Console и Network и пришлите: status app.js и первую ошибку (не Vytal).\\n' +
           'Также попробуйте Incognito (Cmd+Shift+N) и отключите расширения (Vytal мешает консолью).';
         document.body.appendChild(el);
-      }, 1500);
+      }, 4000);
     </script>
 
     <script type="module">
@@ -424,7 +428,7 @@
 
       window.__xystarImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=247')
+      import('./app.js?v=248')
         .then(() => {
           window.__xystarImportOk = true;
         })
