@@ -2787,7 +2787,7 @@ function renderAccountDialogBody() {
     <div class="account-badge" id="accountBadge"></div>
     <div class="row-inline" style="margin-top:12px;justify-content:center" id="accountSignedIn">
       <button id="btnChangePassword" class="btn" type="button">Сменить пароль</button>
-      <button id="btnExportData" class="btn" type="button" title="Скачать копию своих персональных данных (152-ФЗ, ст. 14)">Экспорт данных</button>
+      <button id="btnExportData" class="btn ghost" type="button" title="Скачать копию своих персональных данных (152-ФЗ, ст. 14)">Экспорт данных</button>
       <button id="btnAccountLogout" class="btn danger" type="button">Выход</button>
     </div>
     <div class="row" id="changePasswordBox" hidden style="margin-top:12px">
@@ -3123,8 +3123,8 @@ function renderSubscriptionContent(highlightFeature) {
       ? 'Автопродление вашей подписки активно. Отмените в любой момент — преимущества сохранятся до конца оплаченного периода.'
       : 'Управление подпиской — после подключения одного из планов (Стандарт, Премиум, VIP, Эксклюзив).';
     const manageBtn = onPaidPlan
-      ? `<button class="btn ghost" id="btnCancelSub" type="button" style="display:block;margin:0 auto;min-width:200px;font-size:12px;color:#f43f5e">Отменить подписку</button>`
-      : `<button class="btn ghost" id="btnCancelSub" type="button" disabled style="display:block;margin:0 auto;min-width:200px;font-size:12px;color:#f43f5e;opacity:0.45;cursor:not-allowed" title="Отмена доступна после подключения плана">Отменить подписку</button>`;
+      ? `<button class="btn danger" id="btnCancelSub" type="button" style="display:block;margin:0 auto;min-width:200px;font-size:12px">Отменить подписку</button>`
+      : `<button class="btn danger" id="btnCancelSub" type="button" disabled style="display:block;margin:0 auto;min-width:200px;font-size:12px;opacity:0.45;cursor:not-allowed" title="Отмена доступна после подключения плана">Отменить подписку</button>`;
     manageEl.innerHTML = `
       <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 16px 14px">
         <div class="muted" style="font-size:12px">${manageHint}</div>
@@ -5604,7 +5604,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v246</div>
+        <div class="muted app-version">v247</div>
     </div>
   `;
 
@@ -5941,11 +5941,11 @@ function renderStats() {
       </div>
 
       <div class="card" style="margin-top:12px">
-        <button id="btnShareColleague" class="btn" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block;font-size:13px">📨 Поделиться с коллегой</button>
+        <button id="btnShareColleague" class="btn ghost" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block;font-size:13px">📨 Поделиться с коллегой</button>
       </div>
 
       <div class="card" id="accountCard" style="margin-top:12px">
-        <button id="btnOpenAccount" class="btn" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block">
+        <button id="btnOpenAccount" class="btn ghost" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block">
           👤 Аккаунт${accountInfo?.email ? ` · ${escapeHtml(accountInfo.email)}` : ''}
         </button>
         <div class="muted" style="text-align:center;margin-top:6px;font-size:12px">
@@ -5954,7 +5954,7 @@ function renderStats() {
       </div>
 
       <div class="card" id="legalConsentCard">
-        <button id="btnOpenConsent" class="btn" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block">
+        <button id="btnOpenConsent" class="btn ghost" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block">
           📄 Согласие${allLegalConsentsAccepted ? ' ✓' : ''}
         </button>
       </div>

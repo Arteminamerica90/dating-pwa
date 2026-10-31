@@ -754,31 +754,53 @@ dialog.net-gate::backdrop {
 .row-inline { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .right { justify-content: flex-end; }
 
+/* Кнопки в стиле iOS: плоская заливка, скругление 14px, высота 46px,
+   мягкое нажатие. Основная — фирменная, второстепенная — серая,
+   деструктивная — красная. */
 .btn {
-  border: 1px solid rgba(167, 139, 250, 0.55);
-  background:
-    radial-gradient(circle at 20% 20%, rgba(167, 139, 250, 0.22), transparent 45%),
-    radial-gradient(circle at 80% 20%, rgba(34, 211, 238, 0.18), transparent 42%),
-    rgba(15, 23, 42, 0.04);
-  color: var(--text);
-  padding: 12px 14px;
-  border-radius: var(--radius-md);
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 46px;
+  border: 1px solid transparent;
+  background: var(--brand);
+  color: #fff;
+  padding: 11px 18px;
+  border-radius: 14px;
   cursor: pointer;
-  font-weight: 700;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  transition: background-color 160ms ease, opacity 160ms ease, transform 120ms ease;
 }
-.btn:hover {
-  background:
-    radial-gradient(circle at 20% 20%, rgba(167, 139, 250, 0.28), transparent 45%),
-    radial-gradient(circle at 80% 20%, rgba(34, 211, 238, 0.22), transparent 42%),
-    rgba(15, 23, 42, 0.06);
-  border-color: rgba(167, 139, 250, 0.75);
+.btn:hover { background: #6d28d9; }
+.btn:active { transform: scale(0.97); opacity: 0.86; }
+.btn:focus-visible { outline: 3px solid rgba(124, 58, 237, 0.28); outline-offset: 2px; }
+.btn.ghost {
+  background: rgba(118, 118, 128, 0.12);
+  border-color: transparent;
+  color: var(--text);
+  box-shadow: none;
 }
-.btn.ghost { background: transparent; border-color: rgba(15, 23, 42, 0.14); color: var(--text); }
-.btn.ghost:hover { color: var(--text); background: rgba(15, 23, 42, 0.06); border-color: rgba(15, 23, 42, 0.18); }
-.btn.danger { border-color: rgba(251, 113, 133, 0.6); color: #be123c; }
-.btn.ok { background: var(--ok); border-color: var(--ok); color: #fff; }
-.btn.ok:hover { background: var(--ok); opacity: 0.9; }
+.btn.ghost:hover { background: rgba(118, 118, 128, 0.18); }
+.btn.report-reason { justify-content: flex-start; }
+.btn.danger {
+  background: rgba(255, 59, 48, 0.12);
+  border-color: transparent;
+  color: #d70015;
+  box-shadow: none;
+}
+.btn.danger:hover { background: rgba(255, 59, 48, 0.18); }
+.btn.ok { background: var(--ok); border-color: transparent; color: #fff; }
+.btn.ok:hover { background: #047857; }
 
 .link-btn {
   background: none;
@@ -856,7 +878,9 @@ dialog.net-gate::backdrop {
 }
 .sub-plan-buy {
   margin-top: 12px;
-  display: block;
+  display: flex;
+  width: 100%;
+  max-width: 240px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -932,6 +956,12 @@ dialog.net-gate::backdrop {
   max-width: none;
   white-space: nowrap;
   text-align: center;
+}
+/* На узких экранах две кнопки в ряд обрезают «Зарегистрироваться» —
+   складываем их в столбик на всю ширину. */
+@media (max-width: 359px) {
+  .auth-form .reg-actions { flex-wrap: wrap; }
+  .auth-form .reg-actions .btn { flex: 1 0 100%; white-space: normal; }
 }
 .auth-form .row.auth-field {
   flex-direction: column;
@@ -1349,16 +1379,16 @@ dialog.net-gate::backdrop {
   display: grid;
   place-items: center;
   border-radius: 999px;
+  background: rgba(118, 118, 128, 0.12);
+  border-color: transparent;
   color: var(--ok);
-  border-color: rgba(34, 197, 94, 0.45);
+  box-shadow: none;
 }
-.dating-topbar .btn.icon-only.filter {
-  color: #a78bfa;
-  border-color: rgba(167, 139, 250, 0.5);
-}
+.dating-topbar .btn.icon-only:hover { background: rgba(118, 118, 128, 0.18); }
+.dating-topbar .btn.icon-only.filter { color: var(--brand); }
 .dating-topbar .btn.icon-only.filter[aria-expanded='true'] {
-  background: rgba(167, 139, 250, 0.18);
-  border-color: rgba(167, 139, 250, 0.8);
+  background: rgba(124, 58, 237, 0.14);
+  color: var(--brand);
 }
 .accordion-head.narrow .accordion-title {
   flex: 0 0 auto;
@@ -2923,23 +2953,25 @@ textarea.input {
 }
 
 #cookieBanner .btn {
+  min-height: 38px;
   color: #fff !important;
-  background: rgba(99, 102, 241, 0.9) !important;
-  border-color: rgba(99, 102, 241, 0.5) !important;
+  background: var(--brand) !important;
+  border-color: transparent !important;
+  box-shadow: none;
 }
 
 #cookieBanner .btn.ghost {
-  background: rgba(255, 255, 255, 0.1) !important;
-  border-color: rgba(255, 255, 255, 0.25) !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
 }
 
 #cookieBanner .btn:hover {
   opacity: 0.85;
 }
 
-/* Единое скругление: все кнопки, фильтры, поля и карточки — radius-md.
-   Круги (аватары, фото, tbtn, badge/пилюли слайдера) остаются круглыми. */
-.btn,
+/* Единое скругление: фильтры, поля и карточки — radius-md.
+   У .btn своё iOS-скругление 14px, круги (аватары, фото, tbtn,
+   badge/пилюли слайдера) остаются круглыми. */
 .input,
 .select,
 .filter-select,
@@ -3074,14 +3106,6 @@ textarea.input {
   margin-top: 12px;
 }
 
-.btn {
-  min-height: 46px;
-  border-radius: 14px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-.btn:active { filter: brightness(0.95); }
-.btn.ok { min-height: 46px; }
 .input, .select, textarea.input {
   border-radius: 12px;
   min-height: 46px;
