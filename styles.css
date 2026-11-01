@@ -2913,15 +2913,35 @@ textarea.input {
 }
 
 .consent-doc {
-  text-align: center;
+  text-align: left;
 }
 
-/* Центрируем чекбоксы и текст согласий */
-.consent-inline { text-align: center; }
-.consent-inline label { justify-content: center; }
-.consent-inline label span { text-align: center; }
+/* Окно согласия: текст по ширине, чекбоксы слева, подписи занимают
+   всю оставшуюся ширину — без «рваного» центрирования. */
+.consent-inline { text-align: justify; text-justify: inter-word; }
+.consent-inline .muted { text-align: justify; }
+.consent-inline label { justify-content: flex-start; }
+.consent-inline label span {
+  flex: 1 1 auto;
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+/* Ссылки «(подробнее)» не разрываем переносом. */
+.consent-inline label span a { hyphens: none; -webkit-hyphens: none; white-space: nowrap; }
 .auth-form label { justify-content: center; }
 .auth-form label span { text-align: center; }
+/* Согласия в форме регистрации — на всю ширину, текст по ширине. */
+.reg-consent label { justify-content: flex-start; }
+.reg-consent label span {
+  flex: 1 1 auto;
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+.reg-consent label span a { hyphens: none; -webkit-hyphens: none; white-space: nowrap; }
 
 .questionnaire-grid {
   justify-items: center;
