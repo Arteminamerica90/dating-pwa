@@ -5204,17 +5204,19 @@ function renderTreeFilters(filters = {}) {
 }
 
 function matchesTreeFilters(p, treeFilter = {}) {
-  for (const [qid, opts] of Object.entries(treeFilter)) {
-    if (!Array.isArray(opts) || !opts.length) continue;
+  const active = Object.entries(treeFilter).filter(([, opts]) => Array.isArray(opts) && opts.length);
+  if (!active.length) return true;
+  // Ответы анкеты — канонический источник: сводка persona/factual может быть
+  // не догружена, а фильтр всё равно должен работать. Дерево строим один раз
+  // на кандидата, а не на каждый выбранный вопрос.
+  const tree = candidateTree(p);
+  for (const [qid, opts] of active) {
     const q = ALL_QUESTIONS.find((x) => x.id === qid);
     if (!q || q.numeric || q.search) continue;
     if (qid === 'q274') {
       if (!opts.some((optId) => p.city === CITY_ANSWER_TO_KEY[optId])) return false;
       continue;
     }
-    // Ответы анкеты — канонический источник: сводка persona/factual может быть
-    // не догружена, а фильтр всё равно должен работать.
-    const tree = candidateTree(p);
     const matches = opts.some((optId) => {
       const opt = questionOptions(q).find((o) => o.id === optId);
       if (!opt) return false;
@@ -5599,7 +5601,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v254</div>
+        <div class="muted app-version">v255</div>
     </div>
   `;
 
