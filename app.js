@@ -1075,7 +1075,7 @@ const QUESTIONNAIRE_LABELS = {
 
 // Полная анкета = психологический блок (дерево решений) + фактические категории.
 const ALL_QUESTIONS = [...QUESTIONNAIRE, ...FULL_QUESTIONNAIRE];
-const PSYCH_FIELDS = ['attachment', 'conflict', 'temperament', 'game', 'humor', 'social', 'pace', 'attribution'];
+const PSYCH_FIELDS = ['attachment', 'conflict', 'temperament', 'motivation', 'game', 'humor', 'social', 'pace', 'attribution'];
 const DEALBREAKER_CATS = new Set(['habits', 'family', 'relationship', 'finance', 'extra']);
 
 const QN_ZODIAC_MAP = {
@@ -5196,7 +5196,7 @@ function renderTreeFilters(filters = {}) {
   const totalActive = Object.values(tree).reduce((n, a) => n + a.length, 0);
   return `
     <div class="filter-group tree-filter-group">
-      <div class="label">Анкета (дерево решений)${totalActive ? ` <span class="pill">${totalActive}</span>` : ''}</div>
+      <div class="label">Фильтры анкеты (по желанию)${totalActive ? ` <span class="pill">${totalActive}</span>` : ''}</div>
       <div class="tree-filter">${cats}${psych}</div>
       ${totalActive ? '<button class="btn ghost" type="button" data-tree-filter-reset>Сбросить фильтры анкеты</button>' : ''}
     </div>
@@ -5223,12 +5223,10 @@ function matchesTreeFilters(p, treeFilter = {}) {
   return true;
 }
 
-// Категории дерева решений, где несовпадение значений критично для матча.
-const TREE_CRITICAL_CATEGORIES = ['family', 'habits', 'relationship', 'extra'];
 // Все категории большой анкеты: по ним ветки считаются фактическими.
 const QUESTIONNAIRE_CATEGORIES = new Set(ALL_QUESTIONS.map((q) => q.category).filter(Boolean));
-// Минимальная доля совпавших веток дерева для матча.
-const TREE_MATCH_THRESHOLD = 0.4;
+// Сколько всего веток может быть у дерева: психология + фактические категории.
+const TREE_TOTAL_DIMS = PSYCH_FIELDS.length + QUESTIONNAIRE_CATEGORIES.size;
 
 // Ветки анкеты: по каждой категории/признаку берём значение, которое выбрано чаще
 // всего (как в портрете), а не последний ответ — иначе 282 вопроса схлопываются
@@ -5238,7 +5236,10 @@ function buildProfileTree(profile) {
     ? profile.questionnaireAnswers
     : {};
   const g = genderOf(profile);
-  const buckets = {};
+  // Ветки раскладываем по типу вопроса, а не по имени измерения: иначе
+  // психологическая social и фактическая social сливаются в одну.
+  const factualBuckets = {};
+  const personaBuckets = {};
   for (const q of ALL_QUESTIONS) {
     const answerId = answers[q.id];
     if (!answerId) continue;
@@ -5259,20 +5260,23 @@ function buildProfileTree(profile) {
         })
         .filter(Boolean);
     }
+    const target = q.category ? factualBuckets : personaBuckets;
     for (const traits of traitsList) {
       for (const [dim, val] of Object.entries(traits)) {
-        if (!buckets[dim]) buckets[dim] = {};
-        buckets[dim][val] = (buckets[dim][val] || 0) + 1;
+        if (!target[dim]) target[dim] = {};
+        target[dim][val] = (target[dim][val] || 0) + 1;
       }
     }
   }
   const factual = {};
   const persona = {};
-  for (const [dim, bucket] of Object.entries(buckets)) {
+  for (const [dim, bucket] of Object.entries(factualBuckets)) {
     const top = pickTopEntry(bucket);
-    if (!top) continue;
-    if (QUESTIONNAIRE_CATEGORIES.has(dim)) factual[dim] = top;
-    else persona[dim] = top;
+    if (top) factual[dim] = top;
+  }
+  for (const [dim, bucket] of Object.entries(personaBuckets)) {
+    const top = pickTopEntry(bucket);
+    if (top) persona[dim] = top;
   }
   return { factual, persona };
 }
@@ -5286,13 +5290,9 @@ function candidateTree(candidate) {
   return { factual: candidate?.factual || {}, persona: candidate?.persona || {} };
 }
 
-function buildUserTree(profile = state.profile) {
-  return buildProfileTree(profile);
-}
-
-// Все ветки анкеты в одной карте dim → значение. В buildProfileTree категоризованные
-// вопросы попадают в factual, остальные — в persona; в старых записях всё лежит
-// в persona, поэтому для сравнения ветки всегда сливаем в одну карту.
+// Все ветки анкеты в одной карте dim → значение. Нужна только для проверки,
+// есть ли у анкеты данные: для сравнения persona и factual идут раздельно,
+// потому что у них есть одноимённая ветка social.
 function treeDims(tree) {
   return { ...(tree?.persona || {}), ...(tree?.factual || {}) };
 }
@@ -5301,29 +5301,13 @@ function candidateTreeDims(candidate) {
   return treeDims(candidateTree(candidate));
 }
 
-// Совместимость по дереву решений: сравнивает ветки пользователя и кандидата.
-// known — ветки, где известны значения обоих; match — совпавшие; conflicts — критичные расхождения.
-// Настройки читаются из state.dating.filters: treeEnabled, treeThreshold (%), treeConflicts.
+// Совместимость по дереву решений. Дерево больше ничего не отсекает:
+// оно только считает, насколько человек подходит, чтобы лента ранжировалась
+// от самого подходящего к менее подходящему. Пороговых значений нет.
 function treeMatchCompatibility(userProfile = state.profile, candidate = {}) {
   const filters = state.dating?.filters || {};
   const enabled = filters.treeEnabled !== false;
-  const conflictsEnabled = filters.treeConflicts !== false;
-  const threshold = Number.isFinite(Number(filters.treeThreshold)) ? Number(filters.treeThreshold) / 100 : TREE_MATCH_THRESHOLD;
-  const me = treeDims(buildUserTree(userProfile));
-  const them = candidateTreeDims(candidate);
-  const known = [];
-  const match = [];
-  const conflicts = [];
-  for (const [dim, myVal] of Object.entries(me)) {
-    const theirVal = them[dim];
-    if (!theirVal) continue;
-    known.push(dim);
-    if (myVal === theirVal) match.push(dim);
-    else if (conflictsEnabled && TREE_CRITICAL_CATEGORIES.includes(dim)) conflicts.push({ dim, mine: myVal, theirs: theirVal });
-  }
-  const pct = known.length ? match.length / known.length : null;
-  const compatible = !enabled || !known.length ? true : pct >= threshold && conflicts.length === 0;
-  return { known, match, conflicts, pct, compatible, enabled, conflictsEnabled, threshold };
+  return { ...compareTreeProfiles(userProfile, candidate), enabled, compatible: true };
 }
 
 // Подсчёт совпадений по полной анкете (282 вопроса). Если у кандидата есть полные
@@ -5366,8 +5350,12 @@ function countQuestionnaireMatches(userProfile = state.profile, candidate = {}) 
     return { total, matched };
   }
   // Fallback: кандидат без полной анкеты — сверяем по агрегированному портрету.
+  // Психо-ветки сверяем с persona, фактические — с factual: у них есть
+  // одноимённая social, и общая карта теряла одну из них.
   const answers = getQuestionnaireAnswers(userProfile);
-  const cand = candidateTreeDims(candidate);
+  const candTree = candidateTree(candidate);
+  const candPersona = candTree.persona || {};
+  const candFactual = candTree.factual || {};
   let total = 0;
   let matched = 0;
   for (const q of ALL_QUESTIONS) {
@@ -5394,7 +5382,14 @@ function countQuestionnaireMatches(userProfile = state.profile, candidate = {}) 
     const hit = traitsList.some((traits) => {
       const entries = Object.entries(traits);
       if (!entries.length) return false;
-      return entries.every(([dim, val]) => cand[dim] === val);
+      return entries.every(([dim, val]) => {
+        const factual = QUESTIONNAIRE_CATEGORIES.has(dim);
+        const primary = factual ? candFactual : candPersona;
+        const legacy = factual ? candPersona : candFactual;
+        // У старых записей категории лежали в persona — читаем их, только
+        // если в правильном бакете значения нет.
+        return primary[dim] != null ? primary[dim] === val : legacy[dim] === val;
+      });
     });
     if (hit) matched += 1;
   }
@@ -5426,7 +5421,6 @@ function renderDating() {
   }
   syncReportStatuses().catch(() => {});
   const cityKey = currentCityKey();
-  const userPortrait = buildQuestionnairePortrait(state.profile?.questionnaireAnswers || {});
   const interests = new Set(state.profile.interests || []);
   const comm = new Set(state.profile.communication || []);
   const values = new Set(state.profile.values || []);
@@ -5442,8 +5436,6 @@ function renderDating() {
   const distanceMatters = filters.distanceMatters !== false;
   const canMeasure = geoActive || !!cityKey;
   const treeEnabled = filters.treeEnabled !== false;
-  const treeConflicts = filters.treeConflicts !== false;
-  const treeThresholdPct = Number.isFinite(Number(filters.treeThreshold)) ? Number(filters.treeThreshold) : Math.round(TREE_MATCH_THRESHOLD * 100);
 
   if (!liveProfilesLoaded && isSupabaseConfigured()) {
     loadLiveProfiles();
@@ -5505,8 +5497,8 @@ function renderDating() {
       (edu && normText(p.education) === edu ? 1 : 0)
   });
   const sorter = (a, b) => {
-    const ar = (a.compatibility?.support || 0) - (a.compatibility?.tension || 0);
-    const br = (b.compatibility?.support || 0) - (b.compatibility?.tension || 0);
+    const ar = treeEnabled ? (a.compatibility?.rankScore || 0) : 0;
+    const br = treeEnabled ? (b.compatibility?.rankScore || 0) : 0;
     if (br !== ar) return br - ar;
     return b.score - a.score;
   };
@@ -5533,7 +5525,7 @@ function renderDating() {
   const feedReason = !visible.length
     ? liveMode
       ? (liveProfiles.length
-          ? 'Анкеты скрыты текущими фильтрами (пол, дерево, доход, шаги, лайки). Уберите лишние фильтры.'
+          ? 'Анкеты скрыты выбранными фильтрами (пол, анкета, доход, шаги, лайки). Уберите лишние фильтры.'
           : 'Публичные анкеты других участников пока не найдены. Пригласите друзей в сервис — новые анкеты появятся по мере регистрации участников.')
       : ''
     : '';
@@ -5584,16 +5576,12 @@ function renderDating() {
             </div>
           </div>
           <div class="filter-group">
-            <div class="label">Матчинг по дереву решений</div>
+            <div class="label">Ранжирование по дереву решений</div>
             <div class="chip-row">
-              <button class="chip ${treeEnabled ? 'active' : ''}" type="button" data-tree-toggle-match>Учитывать дерево при матче</button>
+              <button class="chip ${treeEnabled ? 'active' : ''}" type="button" data-tree-toggle-match>Учитывать дерево при ранжировании</button>
             </div>
-            <div class="label ${!treeEnabled ? 'muted' : ''}">Порог совпадений: ${treeThresholdPct}%</div>
-            <input class="range" type="range" min="0" max="100" step="5" value="${treeThresholdPct}" data-tree-threshold ${!treeEnabled ? 'disabled' : ''} />
-            <div class="chip-row">
-              <button class="chip ${treeConflicts ? 'active' : ''}" type="button" data-tree-conflicts-toggle>Блокировать критические конфликты</button>
-            </div>
-            <div class="muted">Критичные расхождения: семья/дети, привычки, цель отношений, религия — матч не засчитывается.</div>
+            <div class="muted">Порогов нет: анкеты не исключаются. Чем больше вопросов заполнено у обоих, тем точнее подбор — самые подходящие показываются первыми, остальные ниже.</div>
+            <div class="muted">Критичные расхождения (семья, привычки, отношения, финансы, дополнительное) снижают позицию, но не убирают анкету из выдачи.</div>
           </div>
           ${renderTreeFilters(filters)}
           </div>
@@ -5604,7 +5592,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v251</div>
+        <div class="muted app-version">v252</div>
     </div>
   `;
 
@@ -5733,27 +5721,6 @@ ${visible.length
     });
   });
 
-  $('#view-dating').querySelectorAll('[data-tree-conflicts-toggle]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state.dating.filters = state.dating.filters || {};
-      state.dating.filters.treeConflicts = state.dating.filters.treeConflicts === false;
-      save();
-      renderAll();
-      haptic('light');
-    });
-  });
-
-  $('#view-dating').querySelectorAll('[data-tree-threshold]').forEach((el) => {
-    el.addEventListener('input', () => {
-      state.dating.filters = state.dating.filters || {};
-      state.dating.filters.treeThreshold = Number(el.value || 0);
-      const label = el.closest('.filter-group')?.querySelector('.label');
-      if (label) label.textContent = `Порог совпадений: ${Number(el.value || 0)}%`;
-      save();
-    });
-    el.addEventListener('change', () => renderAll());
-  });
-
   if (visible.length) {
     mountTinder(visible);
     // Ответы анкеты нужны для «N из M вопросов совпало» — догружаем их
@@ -5803,7 +5770,7 @@ function openMatchChat(matchId) {
 
 
 // Готовность собственной анкеты: обязательные поля + ответы на вопросы анкеты.
-// Пока анкета не заполнена, в ленте не считается совместимость и дерево решений.
+// Это только прогресс заполнения — лента от него ничего не скрывает.
 function profileCompletion(profile = state.profile) {
   const p = profile || {};
   const portrait = buildQuestionnairePortrait(p.questionnaireAnswers || {});
@@ -6723,12 +6690,11 @@ function onLike(id) {
   mySubscription = incrementLikes(mySubscription);
   const candidate = DATING_PROFILES.find((x) => x.id === id) || liveProfiles.find((x) => x.id === id);
   const tree = treeMatchCompatibility(state.profile, candidate || {});
-  const treeOk = tree.compatible;
   const mutual = profileLikesYou(id);
   state.dating.matches = (state.dating.matches || []).filter((x) => x !== id);
-  if (mutual && treeOk) state.dating.matches.unshift(id);
+  if (mutual) state.dating.matches.unshift(id);
 
-  if (mutual && treeOk) {
+  if (mutual) {
     // Критично: даже во «взаимной» ветке свой лайк ОБЯЗАТЕЛЬНО сохраняем на
     // сервере. Раньше он не записывался, сервер не видел взаимности и матч
     // существовал только локально: у лайкнувшего он был, у второго — «нет
@@ -6751,18 +6717,10 @@ function onLike(id) {
         .catch(() => { scheduleLikesResync(2000); });
     }
     haptic('match');
-    toast('Есть матч! Вопросы подтвердило совместимость. Переписка — в табе «Сообщение».');
-    save();
-    renderAll();
-    return;
-  }
-
-  if (mutual && !treeOk && tree.known.length) {
-    // Свой лайк всё равно фиксируем на сервере: это факт, а матч не создаём —
-    // совместимость по анкете не подтверждена.
-    if (accountInfo?.id) supabaseSaveLike(accountInfo.id, id, 'like').catch(() => { scheduleLikesResync(2000); });
-    toast('Взаимный лайк, но дерево решений не подтверждает совместимость');
-    haptic('skip');
+    const treeNote = tree.tone === 'bad'
+      ? ' Дерево показывает существенные расхождения — обсудите их в переписке.'
+      : '';
+    toast(`Есть матч!${treeNote} Переписка — в табе «Сообщение».`);
     save();
     renderAll();
     return;
@@ -7641,14 +7599,20 @@ function renderTinderInner(p) {
   const neutralRows = (Array.isArray(compat.neutral) ? compat.neutral : []).slice(0, 3)
     .map((x) => `<div class="tinder-badges"><span class="pill muted-pill">${escapeHtml(x)}</span></div>`).join('');
   const tree = treeMatchCompatibility(state.profile, p);
-  const myTreeBranches = Object.keys(treeDims(buildUserTree(state.profile))).length;
+  const myTreeBranches = tree.myBranches;
+  const treeLabel = tree.tone === 'good'
+    ? 'много общего'
+    : tree.tone === 'bad'
+      ? 'существенные расхождения'
+      : 'есть отличия — можно обсудить';
+  const treeAnswers = tree.answered > 0 ? ` · ${tree.answered} отв.` : '';
   const treeBadge = !tree.enabled
     ? '<span class="pill muted-pill">дерево: отключено в фильтрах</span>'
     : myTreeBranches === 0
       ? '<span class="pill muted-pill">дерево: вы ещё не ответили на вопросы анкеты</span>'
       : tree.known.length === 0
         ? '<span class="pill muted-pill">дерево: у анкеты нет веток для сравнения</span>'
-        : `<span class="pill status-pill ${tree.compatible ? 'good' : 'bad'}">дерево: ${Math.round(tree.pct * 100)}% совпадений${tree.conflicts.length ? ` • ${tree.conflicts.length} конфликт` : ''}</span>`;
+        : `<span class="pill status-pill ${tree.tone || 'warn'}" title="опора ${tree.support.toFixed(1)} · напряжение ${tree.tension.toFixed(1)}">дерево: ${treeLabel}${treeAnswers}</span>`;
   const pid = p.id || p.name || '';
   const reportRec = state.moderation?.reports?.[pid];
   const reportStatus = reportRec
@@ -7668,7 +7632,7 @@ function renderTinderInner(p) {
     const sharedTraits = Array.isArray(compat.shared) && compat.shared.length ? compat.shared.slice(0, 3) : [];
     interestTags = sharedTraits.map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join(' ');
   }
-  const qm = countQuestionnaireMatches(state.profile, p);
+  const qm = p.compatibility?.questionnaire || countQuestionnaireMatches(state.profile, p);
   const qmBadge = qm.total > 0
     ? `<span class="pill status-pill good match-badge">${qm.matched} из ${qm.total} вопросов анкеты совпало</span>`
     : '';
@@ -7794,8 +7758,13 @@ function getPortraitSummaryFromAnswers(answers = {}) {
   return buildQuestionnairePortrait(answers);
 }
 
-function comparePortraits(userPortrait = {}, candidatePersona = {}) {
-  const summary = userPortrait?.summary || {};
+function comparePortraits(userTree = {}, candidateTree = {}) {
+  // persona и factual держим раздельно: у психологии и фактической анкеты
+  // есть одноимённая ветка social, и при слиянии она терялась.
+  const personaA = userTree?.persona || userTree?.summary || {};
+  const factualA = userTree?.factual || {};
+  const personaB = candidateTree?.persona || {};
+  const factualB = candidateTree?.factual || {};
   const shared = [];
   const differences = [];
   const neutral = [];
@@ -7803,8 +7772,8 @@ function comparePortraits(userPortrait = {}, candidatePersona = {}) {
   let tension = 0;
 
   for (const field of PSYCH_FIELDS) {
-    const a = summary[field];
-    const b = candidatePersona[field];
+    const a = personaA[field];
+    const b = personaB[field];
     if (!a || !b) continue;
     if (a === b) {
       support += field === 'humor' ? 0.5 : 1;
@@ -7829,10 +7798,9 @@ function comparePortraits(userPortrait = {}, candidatePersona = {}) {
   }
 
   // Фактические категории из большой анкеты (дерево решений по категориям).
-  const factual = candidatePersona?.factual || {};
-  for (const cat of Object.keys(factual)) {
-    const a = summary[cat];
-    const b = factual[cat];
+  for (const cat of Object.keys(factualB)) {
+    const a = factualA[cat];
+    const b = factualB[cat];
     if (!a || !b) continue;
     const block = CATEGORY_LABELS[cat] || cat;
     const la = factualLabel(a);
@@ -7850,7 +7818,7 @@ function comparePortraits(userPortrait = {}, candidatePersona = {}) {
     neutral.push(`${block}: ${la} ↔ ${lb}`);
   }
 
-  let label = '';
+  let label = shared.length || differences.length || neutral.length ? 'есть отличия, но можно обсудить' : '';
   let tone = 'warn';
   const net = support - tension;
   if (tension >= 3.2) {
@@ -7891,20 +7859,71 @@ function fmtNumeric(q, n) {
   return `${n.toLocaleString('ru-RU')}${q?.numericSymbol || ' ₽'}`;
 }
 
+// Сравнение деревьев по изначальной теории: support/tension, мягкие
+// дополнения, жёсткие конфликты и dealbreaker-категории. Дерево строим для
+// обоих участников, поэтому сравнение симметрично.
+function compareTreeProfiles(userProfile = state.profile, candidate = {}) {
+  const me = buildProfileTree(userProfile);
+  const them = candidateTree(candidate);
+  const theory = comparePortraits(me, them);
+
+  const known = [];
+  const exact = [];
+  const conflicts = [];
+  for (const [dim, myVal] of Object.entries(me.persona || {})) {
+    const theirVal = (them.persona || {})[dim];
+    if (!theirVal) continue;
+    known.push(`persona:${dim}`);
+    if (myVal === theirVal) exact.push(`persona:${dim}`);
+  }
+  for (const [dim, myVal] of Object.entries(me.factual || {})) {
+    const theirVal = (them.factual || {})[dim];
+    if (!theirVal) continue;
+    known.push(`factual:${dim}`);
+    if (myVal === theirVal) exact.push(`factual:${dim}`);
+    else if (DEALBREAKER_CATS.has(dim)) conflicts.push({ dim, mine: myVal, theirs: theirVal });
+  }
+
+  const myAnswers = getQuestionnaireAnswers(userProfile);
+  const theirAnswers = getQuestionnaireAnswers(candidate);
+  const myAnswered = Object.keys(myAnswers).length;
+  const answered = Object.keys(theirAnswers).length;
+  const myBranches = Object.keys(me.persona || {}).length + Object.keys(me.factual || {}).length;
+  const theirBranches = Object.keys(them.persona || {}).length + Object.keys(them.factual || {}).length;
+  const coverage = TREE_TOTAL_DIMS ? known.length / TREE_TOTAL_DIMS : 0;
+  // Уверенность растёт от числа сравнимых веток и от заполненности анкеты.
+  // Это не порог, а множитель: 280 ответов весят больше, чем 5.
+  const dataCompleteness = Math.max(
+    answered / Math.max(1, ALL_QUESTIONS.length),
+    theirBranches / Math.max(1, TREE_TOTAL_DIMS)
+  );
+  const confidence = 0.5 * coverage + 0.5 * dataCompleteness;
+  const questionnaire = countQuestionnaireMatches(userProfile, candidate);
+  const qmRatio = questionnaire.total ? questionnaire.matched / questionnaire.total : 0;
+  const net = theory.support - theory.tension;
+  const rankScore = (net + qmRatio * 2) * (0.4 + 0.6 * confidence) + confidence * 0.5;
+
+  return {
+    ...theory,
+    known,
+    match: exact,
+    exact,
+    conflicts,
+    myAnswered,
+    answered,
+    myBranches,
+    theirBranches,
+    coverage,
+    confidence,
+    questionnaire,
+    rankScore
+  };
+}
+
 // Полная совместимость пары: дерево решений + гороскоп, работа, бюджет,
 // места для встреч (неограниченный список) и планы на сегодня.
 function buildPairCompatibility(user = {}, candidate = {}) {
-  const portrait = buildQuestionnairePortrait(user.questionnaireAnswers || {});
-  // comparePortraits ждёт психо-поля на верхнем уровне и factual вложенным объектом.
-// Ветки сливаем в одну карту: у старых записей категории лежат в persona.
-  const dims = candidateTreeDims(candidate);
-  const factual = {};
-  const topDims = {};
-  for (const [dim, val] of Object.entries(dims)) {
-    if (QUESTIONNAIRE_CATEGORIES.has(dim)) factual[dim] = val;
-    else topDims[dim] = val;
-  }
-  const base = comparePortraits(portrait, { ...topDims, factual });
+  const base = compareTreeProfiles(user, candidate);
   const out = {
     ...base,
     shared: [...(base.shared || [])],
@@ -7990,8 +8009,8 @@ function buildPairCompatibility(user = {}, candidate = {}) {
     }
   }
 
-  let label = '';
-  let tone = 'warn';
+  let label = base.label || '';
+  let tone = base.tone || 'warn';
   const net = out.support - out.tension;
   if (out.tension >= 3.2) {
     label = 'существенные расхождения';
@@ -8002,6 +8021,12 @@ function buildPairCompatibility(user = {}, candidate = {}) {
   }
   out.label = label;
   out.tone = tone;
+  // Итоговый сорт-ключ: теория + совпадения по вопросам, с поправкой на
+  // заполненность анкеты. Никого не отсекаем — только меняем порядок.
+  const qm = out.questionnaire || { total: 0, matched: 0 };
+  const qmRatio = qm.total ? qm.matched / qm.total : 0;
+  const confidence = Number(out.confidence) || 0;
+  out.rankScore = ((out.support - out.tension) + qmRatio * 2) * (0.4 + 0.6 * confidence) + confidence * 0.5;
   return out;
 }
 
