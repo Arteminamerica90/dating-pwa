@@ -5212,11 +5212,18 @@ function matchesTreeFilters(p, treeFilter = {}) {
       if (!opts.some((optId) => p.city === CITY_ANSWER_TO_KEY[optId])) return false;
       continue;
     }
+    // Ответы анкеты — канонический источник: сводка persona/factual может быть
+    // не догружена, а фильтр всё равно должен работать.
+    const tree = candidateTree(p);
     const matches = opts.some((optId) => {
       const opt = questionOptions(q).find((o) => o.id === optId);
       if (!opt) return false;
-      if (q.category) return p.factual?.[q.category] === opt.value;
-      return Object.entries(getOptionTraits(q, opt)).some(([dim, val]) => p.persona?.[dim] === val);
+      if (q.category) {
+        return (tree.factual?.[q.category] ?? p.factual?.[q.category]) === opt.value;
+      }
+      return Object.entries(getOptionTraits(q, opt)).some(([dim, val]) =>
+        (tree.persona?.[dim] ?? p.persona?.[dim]) === val
+      );
     });
     if (!matches) return false;
   }
@@ -5592,7 +5599,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v253</div>
+        <div class="muted app-version">v254</div>
     </div>
   `;
 
