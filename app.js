@@ -5592,7 +5592,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v252</div>
+        <div class="muted app-version">v253</div>
     </div>
   `;
 
@@ -7600,11 +7600,7 @@ function renderTinderInner(p) {
     .map((x) => `<div class="tinder-badges"><span class="pill muted-pill">${escapeHtml(x)}</span></div>`).join('');
   const tree = treeMatchCompatibility(state.profile, p);
   const myTreeBranches = tree.myBranches;
-  const treeLabel = tree.tone === 'good'
-    ? 'много общего'
-    : tree.tone === 'bad'
-      ? 'существенные расхождения'
-      : 'есть отличия — можно обсудить';
+  const treeLabel = tree.label || 'есть отличия, но можно обсудить';
   const treeAnswers = tree.answered > 0 ? ` · ${tree.answered} отв.` : '';
   const treeBadge = !tree.enabled
     ? '<span class="pill muted-pill">дерево: отключено в фильтрах</span>'
