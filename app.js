@@ -2134,7 +2134,19 @@ function matchesStepBucket(stepCount, bucket) {
   return true;
 }
 
+function questionnaireIsOpen() {
+  const dlg = document.getElementById('dlgQuestionnaire');
+  return !!(dlg && dlg.open);
+}
+
 function renderAll() {
+  // Анкета — полноэкранный диалог. Пока он открыт, не пересобираем экраны под
+  // ним: фоновые загрузки (анкеты, фото, лайки) успевают вызвать renderAll
+  // несколько раз за один ответ, и на iOS это даёт заметное мерцание — на
+  // мгновение просвечивает другой экран. Ответы обновляются точечно, поэтому
+  // отложенный рендер безопасно выполнить один раз при закрытии анкеты
+  // (обработчик close в wireQuestionnaire).
+  if (questionnaireIsOpen()) return;
   renderHome();
   // renderEvents(); // скрыто — вернём позже
   renderDating();
@@ -5601,7 +5613,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v255</div>
+        <div class="muted app-version">v256</div>
     </div>
   `;
 
