@@ -168,7 +168,20 @@ export async function loadState() {
   return defaultState();
 }
 
-export async function saveState(state, { noEncrypt } = {}) {
+// Записи состояния выполняем строго по очереди. Несколько быстрых ответов
+// подряд запускали параллельные idbSet, и более старая запись могла завершиться
+// последней — тогда на диске оставался вариант без последних ответов.
+let saveStateChain = Promise.resolve();
+
+export function saveState(state, options = {}) {
+  const run = () => saveStateNow(state, options);
+  const result = saveStateChain.then(run);
+  // Ошибка одной записи не должна останавливать очередь следующих.
+  saveStateChain = result.catch(() => {});
+  return result;
+}
+
+async function saveStateNow(state, { noEncrypt } = {}) {
   const st = sanitizeState(state);
 
   if (noEncrypt || !st.encryption?.enabled) {
@@ -227,7 +240,16 @@ export async function saveState(state, { noEncrypt } = {}) {
   });
 }
 
-export async function clearState() {
+export function clearState() {
+  // Очистка идёт в той же очереди, что и сохранения: иначе запись, начатая
+  // чуть раньше выхода, могла завершиться уже после очистки и вернуть профиль.
+  const run = () => clearStateNow();
+  const result = saveStateChain.then(run);
+  saveStateChain = result.catch(() => {});
+  return result;
+}
+
+async function clearStateNow() {
   await idbDel(STATE_KEY);
   await idbDel(CRYPTO_KEY);
 }

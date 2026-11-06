@@ -10,12 +10,12 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=70';
+} from './storage.js?v=71';
 import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=70';
 import { StepCounter } from './steps.js?v=70';
 import { decryptJson, encryptJson } from './encryption.js?v=70';
 import { decryptChatText, derivePairKey, encryptChatText } from './chat-crypto.js?v=70';
-import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=70';
+import { FULL_QUESTIONNAIRE, CATEGORY_LABELS, CATEGORY_ORDER, factualLabel } from './questionnaire-data.js?v=71';
 import { partnerFilterText } from './partner-filter-text.js?v=70';
 import { installIosScrollbars } from './ui-scrollbars.js?v=4';
 import { openDatePicker, formatRuDate } from './date-picker.js?v=1';
@@ -1440,6 +1440,16 @@ function boot() {
   // Гео-трекинг и датчики отключены (UI убран); город выбирается вручную в настройках.
   save();
 
+  // Досохраняем состояние, если приложение уходит в фон или закрывается сразу
+  // после ответа: запись в IndexedDB асинхронная, а облачная отправка ждёт 4 с.
+  const flushState = () => {
+    saveState(state).catch(() => {});
+  };
+  window.addEventListener('pagehide', flushState);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushState();
+  });
+
   // Лайки/матчи досинхронизируются, когда пользователь возвращается в приложение
   // или раз в минуту: иначе матч, сделанный во втором аккаунте другим
   // устройством, появлялся только после перезагрузки страницы.
@@ -1598,14 +1608,22 @@ async function syncProfileAfterAuth() {
     if (payload) {
       if (payload.profile) {
         const remote = { ...payload.profile };
-        const localAnswers = Object.keys(state.profile.questionnaireAnswers || {}).length;
-        const remoteAnswers = Object.keys(remote.questionnaireAnswers || {}).length;
         if (accountSwitched) {
           state.profile = { ...remote };
         } else {
-          if (localAnswers > remoteAnswers) {
-            delete remote.questionnaireAnswers;
-            delete remote.portrait;
+          // Локальные ответы — самые свежие на этом устройстве. Серверная
+          // копия может быть старше на несколько секунд: облачная отправка
+          // идёт с задержкой, а загрузка профиля — параллельно. Раньше при
+          // равном числе ответов сервер затирал локальные (например, только
+          // что изменённый ответ), и он молча пропадал. Объединяем карты,
+          // отдавая приоритет локальным ответам; серверные добирают вопросы,
+          // которых на этом устройстве ещё нет.
+          const localAnswers = state.profile.questionnaireAnswers || {};
+          const remoteAnswers = remote.questionnaireAnswers || {};
+          if (Object.keys(localAnswers).length || Object.keys(remoteAnswers).length) {
+            const mergedAnswers = mergeQuestionnaireAnswers(localAnswers, remoteAnswers);
+            remote.questionnaireAnswers = mergedAnswers;
+            remote.portrait = buildQuestionnairePortrait(mergedAnswers);
           }
           // Пустые значения с сервера (старые/тестовые анкеты с name:'Вы' и
           // пустым полом) не должны затирать уже введённые данные — иначе после
@@ -2578,6 +2596,9 @@ async function clearLocalUserData() {
   lastAccountId = null;
   liveProfiles = [];
   liveProfilesLoaded = false;
+  // Сохраняем пустое состояние уже после очистки: запись со старым профилем,
+  // которая успела встать в очередь во время выхода, не должна его вернуть.
+  try { await saveState(state, { noEncrypt: true }); } catch { /* ignore */ }
   try {
     localStorage.removeItem(COOKIE_CONSENT_KEY);
     document.cookie.split(';').forEach((c) => {
@@ -3525,6 +3546,13 @@ function getQuestionnaireAnswers(profile = state.profile) {
   return profile?.questionnaireAnswers && typeof profile.questionnaireAnswers === 'object' ? profile.questionnaireAnswers : {};
 }
 
+// Локальные ответы приоритетнее серверных: на этом устройстве они самые
+// свежие, а серверная копия может отставать на несколько секунд. Серверные
+// ответы добавляем только для вопросов, которых локально ещё нет.
+function mergeQuestionnaireAnswers(localAnswers = {}, remoteAnswers = {}) {
+  return { ...(remoteAnswers || {}), ...(localAnswers || {}) };
+}
+
 function getOptionTraits(q, opt) {
   if (opt.traits) return opt.traits;
   if (q.category) return { [q.category]: opt.value };
@@ -3590,7 +3618,7 @@ function setQuestionnaireAnswer(questionId, optionId, { silent } = {}) {
   // Единая точка записи ответов: гость не может редактировать дерево решений.
   if (!accountInfo?.id) {
     if (!silent) requireRegistration('Заполнение анкеты доступно только зарегистрированным пользователям');
-    return;
+    return false;
   }
   const q = ALL_QUESTIONS.find((x) => x.id === questionId);
   let stored = optionId;
@@ -3622,6 +3650,7 @@ function setQuestionnaireAnswer(questionId, optionId, { silent } = {}) {
 
   save();
   if (!silent) renderAll();
+  return true;
 }
 
 function buildQuestionnairePortrait(answers = {}) {
@@ -3904,7 +3933,7 @@ function setQuestionCard() {
   `;
   $('#qnBlock').textContent = q.block || (q.category ? CATEGORY_LABELS[q.category] : '');
   const answers2 = getQuestionnaireAnswers();
-  const count2 = Object.keys(answers2).length;
+  const count2 = Object.values(answers2).filter(Boolean).length;
   $('#qnCounter').textContent = `Вопрос ${qnIndex + 1} из ${ALL_QUESTIONS.length} • отвечено: ${count2}`;
   $('#qnProgressBar').style.width = Math.round(((qnIndex + 1) / ALL_QUESTIONS.length) * 100) + '%';
   const optsStrip = document.getElementById('qnOptsStrip');
@@ -3923,7 +3952,7 @@ function setQuestionCard() {
       saveBtn.addEventListener('click', () => {
         const v = numericAnswerValue(`custom:${input?.value || ''}`);
         if (v == null) return;
-        setQuestionnaireAnswer(q.id, `custom:${v}`, { silent: true });
+        if (!setQuestionnaireAnswer(q.id, `custom:${v}`, { silent: true })) return;
         haptic('light');
         qnGo(1);
       });
@@ -4003,6 +4032,13 @@ function wireQuestionnaire() {
   const card = $('#qnCard');
   if (!card) return;
 
+  const updateQnProgress = () => {
+    const answers = getQuestionnaireAnswers();
+    const count = Object.values(answers).filter(Boolean).length;
+    $('#qnCounter').textContent = `Вопрос ${qnIndex + 1} из ${ALL_QUESTIONS.length} • отвечено: ${count}`;
+    $('#qnProgressBar').style.width = Math.round(((qnIndex + 1) / ALL_QUESTIONS.length) * 100) + '%';
+  };
+
   card.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-qn-opt]');
     if (btn) {
@@ -4010,7 +4046,7 @@ function wireQuestionnaire() {
       const q = ALL_QUESTIONS[qnIndex];
       if (!q || !oid) return;
       if (q.multi) {
-        setQuestionnaireAnswer(q.id, oid, { silent: true });
+        if (!setQuestionnaireAnswer(q.id, oid, { silent: true })) return;
         haptic('light');
         const sel = new Set(multiAnswerList(getQuestionnaireAnswers()[q.id]));
         card.querySelectorAll('[data-qn-opt]').forEach((b) => {
@@ -4018,31 +4054,32 @@ function wireQuestionnaire() {
         });
         const doneBtn = document.getElementById('qnMultiDone');
         if (doneBtn) doneBtn.disabled = !sel.size;
+        updateQnProgress();
         return;
       }
       const prev = getQuestionnaireAnswers()[q.id];
       if (prev === oid) {
-        setQuestionnaireAnswer(q.id, null, { silent: true });
-        btn.classList.remove('selected');
-      } else {
-        setQuestionnaireAnswer(q.id, oid, { silent: true });
+        // Повторный тап по выбранному варианту раньше снимал ответ: при
+        // случайном двойном нажатии вопрос оставался без ответа, хотя
+        // визуально казался выбранным. Оставляем ответ как есть — изменить
+        // его можно, выбрав другой вариант.
         haptic('light');
-        card.querySelectorAll('[data-qn-opt]').forEach((b) => {
-          b.classList.toggle('selected', b.dataset.qnOpt === oid);
-        });
-        setTimeout(() => qnGo(1), 300);
+        return;
       }
-      const answers = getQuestionnaireAnswers();
-      const count = Object.keys(answers).length;
-      $('#qnCounter').textContent = `Вопрос ${qnIndex + 1} из ${ALL_QUESTIONS.length} • отвечено: ${count}`;
-      $('#qnProgressBar').style.width = Math.round(((qnIndex + 1) / ALL_QUESTIONS.length) * 100) + '%';
+      if (!setQuestionnaireAnswer(q.id, oid, { silent: true })) return;
+      haptic('light');
+      card.querySelectorAll('[data-qn-opt]').forEach((b) => {
+        b.classList.toggle('selected', b.dataset.qnOpt === oid);
+      });
+      updateQnProgress();
+      setTimeout(() => qnGo(1), 300);
       return;
     }
     const searchBtn = e.target.closest('[data-qn-search]');
     if (searchBtn) {
       const q = ALL_QUESTIONS[qnIndex];
       if (!q) return;
-      setQuestionnaireAnswer(q.id, `search:${searchBtn.dataset.qnSearch}`, { silent: true });
+      if (!setQuestionnaireAnswer(q.id, `search:${searchBtn.dataset.qnSearch}`, { silent: true })) return;
       haptic('light');
       setTimeout(() => qnGo(1), 300);
     }
@@ -5229,6 +5266,16 @@ function matchesTreeFilters(p, treeFilter = {}) {
       if (!opts.some((optId) => p.city === CITY_ANSWER_TO_KEY[optId])) return false;
       continue;
     }
+    // У вопросов с несколькими вариантами проверяем весь набор, а не только
+    // верхнюю ветку дерева: иначе фильтр по второму выбранному варианту
+    // ошибочно отсекал бы анкету.
+    if (q.multi) {
+      const selected = multiAnswerList(getQuestionnaireAnswers(p)[qid]);
+      if (selected.length) {
+        if (!opts.some((optId) => selected.includes(optId))) return false;
+        continue;
+      }
+    }
     const matches = opts.some((optId) => {
       const opt = questionOptions(q).find((o) => o.id === optId);
       if (!opt) return false;
@@ -5613,7 +5660,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v256</div>
+        <div class="muted app-version">v257</div>
     </div>
   `;
 

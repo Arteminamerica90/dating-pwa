@@ -683,6 +683,7 @@ export const FULL_QUESTIONNAIRE = [
 "block": "ЛИЧНЫЕ ДАННЫЕ И ВНЕШНОСТЬ",
 "question": "Как вы относитесь к макияжу на женщине?",
 "questionF": "Как вы относитесь к макияжу?",
+"multi": true,
 "optionsF": [
 {
 "id": "a",
