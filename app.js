@@ -93,13 +93,16 @@ function loadCookieConsent() {
   } catch { return null; }
 }
 
-function saveCookieConsent(consent) {
-  localStorage.setItem(COOKIE_CONSENT_KEY, JSON.stringify({
+function writeCookieConsent(consent) {
+  const data = {
     necessary: true,
     analytics: !!consent.analytics,
     marketing: !!consent.marketing,
+    version: 2,
     consentAt: new Date().toISOString()
-  }));
+  };
+  try { localStorage.setItem(COOKIE_CONSENT_KEY, JSON.stringify(data)); } catch { /* ignore */ }
+  return data;
 }
 
 function getCookieConsent() {
@@ -109,27 +112,94 @@ function getCookieConsent() {
 function isAnalyticsAllowed() { return getCookieConsent().analytics; }
 function isMarketingAllowed() { return getCookieConsent().marketing; }
 
+// Баннер не должен перекрывать нижнюю навигацию: пока он открыт, добавляем
+// отступ контенту и прячем маленькую ссылку «Настройки cookies».
+function updateCookieBannerLayout() {
+  const banner = document.getElementById('cookieBanner');
+  const open = !!banner && banner.style.display !== 'none';
+  document.body.classList.toggle('cookie-open', open);
+  if (!open) {
+    document.documentElement.style.removeProperty('--cookie-banner-h');
+    return;
+  }
+  // На гостевом экране нижней навигации нет: баннер можно опустить к самому
+  // низу, чтобы он не закрывал кнопки «Войти» и «Зарегистрироваться».
+  const gate = document.getElementById('authGate');
+  const guest = !!gate && !gate.classList.contains('hidden');
+  banner.style.bottom = guest
+    ? 'env(safe-area-inset-bottom)'
+    : 'calc(92px + env(safe-area-inset-bottom))';
+  const apply = () => {
+    const h = Math.ceil(banner.getBoundingClientRect().height);
+    if (h > 0) document.documentElement.style.setProperty('--cookie-banner-h', `${h}px`);
+  };
+  apply();
+  requestAnimationFrame(apply);
+}
+
+function hideCookieBanner() {
+  const banner = document.getElementById('cookieBanner');
+  if (banner) banner.style.display = 'none';
+  updateCookieBannerLayout();
+}
+
+// Фиксирует выбор пользователя. Если он ничего не выбрал, эта функция не
+// вызывается: по умолчанию работают только необходимые cookies, а
+// аналитические и рекламные остаются выключенными.
+function applyCookieChoice(consent, { updateProfile = true } = {}) {
+  const data = writeCookieConsent(consent);
+  hideCookieBanner();
+  if (updateProfile && state?.consent) {
+    // Поле cookies в профиле означает согласие на необязательные cookies и
+    // метрику. Отказ («только необходимые») оставляет его выключенным.
+    state.consent.cookies = !!(data.analytics || data.marketing);
+    save();
+    if (accountInfo?.id) {
+      supabaseSaveConsentsBulk(accountInfo.id, { cookies: state.consent.cookies }).catch(() => {});
+    }
+  }
+  return data;
+}
+
+// Если согласие уже есть в профиле (например, пользователь зарегистрировался
+// на другом устройстве), не показываем баннер повторно.
+function syncCookieBannerWithConsent() {
+  if (loadCookieConsent()) return;
+  if (state.consent?.cookies) {
+    writeCookieConsent({ analytics: true, marketing: false });
+    hideCookieBanner();
+  } else {
+    window.__showCookieBanner?.();
+  }
+}
+
 function initCookieBanner() {
-  const existing = loadCookieConsent();
+  let existing = loadCookieConsent();
+  // Старые аккаунты могли дать согласие в форме регистрации, когда отдельного
+  // cookie-баннера ещё не было. Не заставляем их выбирать заново.
+  if (!existing && state.consent?.cookies) {
+    existing = writeCookieConsent({ analytics: true, marketing: false });
+  }
   const banner = $('#cookieBanner');
   const settingsPanel = $('#cookieSettings');
   const btnSave = $('#cookieSaveSettings');
   const btnShow = $('#cookieShowSettings');
   const btnAcceptAll = $('#cookieAcceptAll');
   const btnAcceptNecessary = $('#cookieAcceptNecessary');
+  const btnClose = $('#cookieClose');
 
   function showBanner() {
     if (banner) banner.style.display = 'block';
     if (settingsPanel) settingsPanel.style.display = 'none';
     if (btnSave) btnSave.style.display = 'none';
     if (btnShow) btnShow.style.display = '';
+    updateCookieBannerLayout();
   }
 
   function hideBanner() {
     if (banner) banner.style.display = 'none';
+    updateCookieBannerLayout();
   }
-
-  if (existing) return;
 
   // Баннер показываем намеренно позже: как только откроется его окно поверх онбординга,
   // иначе модальный диалог (top-layer) его перекрывает до конца заполнения анкеты.
@@ -137,21 +207,24 @@ function initCookieBanner() {
     if (loadCookieConsent()) return;
     showBanner();
   };
+  window.__hideCookieBanner = hideBanner;
 
+  // Обработчики вешаем всегда: «Настройки cookies» должны работать и после
+  // того, как выбор уже сделан. Раньше initCookieBanner выходил раньше и
+  // ссылка внизу переставала открывать баннер.
   btnShow?.addEventListener('click', () => {
     settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
     btnSave.style.display = settingsPanel.style.display === 'none' ? 'none' : '';
     btnShow.style.display = settingsPanel.style.display === 'none' ? '' : 'none';
+    updateCookieBannerLayout();
   });
 
   btnAcceptAll?.addEventListener('click', () => {
-    saveCookieConsent({ necessary: true, analytics: true, marketing: true });
-    hideBanner();
+    applyCookieChoice({ necessary: true, analytics: true, marketing: true });
   });
 
   btnAcceptNecessary?.addEventListener('click', () => {
-    saveCookieConsent({ necessary: true, analytics: false, marketing: false });
-    hideBanner();
+    applyCookieChoice({ necessary: true, analytics: false, marketing: false });
     document.cookie.split(';').forEach((c) => {
       const name = c.split('=')[0].trim();
       if (!COOKIE_NECESSARY.includes(name)) {
@@ -160,11 +233,16 @@ function initCookieBanner() {
     });
   });
 
+  btnClose?.addEventListener('click', () => {
+    // Крестик — это осознанный отказ от необязательных cookies, а не
+    // «продолжить без выбора»: так баннер не возвращается при каждом входе.
+    applyCookieChoice({ necessary: true, analytics: false, marketing: false });
+  });
+
   btnSave?.addEventListener('click', () => {
     const analytics = $('#cookieAnalytics')?.checked || false;
     const marketing = $('#cookieMarketing')?.checked || false;
-    saveCookieConsent({ necessary: true, analytics, marketing });
-    hideBanner();
+    applyCookieChoice({ necessary: true, analytics, marketing });
     if (!analytics || !marketing) {
       document.cookie.split(';').forEach((c) => {
         const name = c.split('=')[0].trim();
@@ -185,7 +263,13 @@ function initCookieBanner() {
     if (settingsPanel) settingsPanel.style.display = 'block';
     if (btnSave) btnSave.style.display = '';
     if (btnShow) btnShow.style.display = 'none';
+    updateCookieBannerLayout();
   });
+
+  if (existing) {
+    hideBanner();
+    return;
+  }
 }
 
 function showReportDialog(targetId, targetType) {
@@ -1276,6 +1360,9 @@ function updateGuestGate() {
   // Шапку с логотипом прячем только когда показан экран регистрации
   // (у него свой логотип); во время определения сессии она видна как заглушка.
   if (topbar) topbar.classList.toggle('hidden', showGate);
+  // Гостевой экран меняет положение cookie-баннера: без навигации он
+  // прижимается к низу. Пересчитываем после того, как экран определился.
+  updateCookieBannerLayout();
 }
 
 function wireAuthGate() {
@@ -1306,6 +1393,7 @@ function syncLegalConsentFromStorage() {
         state.consent.newsletters = true;
         state.consent.cookies = true;
         state.consent.thirdPartyData = true;
+        applyCookieChoice({ necessary: true, analytics: true, marketing: false }, { updateProfile: false });
         save();
         renderAll();
       }
@@ -1678,6 +1766,7 @@ async function syncProfileAfterAuth() {
     await supabasePushProfile();
     await syncLikesFromSupabase();
     renderAll();
+    syncCookieBannerWithConsent();
   } catch (err) {
     console.warn('supabase pull', err?.message);
   }
@@ -1963,6 +2052,7 @@ function wireSettings() {
       state.consent.cookies = true;
       state.consent.thirdPartyData = true;
       save();
+      applyCookieChoice({ necessary: true, analytics: true, marketing: false }, { updateProfile: false });
       if (accountInfo?.id) {
         try {
           await supabaseSaveConsentsBulk(accountInfo.id, {
@@ -2516,6 +2606,9 @@ function wireRegisterDialogOnce() {
       state.consent.cookies = !!cookies;
       state.consent.thirdPartyData = !!tp?.checked;
       save();
+      // Регистрация — тоже осознанный выбор в отношении cookies. Фиксируем его
+      // в том же хранилище, что и баннер, чтобы баннер не висел после входа.
+      applyCookieChoice({ necessary: true, analytics: !!cookies, marketing: false }, { updateProfile: false });
       __regAfterAuth(dlg);
       toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
       // Анкета публикуется на сервер только после согласия на обработку ПДн.
@@ -2931,6 +3024,9 @@ function wireConsentDialogBody() {
     state.consent.thirdPartyData = on;
     state.consent.crossBorder = on;
     save();
+    // Держим cookie-баннер и окно согласий в одном состоянии: «принято всё»
+    // разрешает аналитику, отзыв — оставляет только необходимые cookies.
+    applyCookieChoice({ necessary: true, analytics: on, marketing: false }, { updateProfile: false });
     if (accountInfo?.id) {
       try {
         await supabaseSaveConsentsBulk(accountInfo.id, {
@@ -2988,6 +3084,11 @@ function openRegisterDialog() {
   wireRegisterDialogOnce();
   const title = dlg.querySelector('.dialog-title');
   if (title) title.textContent = 'Регистрация';
+  // Галочка cookie не должна быть проставлена заранее: согласие должно быть
+  // активным. Если пользователь уже выбрал «Принять все» в баннере — отражаем
+  // это, чтобы не спрашивать повторно.
+  const cookieCb = $('#regCookiesConfirm');
+  if (cookieCb) cookieCb.checked = !!getCookieConsent().analytics;
   __regMsg('', 0);
   dlg.showModal();
   setTimeout(() => $('#regEmail')?.focus(), 120);
@@ -2999,6 +3100,8 @@ function openLoginDialog() {
   wireRegisterDialogOnce();
   const title = dlg.querySelector('.dialog-title');
   if (title) title.textContent = 'Вход';
+  const cookieCb = $('#regCookiesConfirm');
+  if (cookieCb) cookieCb.checked = !!getCookieConsent().analytics;
   __regMsg('', 0);
   dlg.showModal();
   setTimeout(() => $('#regEmail')?.focus(), 120);
@@ -5660,7 +5763,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v257</div>
+        <div class="muted app-version">v258</div>
     </div>
   `;
 

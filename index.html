@@ -11,7 +11,7 @@
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://mdabznllmqnhddgwontq.supabase.co" crossorigin />
     <link rel="dns-prefetch" href="https://mdabznllmqnhddgwontq.supabase.co" />
-    <link rel="stylesheet" href="./styles.css?v=257" />
+    <link rel="stylesheet" href="./styles.css?v=258" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script defer src="https://widget.cloudpayments.ru/bundles/cloudpayments.js"></script>
@@ -20,10 +20,11 @@
     <div id="app" class="app">
       <div style="position:fixed;top:0;right:0;z-index:100;background:#e11d48;color:#fff;font-weight:700;font-size:10px;padding:2px 6px;border-radius:0 0 0 8px">18+</div>
 
-      <div id="cookieBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9999;background:rgba(17,24,39,0.97);backdrop-filter:blur(12px);padding:16px;color:#e5e7eb;font-size:13px;border-top:1px solid rgba(255,255,255,0.1)">
+      <div id="cookieBanner" role="dialog" aria-label="Настройки cookies" style="display:none;position:fixed;bottom:calc(92px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(600px, calc(100% - 24px));z-index:1300;background:rgba(17,24,39,0.98);backdrop-filter:blur(12px);padding:14px 16px;color:#e5e7eb;font-size:13px;border:1px solid rgba(255,255,255,0.14);border-radius:16px;max-height:52vh;overflow-y:auto;box-shadow:0 18px 60px rgba(0,0,0,0.35)">
+        <button id="cookieClose" type="button" aria-label="Закрыть и оставить только необходимые cookies" title="Только необходимые" style="position:absolute;top:4px;right:6px;border:0;background:transparent;color:#9ca3af;font-size:24px;line-height:1;padding:4px 8px;cursor:pointer">×</button>
         <div style="max-width:600px;margin:0 auto">
-          <div style="font-weight:700;margin-bottom:6px">🍪 Cookies</div>
-          <div style="margin-bottom:10px;line-height:1.5">Мы используем файлы cookies для улучшения работы сайта. Продолжая использовать сайт, вы соглашаетесь с условиями использования файлов cookies в соответствии с <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:#a78bfa">Политикой конфиденциальности</a>. Вы можете изменить свой выбор в настройках cookies.</div>
+          <div style="font-weight:700;margin-bottom:6px;padding-right:24px">🍪 Cookies</div>
+          <div style="margin-bottom:10px;line-height:1.5">Мы используем cookies. Необходимые — всегда, аналитические и рекламные — только с вашего согласия. Без выбора останутся только необходимые. <a href="./legal.html#privacy" target="_blank" rel="noopener" style="color:#a78bfa">Политика</a> · <a href="javascript:void(0)" id="cookieShowSettings" style="color:#a78bfa">Настроить</a></div>
           <div id="cookieSettings" style="display:none;margin-bottom:12px">
             <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;cursor:pointer">
               <input type="checkbox" checked disabled style="accent-color:#a78bfa;width:16px;height:16px;margin-top:2px">
@@ -49,8 +50,7 @@
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button id="cookieAcceptAll" class="btn" type="button" style="font-size:12px;padding:6px 14px;color:#fff">Принять все</button>
-            <button id="cookieAcceptNecessary" class="btn ghost" type="button" style="font-size:12px;padding:6px 14px;color:#fff">Только необходимые</button>
-            <button id="cookieShowSettings" class="btn ghost" type="button" style="font-size:12px;padding:6px 14px;color:#fff">Настроить</button>
+            <button id="cookieAcceptNecessary" class="btn ghost" type="button" title="Отклонить аналитические и рекламные cookies" style="font-size:12px;padding:6px 14px;color:#fff">Только необходимые</button>
             <button id="cookieSaveSettings" class="btn" type="button" style="display:none;font-size:12px;padding:6px 14px;color:#fff">Сохранить настройки</button>
           </div>
         </div>
@@ -210,8 +210,8 @@
           </div>
           <div class="row reg-consent" style="margin-bottom:4px">
             <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer">
-              <input type="checkbox" id="regCookiesConfirm" checked style="margin-top:3px;width:16px;height:16px;accent-color:var(--brand)" />
-              <span>Я даю согласие на использование файлов cookie и метрики для обеспечения работы и улучшения Сервиса.</span>
+              <input type="checkbox" id="regCookiesConfirm" style="margin-top:3px;width:16px;height:16px;accent-color:var(--brand)" />
+              <span>Необходимые cookies нужны для работы Сервиса. Я разрешаю дополнительно использовать аналитические cookies и метрики (необязательно).</span>
             </label>
           </div>
           <div class="row reg-consent" style="margin-bottom:4px">
@@ -324,7 +324,7 @@
       </div>
     </dialog>
 
-    <a href="javascript:void(0)" id="btnCookieSettings" style="position:fixed;bottom:40px;left:10px;font-size:10px;color:rgba(255,255,255,0.30);text-decoration:none;z-index:900;line-height:1">Настройки cookies</a>
+    <a href="javascript:void(0)" id="btnCookieSettings" style="position:fixed;bottom:calc(96px + env(safe-area-inset-bottom));left:10px;font-size:10px;color:rgba(255,255,255,0.30);text-decoration:none;z-index:1250;line-height:1">Настройки cookies</a>
     <a href="./legal-entity.html" style="position:fixed;bottom:1px;right:2px;font-size:5px;color:rgba(0,0,0,0.04);text-decoration:none;z-index:-1;line-height:1" aria-hidden="true" tabindex="-1">.</a>
 
     <script>
@@ -428,7 +428,7 @@
 
       window.__xystarImportAttempted = true;
       // Cache-bust to avoid stale SW cached JS after rapid iterations.
-      import('./app.js?v=257')
+      import('./app.js?v=258')
         .then(() => {
           window.__xystarImportOk = true;
         })

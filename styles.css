@@ -2990,6 +2990,46 @@ textarea.input {
   opacity: 0.85;
 }
 
+#cookieClose:hover {
+  color: #fff;
+}
+
+/* Пока cookie-баннер открыт, он стоит над нижней навигацией. Добавляем
+   контентный отступ на его высоту, чтобы последние карточки не прятались
+   под баннером, и убираем маленькую ссылку «Настройки cookies» — её роль
+   выполняет кнопка «Настроить» внутри баннера. */
+body.cookie-open .main {
+  padding-bottom: calc(100px + var(--cookie-banner-h, 0px) + env(safe-area-inset-bottom));
+}
+
+/* На гостевом экране нижней навигации нет: баннер прижат к низу, а контент
+   поднимается на его высоту, чтобы кнопки «Войти» и «Зарегистрироваться»
+   оставались доступными. */
+body.cookie-open .auth-gate {
+  padding-bottom: calc(56px + var(--cookie-banner-h, 0px) + env(safe-area-inset-bottom));
+}
+
+/* На коротких экранах (iPhone SE и подобные) места мало: убираем подзаголовок
+   и уменьшаем логотип, чтобы кнопки входа оставались выше баннера. */
+@media (max-height: 640px) {
+  body.cookie-open .auth-gate {
+    gap: 8px;
+    padding-top: 12px;
+    padding-bottom: calc(16px + var(--cookie-banner-h, 0px) + env(safe-area-inset-bottom));
+  }
+  body.cookie-open .auth-gate-logo {
+    width: 56px;
+    height: 56px;
+  }
+  body.cookie-open .auth-gate-sub {
+    display: none;
+  }
+}
+
+body.cookie-open #btnCookieSettings {
+  display: none;
+}
+
 /* Единое скругление: фильтры, поля и карточки — radius-md.
    У .btn своё iOS-скругление 14px, круги (аватары, фото, tbtn,
    badge/пилюли слайдера) остаются круглыми. */
