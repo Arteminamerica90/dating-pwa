@@ -314,7 +314,7 @@ function initCookieBanner() {
     }
   });
 
-  $('#btnCookieSettings')?.addEventListener('click', () => {
+  function openCookieSettings() {
     const consent = getCookieConsent();
     const analyticsCb = $('#cookieAnalytics');
     const marketingCb = $('#cookieMarketing');
@@ -326,7 +326,11 @@ function initCookieBanner() {
     if (btnSave) btnSave.style.display = '';
     if (btnShow) btnShow.style.display = 'none';
     updateCookieBannerLayout();
-  });
+  }
+
+  $('#btnCookieSettings')?.addEventListener('click', openCookieSettings);
+  // Этой же функцией пользуется строка «Cookies» в окне аккаунта.
+  window.__openCookieSettings = openCookieSettings;
 
   if (existing) {
     hideBanner();
@@ -1358,7 +1362,6 @@ async function refreshAccountInfo() {
     lastAccountId = null;
   }
   await refreshSubscription();
-  renderAccountBadge();
 }
 
 async function refreshSubscription() {
@@ -1386,24 +1389,6 @@ function checkMonthlyReset() {
   if (!last || last.getMonth() !== now.getMonth() || last.getFullYear() !== now.getFullYear()) {
     mySubscription.likesThisMonth = 0;
     mySubscription.likesResetAt = now.toISOString();
-  }
-}
-
-function renderAccountBadge() {
-  const el = document.getElementById('accountBadge');
-  if (!el) return;
-  if (!isSupabaseConfigured()) {
-    el.innerHTML = `<span class="muted">Бэкенд не настроен</span>`;
-    return;
-  }
-  if (accountInfo?.email) {
-    el.className = 'account-badge signed';
-    el.innerHTML = `
-      <span class="account-badge-info"><b>${escapeHtml(accountInfo.email)}</b></span>`;
-  } else {
-    el.className = 'account-badge';
-    el.innerHTML = `
-      <span class="muted">Вход не выполнен</span>`;
   }
 }
 
@@ -2326,7 +2311,6 @@ function renderAll() {
   renderDating();
   renderStats();
   // renderCircle(); // скрыто — вернём позже
-  renderAccountBadge();
   syncSettingsUi();
   updateGuestGate();
 }
@@ -2818,6 +2802,14 @@ function wireAccountDialogBody() {
     }
   });
 
+  // Настройки cookies из окна аккаунта: закрываем аккаунт и открываем
+  // cookie-баннер сразу на панели настроек.
+  $('#btnAccountCookieSettings')?.addEventListener('click', () => {
+    haptic('light');
+    $('#dlgAccount')?.close();
+    window.__openCookieSettings?.();
+  });
+
   $('#btnExportData')?.addEventListener('click', (e) => {
     e.preventDefault();
     // 152-ФЗ ст. 14 п. 7: субъект вправе получить копию своих ПДн.
@@ -2975,32 +2967,92 @@ async function requestAccountDelete(sbToken) {
 function renderAccountDialogBody() {
   const body = $('#accountDialogBody');
   if (!body) return;
-  body.innerHTML = accountInfo ? `
-    <div class="account-badge" id="accountBadge"></div>
-    <div class="row-inline" style="margin-top:12px;justify-content:center" id="accountSignedIn">
-      <button id="btnChangePassword" class="btn" type="button">Сменить пароль</button>
-      <button id="btnExportData" class="btn ghost" type="button" title="Скачать копию своих персональных данных (152-ФЗ, ст. 14)">Экспорт данных</button>
-      <button id="btnAccountLogout" class="btn danger" type="button">Выход</button>
-    </div>
-    <div class="row" id="changePasswordBox" hidden style="margin-top:12px">
-      <label class="label">Новый пароль</label>
-      <input id="newPassword" class="input" type="password" autocomplete="new-password" placeholder="минимум 6 символов" />
-      <div class="row-inline" style="margin-top:8px">
-        <button id="btnChangePasswordSave" class="btn" type="button">Сохранить пароль</button>
-        <button id="btnChangePasswordCancel" class="btn ghost" type="button">Отмена</button>
+  if (accountInfo) {
+    const email = String(accountInfo.email || '').trim();
+    const initial = (email[0] || '?').toUpperCase();
+    const cookiesOn = !!(getCookieConsent().analytics || getCookieConsent().marketing);
+    body.innerHTML = `
+      <div class="account-panel">
+        <div class="account-identity">
+          <div class="account-avatar" aria-hidden="true">${escapeHtml(initial)}</div>
+          <div class="account-identity-main">
+            <div class="account-identity-label">Вы вошли как</div>
+            <div class="account-identity-email">${escapeHtml(email || 'Аккаунт')}</div>
+            <div class="account-identity-status">Аккаунт активен</div>
+          </div>
+        </div>
+
+        <section class="account-section">
+          <div class="account-section-title">Безопасность</div>
+          <div class="account-row">
+            <div class="account-row-main">
+              <div class="account-row-title">Пароль</div>
+              <div class="account-row-sub">Сменить пароль для входа в аккаунт</div>
+            </div>
+            <button id="btnChangePassword" class="btn ghost account-action" type="button">Сменить</button>
+          </div>
+          <div id="changePasswordBox" class="account-password-box" hidden>
+            <label class="label" for="newPassword">Новый пароль</label>
+            <input id="newPassword" class="input" type="password" autocomplete="new-password" placeholder="Минимум 6 символов" />
+            <div class="account-password-hint">Минимум 6 символов. Пароль используется для входа по email.</div>
+            <div class="account-password-actions">
+              <button id="btnChangePasswordSave" class="btn" type="button">Сохранить пароль</button>
+              <button id="btnChangePasswordCancel" class="btn ghost" type="button">Отмена</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="account-section">
+          <div class="account-section-title">Данные и конфиденциальность</div>
+          <div class="account-row">
+            <div class="account-row-main">
+              <div class="account-row-title">Экспорт данных</div>
+              <div class="account-row-sub">Скачать копию анкеты, переписок и согласий (152-ФЗ, ст. 14)</div>
+            </div>
+            <button id="btnExportData" class="btn ghost account-action" type="button">Скачать</button>
+          </div>
+          <div class="account-row">
+            <div class="account-row-main">
+              <div class="account-row-title">Cookies</div>
+              <div class="account-row-sub">${cookiesOn ? 'Аналитические и рекламные cookies включены' : 'Только необходимые cookies'}</div>
+            </div>
+            <button id="btnAccountCookieSettings" class="btn ghost account-action" type="button">Настроить</button>
+          </div>
+        </section>
+
+        <section class="account-section">
+          <div class="account-section-title">Сессия</div>
+          <div class="account-row">
+            <div class="account-row-main">
+              <div class="account-row-title">Выход</div>
+              <div class="account-row-sub">Завершить сеанс на этом устройстве</div>
+            </div>
+            <button id="btnAccountLogout" class="btn ghost account-action" type="button">Выйти</button>
+          </div>
+        </section>
+
+        <section class="account-section account-danger">
+          <div class="account-section-title">Опасная зона</div>
+          <div class="account-row">
+            <div class="account-row-main">
+              <div class="account-row-title">Удалить аккаунт</div>
+              <div class="account-row-sub">Уничтожение всех данных, включая анкету, переписки и согласия (152-ФЗ, ст. 21). Восстановление невозможно.</div>
+            </div>
+            <button id="btnDeleteAccount" class="btn danger account-action" type="button">Удалить</button>
+          </div>
+        </section>
       </div>
-    </div>
-    <div style="margin-top:18px;text-align:center">
-      <button id="btnDeleteAccount" class="btn danger" type="button">Удалить аккаунт</button>
-      <div class="muted" style="font-size:12px;margin-top:6px">Уничтожение всех данных, включая анкету, переписки и согласия (152-ФЗ, ст. 21). Восстановление невозможно.</div>
-    </div>
-  ` : `
-    <div class="muted" style="text-align:center;margin-bottom:12px;font-size:13px">Анкета, переписка и оплата привязаны к вашему email</div>
-    <div style="text-align:center">
-      <button id="btnOpenRegister" class="btn" type="button" style="max-width:360px">🔑 Войти / Зарегистрироваться</button>
-    </div>
-  `;
-  renderAccountBadge();
+    `;
+  } else {
+    body.innerHTML = `
+      <div class="account-guest">
+        <div class="account-guest-icon" aria-hidden="true">🔑</div>
+        <div class="account-guest-title">Вход в аккаунт</div>
+        <div class="account-guest-sub">Анкета, переписка и оплата привязаны к вашему email. Войдите, чтобы продолжить с этого устройства.</div>
+        <button id="btnOpenRegister" class="btn" type="button" style="max-width:360px;width:100%">Войти / Зарегистрироваться</button>
+      </div>
+    `;
+  }
   wireAccountDialogBody();
   $('#btnOpenRegister')?.addEventListener('click', () => {
     haptic('light');
@@ -5829,7 +5881,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v259</div>
+        <div class="muted app-version">v260</div>
     </div>
   `;
 
