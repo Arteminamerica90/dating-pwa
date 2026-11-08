@@ -59,6 +59,20 @@ html, body {
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
   -webkit-tap-highlight-color: transparent;
   line-height: 1.35;
+  /* iOS Safari не должен сам увеличивать текст при открытии страницы. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Поля ввода не наследуют шрифт страницы и по умолчанию получают 13.3px
+   Arial. На iOS Safari фокус на поле меньше 16px принудительно зумит всю
+   страницу — из-за этого приложение выглядит увеличенным. Держим поля
+   одного размера с интерфейсом и не меньше 16px. */
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: 16px;
 }
 
 a { color: inherit; }
@@ -2691,7 +2705,7 @@ dialog.net-gate::backdrop {
 .qn-num-input { font-size: 17px; font-weight: 650; text-align: left; }
 .qn-num .btn { align-self: flex-start; min-width: 160px; }
 .qn-search { display: flex; flex-direction: column; gap: 10px; padding: 2px 0 6px; }
-.qn-search-input { font-size: 15px; }
+.qn-search-input { font-size: 16px; }
 .qn-search-results { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow: auto; }
 .qn-search-item {
   text-align: left;

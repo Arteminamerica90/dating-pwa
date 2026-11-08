@@ -352,7 +352,7 @@ function showReportDialog(targetId, targetType) {
       ${reasons.map((r, i) => `<button class="btn ghost report-reason" type="button" data-reason="${r}" style="text-align:left;font-size:13px">${r}</button>`).join('')}
     </div>
     <div style="margin-top:10px">
-      <input id="txtReportDetails" class="input" placeholder="Детали (необязательно)" maxlength="500" style="width:100%;box-sizing:border-box;font-size:13px" />
+      <input id="txtReportDetails" class="input" placeholder="Детали (необязательно)" maxlength="500" style="width:100%;box-sizing:border-box;font-size:16px" />
     </div>
     <div style="text-align:center;margin-top:12px"><button class="btn ghost" id="btnReportCancel" type="button">Отмена</button></div>
   </div>`;
@@ -5881,7 +5881,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v260</div>
+        <div class="muted app-version">v261</div>
     </div>
   `;
 
