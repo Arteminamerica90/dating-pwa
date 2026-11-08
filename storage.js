@@ -50,6 +50,8 @@ export function defaultState() {
       personalData: false,
       newsletters: false,
       cookies: false,
+      cookiesDecided: false,
+      cookiesSource: '',
       specialCategories: false,
       profiling: true,
       thirdPartyData: false
@@ -227,7 +229,7 @@ async function saveStateNow(state, { noEncrypt } = {}) {
         photos: st.profile?.photos || [],
         onboarded: !!st.profile?.onboarded
       },
-      consent: st.consent || { asked: true, geo: false, steps: false, agreement: false, personalData: false, newsletters: false, cookies: false },
+      consent: st.consent || { asked: true, geo: false, steps: false, agreement: false, personalData: false, newsletters: false, cookies: false, cookiesDecided: false, cookiesSource: '' },
       ui: st.ui || { homePanel: 'feed', activeChatId: null, eventsView: 'places' },
       circle: st.circle || { friends: [], recommendations: [] },
       encryption: { enabled: true },

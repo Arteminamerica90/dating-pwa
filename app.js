@@ -10,7 +10,7 @@ import {
   saveState,
   unlockWithPassphrase,
   todayKey
-} from './storage.js?v=71';
+} from './storage.js?v=72';
 import { formatLatLon, guessCityKeyFromCoords, haversineKm } from './geo.js?v=70';
 import { StepCounter } from './steps.js?v=70';
 import { decryptJson, encryptJson } from './encryption.js?v=70';
@@ -99,6 +99,11 @@ function writeCookieConsent(consent) {
     analytics: !!consent.analytics,
     marketing: !!consent.marketing,
     version: 2,
+    // source помогает отличить осознанный выбор от безопасного значения по
+    // умолчанию, если баннер проигнорировали. explicit=false означает, что
+    // согласия на необязательные cookies нет — только необходимые.
+    source: consent.source || 'banner',
+    explicit: consent.explicit !== false,
     consentAt: new Date().toISOString()
   };
   try { localStorage.setItem(COOKIE_CONSENT_KEY, JSON.stringify(data)); } catch { /* ignore */ }
@@ -111,6 +116,43 @@ function getCookieConsent() {
 
 function isAnalyticsAllowed() { return getCookieConsent().analytics; }
 function isMarketingAllowed() { return getCookieConsent().marketing; }
+
+// Сценарий «баннер проигнорировали»: через 30 секунд продолжаем работу с
+// безопасным значением по умолчанию — только необходимые cookies. Это не
+// согласие на аналитику, а отказ от необязательных cookies; выбор можно
+// изменить в «Настройках cookies». Пока открыт модальный диалог (онбординг,
+// вход, согласия), баннер перекрыт top-layer — ждём его закрытия.
+const COOKIE_NO_ACTION_MS = 30000;
+let cookieNoActionTimer = null;
+
+function clearCookieNoActionTimer() {
+  if (cookieNoActionTimer) {
+    clearTimeout(cookieNoActionTimer);
+    cookieNoActionTimer = null;
+  }
+}
+
+function scheduleCookieNoActionDefault(delay = COOKIE_NO_ACTION_MS) {
+  clearCookieNoActionTimer();
+  if (loadCookieConsent()) return;
+  const configured = Number(window.__cookieNoActionMs);
+  const wait = configured > 0 ? configured : delay;
+  const tick = () => {
+    cookieNoActionTimer = null;
+    if (loadCookieConsent()) return;
+    const banner = document.getElementById('cookieBanner');
+    if (!banner || banner.style.display === 'none') return;
+    if (document.querySelector('dialog[open]')) {
+      cookieNoActionTimer = setTimeout(tick, 5000);
+      return;
+    }
+    applyCookieChoice(
+      { necessary: true, analytics: false, marketing: false },
+      { source: 'no_action', explicit: false }
+    );
+  };
+  cookieNoActionTimer = setTimeout(tick, wait);
+}
 
 // Баннер не должен перекрывать нижнюю навигацию: пока он открыт, добавляем
 // отступ контенту и прячем маленькую ссылку «Настройки cookies».
@@ -138,35 +180,43 @@ function updateCookieBannerLayout() {
 }
 
 function hideCookieBanner() {
+  clearCookieNoActionTimer();
   const banner = document.getElementById('cookieBanner');
   if (banner) banner.style.display = 'none';
   updateCookieBannerLayout();
 }
 
-// Фиксирует выбор пользователя. Если он ничего не выбрал, эта функция не
-// вызывается: по умолчанию работают только необходимые cookies, а
-// аналитические и рекламные остаются выключенными.
-function applyCookieChoice(consent, { updateProfile = true } = {}) {
-  const data = writeCookieConsent(consent);
+// Фиксирует выбор пользователя. Если он ничего не выбрал, срабатывает
+// scheduleCookieNoActionDefault(): фиксируется безопасное «только необходимые».
+function applyCookieChoice(consent, { updateProfile = true, source = 'banner', explicit = true } = {}) {
+  const data = writeCookieConsent({ ...consent, source, explicit });
   hideCookieBanner();
-  if (updateProfile && state?.consent) {
+  if (state?.consent) {
     // Поле cookies в профиле означает согласие на необязательные cookies и
     // метрику. Отказ («только необходимые») оставляет его выключенным.
-    state.consent.cookies = !!(data.analytics || data.marketing);
+    if (updateProfile) state.consent.cookies = !!(data.analytics || data.marketing);
+    state.consent.cookiesDecided = true;
+    state.consent.cookiesSource = source;
     save();
-    if (accountInfo?.id) {
+    if (updateProfile && accountInfo?.id) {
       supabaseSaveConsentsBulk(accountInfo.id, { cookies: state.consent.cookies }).catch(() => {});
     }
   }
   return data;
 }
 
-// Если согласие уже есть в профиле (например, пользователь зарегистрировался
-// на другом устройстве), не показываем баннер повторно.
+// Если решение по cookies уже есть в профиле (например, пользователь
+// зарегистрировался на другом устройстве), не показываем баннер повторно.
+// Это работает и для отказа: cookiesDecided=true, cookies=false.
 function syncCookieBannerWithConsent() {
   if (loadCookieConsent()) return;
-  if (state.consent?.cookies) {
-    writeCookieConsent({ analytics: true, marketing: false });
+  if (state.consent?.cookiesDecided || state.consent?.cookies) {
+    writeCookieConsent({
+      analytics: !!state.consent.cookies,
+      marketing: false,
+      source: state.consent.cookiesSource || 'profile',
+      explicit: state.consent.cookiesSource !== 'no_action'
+    });
     hideCookieBanner();
   } else {
     window.__showCookieBanner?.();
@@ -176,9 +226,16 @@ function syncCookieBannerWithConsent() {
 function initCookieBanner() {
   let existing = loadCookieConsent();
   // Старые аккаунты могли дать согласие в форме регистрации, когда отдельного
-  // cookie-баннера ещё не было. Не заставляем их выбирать заново.
-  if (!existing && state.consent?.cookies) {
-    existing = writeCookieConsent({ analytics: true, marketing: false });
+  // cookie-баннера ещё не было. Не заставляем их выбирать заново. Если решение
+  // уже было принято (в том числе безопасное «только необходимые»), баннер
+  // тоже не показываем.
+  if (!existing && (state.consent?.cookiesDecided || state.consent?.cookies)) {
+    existing = writeCookieConsent({
+      analytics: !!state.consent.cookies,
+      marketing: false,
+      source: state.consent.cookiesSource || 'profile',
+      explicit: state.consent.cookiesSource !== 'no_action'
+    });
   }
   const banner = $('#cookieBanner');
   const settingsPanel = $('#cookieSettings');
@@ -194,9 +251,11 @@ function initCookieBanner() {
     if (btnSave) btnSave.style.display = 'none';
     if (btnShow) btnShow.style.display = '';
     updateCookieBannerLayout();
+    scheduleCookieNoActionDefault();
   }
 
   function hideBanner() {
+    clearCookieNoActionTimer();
     if (banner) banner.style.display = 'none';
     updateCookieBannerLayout();
   }
@@ -213,6 +272,8 @@ function initCookieBanner() {
   // того, как выбор уже сделан. Раньше initCookieBanner выходил раньше и
   // ссылка внизу переставала открывать баннер.
   btnShow?.addEventListener('click', () => {
+    // Пользователь открыл настройки — не фиксируем выбор за него по таймеру.
+    clearCookieNoActionTimer();
     settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
     btnSave.style.display = settingsPanel.style.display === 'none' ? 'none' : '';
     btnShow.style.display = settingsPanel.style.display === 'none' ? '' : 'none';
@@ -260,6 +321,7 @@ function initCookieBanner() {
     if (analyticsCb) analyticsCb.checked = consent.analytics;
     if (marketingCb) marketingCb.checked = consent.marketing;
     showBanner();
+    clearCookieNoActionTimer();
     if (settingsPanel) settingsPanel.style.display = 'block';
     if (btnSave) btnSave.style.display = '';
     if (btnShow) btnShow.style.display = 'none';
@@ -1351,15 +1413,11 @@ function updateGuestGate() {
   const signedIn = !!accountInfo?.id;
   const showGate = authResolved && !signedIn;
   const gate = document.getElementById('authGate');
-  const topbar = document.getElementById('appTopbar');
   const tabs = document.querySelector('.tabs');
   const main = document.querySelector('.main');
   if (gate) gate.classList.toggle('hidden', !showGate);
   if (tabs) tabs.classList.toggle('hidden', !signedIn);
   if (main) main.classList.toggle('hidden', !signedIn);
-  // Шапку с логотипом прячем только когда показан экран регистрации
-  // (у него свой логотип); во время определения сессии она видна как заглушка.
-  if (topbar) topbar.classList.toggle('hidden', showGate);
   // Гостевой экран меняет положение cookie-баннера: без навигации он
   // прижимается к низу. Пересчитываем после того, как экран определился.
   updateCookieBannerLayout();
@@ -1393,7 +1451,7 @@ function syncLegalConsentFromStorage() {
         state.consent.newsletters = true;
         state.consent.cookies = true;
         state.consent.thirdPartyData = true;
-        applyCookieChoice({ necessary: true, analytics: true, marketing: false }, { updateProfile: false });
+        applyCookieChoice({ necessary: true, analytics: true, marketing: false }, { updateProfile: false, source: 'legal' });
         save();
         renderAll();
       }
@@ -1658,6 +1716,8 @@ async function supabasePushProfile() {
         personalData: !!state.consent?.personalData,
         newsletters: !!state.consent?.newsletters,
         cookies: !!state.consent?.cookies,
+        cookiesDecided: !!state.consent?.cookiesDecided,
+        cookiesSource: state.consent?.cookiesSource || '',
         thirdPartyData: !!state.consent?.thirdPartyData
       },
       updated_at: new Date().toISOString()
@@ -1744,6 +1804,12 @@ async function syncProfileAfterAuth() {
         state.consent.newsletters = !!payload.consent.newsletters;
         state.consent.cookies = !!payload.consent.cookies;
         state.consent.thirdPartyData = !!payload.consent.thirdPartyData;
+        if (typeof payload.consent.cookiesDecided === 'boolean') {
+          state.consent.cookiesDecided = payload.consent.cookiesDecided;
+        }
+        if (typeof payload.consent.cookiesSource === 'string') {
+          state.consent.cookiesSource = payload.consent.cookiesSource;
+        }
       }
     }
     const consentRow = await supabaseGetConsents(user.id);
@@ -2052,7 +2118,7 @@ function wireSettings() {
       state.consent.cookies = true;
       state.consent.thirdPartyData = true;
       save();
-      applyCookieChoice({ necessary: true, analytics: true, marketing: false }, { updateProfile: false });
+      applyCookieChoice({ necessary: true, analytics: true, marketing: false }, { updateProfile: false, source: 'legal' });
       if (accountInfo?.id) {
         try {
           await supabaseSaveConsentsBulk(accountInfo.id, {
@@ -2608,7 +2674,7 @@ function wireRegisterDialogOnce() {
       save();
       // Регистрация — тоже осознанный выбор в отношении cookies. Фиксируем его
       // в том же хранилище, что и баннер, чтобы баннер не висел после входа.
-      applyCookieChoice({ necessary: true, analytics: !!cookies, marketing: false }, { updateProfile: false });
+      applyCookieChoice({ necessary: true, analytics: !!cookies, marketing: false }, { updateProfile: false, source: 'registration' });
       __regAfterAuth(dlg);
       toast(reg.session ? 'Регистрация ок — вход выполнен' : 'Регистрация ок — проверьте почту и подтвердите адрес');
       // Анкета публикуется на сервер только после согласия на обработку ПДн.
@@ -3026,7 +3092,7 @@ function wireConsentDialogBody() {
     save();
     // Держим cookie-баннер и окно согласий в одном состоянии: «принято всё»
     // разрешает аналитику, отзыв — оставляет только необходимые cookies.
-    applyCookieChoice({ necessary: true, analytics: on, marketing: false }, { updateProfile: false });
+    applyCookieChoice({ necessary: true, analytics: on, marketing: false }, { updateProfile: false, source: 'consent_dialog' });
     if (accountInfo?.id) {
       try {
         await supabaseSaveConsentsBulk(accountInfo.id, {
@@ -5763,7 +5829,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v258</div>
+        <div class="muted app-version">v259</div>
     </div>
   `;
 
