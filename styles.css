@@ -2911,12 +2911,92 @@ dialog.net-gate::backdrop {
   font-size: 13px;
 }
 
-.account-danger {
-  border-color: rgba(225, 29, 72, 0.22);
-  background: rgba(225, 29, 72, 0.045);
+/* Удаление аккаунта — обычный пункт в «Данных и конфиденциальности»,
+   без отдельной пугающей секции. Красным выделены только смысловые
+   акценты, а не вся карточка. */
+.account-row-danger {
+  border-top: 1px solid rgba(225, 29, 72, 0.18);
 }
-.account-danger .account-section-title { color: #be123c; }
-.account-danger .account-row-sub { color: #9f1239; }
+.account-row-danger .account-row-title { color: #be123c; }
+.account-row-danger .account-row-sub { color: #9f1239; }
+
+/* Встроенные настройки cookies внутри окна аккаунта: копия экрана из
+   cookie-баннера, но без ухода с текущего экрана. */
+.account-cookie-panel {
+  margin: 2px 0 12px;
+  padding: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+}
+.account-cookie-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.account-cookie-title { font-size: 14px; font-weight: 750; }
+.account-cookie-more {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--brand);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.account-cookie-more:hover { text-decoration: underline; }
+.account-cookie-intro {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.account-cookie-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+}
+.account-cookie-option input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--brand);
+}
+.account-cookie-option > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.account-cookie-option-title { font-size: 13px; font-weight: 650; }
+.account-cookie-option-sub {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.account-cookie-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.account-cookie-actions .btn {
+  min-height: 38px;
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: 12px;
+}
+.account-cookie-msg {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #047857;
+}
 
 .account-guest {
   display: flex;

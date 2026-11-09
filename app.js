@@ -205,6 +205,17 @@ function applyCookieChoice(consent, { updateProfile = true, source = 'banner', e
   return data;
 }
 
+// Удаляем все необязательные cookies, когда пользователь отключает
+// аналитику или рекламу. Необходимые cookies не трогаем.
+function clearNonNecessaryCookies() {
+  document.cookie.split(';').forEach((c) => {
+    const name = c.split('=')[0].trim();
+    if (!COOKIE_NECESSARY.includes(name)) {
+      document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+    }
+  });
+}
+
 // Если решение по cookies уже есть в профиле (например, пользователь
 // зарегистрировался на другом устройстве), не показываем баннер повторно.
 // Это работает и для отказа: cookiesDecided=true, cookies=false.
@@ -286,12 +297,7 @@ function initCookieBanner() {
 
   btnAcceptNecessary?.addEventListener('click', () => {
     applyCookieChoice({ necessary: true, analytics: false, marketing: false });
-    document.cookie.split(';').forEach((c) => {
-      const name = c.split('=')[0].trim();
-      if (!COOKIE_NECESSARY.includes(name)) {
-        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-      }
-    });
+    clearNonNecessaryCookies();
   });
 
   btnClose?.addEventListener('click', () => {
@@ -304,14 +310,7 @@ function initCookieBanner() {
     const analytics = $('#cookieAnalytics')?.checked || false;
     const marketing = $('#cookieMarketing')?.checked || false;
     applyCookieChoice({ necessary: true, analytics, marketing });
-    if (!analytics || !marketing) {
-      document.cookie.split(';').forEach((c) => {
-        const name = c.split('=')[0].trim();
-        if (!COOKIE_NECESSARY.includes(name)) {
-          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-        }
-      });
-    }
+    if (!analytics || !marketing) clearNonNecessaryCookies();
   });
 
   function openCookieSettings() {
@@ -2802,12 +2801,78 @@ function wireAccountDialogBody() {
     }
   });
 
-  // Настройки cookies из окна аккаунта: закрываем аккаунт и открываем
-  // cookie-баннер сразу на панели настроек.
-  $('#btnAccountCookieSettings')?.addEventListener('click', () => {
+  // Настройки cookies из окна аккаунта раскрываются прямо здесь, не уводя
+  // пользователя с экрана. Это копия панели из cookie-баннера с теми же
+  // категориями и быстрыми действиями.
+  const cookiePanel = $('#accountCookiePanel');
+  const cookieToggle = $('#btnAccountCookieSettings');
+
+  const syncAccountCookieInputs = () => {
+    const consent = getCookieConsent();
+    const analytics = $('#accountCookieAnalytics');
+    const marketing = $('#accountCookieMarketing');
+    if (analytics) analytics.checked = !!consent.analytics;
+    if (marketing) marketing.checked = !!consent.marketing;
+  };
+
+  const updateAccountCookieStatus = (data) => {
+    const status = $('#accountCookieStatus');
+    if (!status) return;
+    status.textContent = data.analytics && data.marketing
+      ? 'Аналитические и рекламные cookies включены'
+      : data.analytics
+        ? 'Аналитические cookies включены'
+        : data.marketing
+          ? 'Рекламные cookies включены'
+          : 'Только необходимые cookies';
+  };
+
+  let accountCookieMsgTimer = null;
+  const showAccountCookieMsg = () => {
+    const msg = $('#accountCookieMsg');
+    if (!msg) return;
+    msg.hidden = false;
+    clearTimeout(accountCookieMsgTimer);
+    accountCookieMsgTimer = setTimeout(() => { msg.hidden = true; }, 2500);
+  };
+
+  const applyAccountCookieChoice = (consent) => {
+    const data = applyCookieChoice(consent, { source: 'account' });
+    syncAccountCookieInputs();
+    updateAccountCookieStatus(data);
+    showAccountCookieMsg();
+  };
+
+  cookieToggle?.addEventListener('click', () => {
     haptic('light');
-    $('#dlgAccount')?.close();
-    window.__openCookieSettings?.();
+    if (!cookiePanel) return;
+    const willOpen = cookiePanel.hidden;
+    cookiePanel.hidden = !willOpen;
+    cookieToggle.setAttribute('aria-expanded', String(willOpen));
+    cookieToggle.textContent = willOpen ? 'Свернуть' : 'Настроить';
+    if (willOpen) {
+      syncAccountCookieInputs();
+      cookiePanel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  });
+
+  $('#accountCookieAcceptAll')?.addEventListener('click', () => {
+    haptic('light');
+    applyAccountCookieChoice({ necessary: true, analytics: true, marketing: true });
+  });
+
+  $('#accountCookieAcceptNecessary')?.addEventListener('click', () => {
+    haptic('light');
+    applyAccountCookieChoice({ necessary: true, analytics: false, marketing: false });
+    clearNonNecessaryCookies();
+  });
+
+  $('#accountCookieSave')?.addEventListener('click', () => {
+    haptic('light');
+    const analytics = !!$('#accountCookieAnalytics')?.checked;
+    const marketing = !!$('#accountCookieMarketing')?.checked;
+    applyAccountCookieChoice({ necessary: true, analytics, marketing });
+    if (!analytics || !marketing) clearNonNecessaryCookies();
   });
 
   $('#btnExportData')?.addEventListener('click', (e) => {
@@ -2851,7 +2916,7 @@ function wireAccountDialogBody() {
   $('#btnDeleteAccount')?.addEventListener('click', async (e) => {
     e.preventDefault();
     haptic('light');
-    if (!confirm('Удалить аккаунт? \n\nБудут уничтожены анкета, переписки, согласия и все персональные данные. Восстановление невозможно.')) return;
+    if (!confirm('Удалить аккаунт? \n\nАккаунт, анкета и переписки будут удалены. Персональные данные уничтожаются в течение 30 календарных дней, за исключением случаев, предусмотренных законодательством РФ. Восстановление невозможно.')) return;
     const btn = $('#btnDeleteAccount');
     runWithButton($('#btnDeleteAccount'), 'Удалить аккаунт', async () => {
       try {
@@ -2969,12 +3034,23 @@ function renderAccountDialogBody() {
   if (!body) return;
   if (accountInfo) {
     const email = String(accountInfo.email || '').trim();
-    const initial = (email[0] || '?').toUpperCase();
-    const cookiesOn = !!(getCookieConsent().analytics || getCookieConsent().marketing);
+    const cookieConsent = getCookieConsent();
+    const cookieStatus = cookieConsent.analytics && cookieConsent.marketing
+      ? 'Аналитические и рекламные cookies включены'
+      : cookieConsent.analytics
+        ? 'Аналитические cookies включены'
+        : cookieConsent.marketing
+          ? 'Рекламные cookies включены'
+          : 'Только необходимые cookies';
     body.innerHTML = `
       <div class="account-panel">
         <div class="account-identity">
-          <div class="account-avatar" aria-hidden="true">${escapeHtml(initial)}</div>
+          <div class="account-avatar" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="8" r="3.5"></circle>
+              <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"></path>
+            </svg>
+          </div>
           <div class="account-identity-main">
             <div class="account-identity-label">Вы вошли как</div>
             <div class="account-identity-email">${escapeHtml(email || 'Аккаунт')}</div>
@@ -3014,9 +3090,50 @@ function renderAccountDialogBody() {
           <div class="account-row">
             <div class="account-row-main">
               <div class="account-row-title">Cookies</div>
-              <div class="account-row-sub">${cookiesOn ? 'Аналитические и рекламные cookies включены' : 'Только необходимые cookies'}</div>
+              <div class="account-row-sub" id="accountCookieStatus">${cookieStatus}</div>
             </div>
-            <button id="btnAccountCookieSettings" class="btn ghost account-action" type="button">Настроить</button>
+            <button id="btnAccountCookieSettings" class="btn ghost account-action" type="button" aria-expanded="false" aria-controls="accountCookiePanel">Настроить</button>
+          </div>
+          <div id="accountCookiePanel" class="account-cookie-panel" hidden>
+            <div class="account-cookie-head">
+              <div class="account-cookie-title">Настройки cookies</div>
+              <a class="account-cookie-more" href="./legal.html#cookies" target="_blank" rel="noopener">Подробнее</a>
+            </div>
+            <div class="account-cookie-intro">Необходимые cookies работают всегда. Аналитические и рекламные — только с вашего согласия.</div>
+            <label class="account-cookie-option">
+              <input type="checkbox" checked disabled />
+              <span>
+                <span class="account-cookie-option-title">Необходимые (технические)</span>
+                <span class="account-cookie-option-sub">Вход, настройки и безопасность. Отключить нельзя. Хранятся до 12 месяцев.</span>
+              </span>
+            </label>
+            <label class="account-cookie-option">
+              <input type="checkbox" id="accountCookieAnalytics" ${cookieConsent.analytics ? 'checked' : ''} />
+              <span>
+                <span class="account-cookie-option-title">Аналитические</span>
+                <span class="account-cookie-option-sub">Помогают понять, как вы используете Сервис. Хранятся до 12 месяцев.</span>
+              </span>
+            </label>
+            <label class="account-cookie-option">
+              <input type="checkbox" id="accountCookieMarketing" ${cookieConsent.marketing ? 'checked' : ''} />
+              <span>
+                <span class="account-cookie-option-title">Рекламные</span>
+                <span class="account-cookie-option-sub">Для персонализированной рекламы. Хранятся до 6 месяцев.</span>
+              </span>
+            </label>
+            <div class="account-cookie-actions">
+              <button id="accountCookieAcceptAll" class="btn" type="button">Принять все</button>
+              <button id="accountCookieAcceptNecessary" class="btn ghost" type="button">Только необходимые</button>
+              <button id="accountCookieSave" class="btn" type="button">Сохранить настройки</button>
+            </div>
+            <div id="accountCookieMsg" class="account-cookie-msg" hidden aria-live="polite">Настройки сохранены</div>
+          </div>
+          <div class="account-row account-row-danger">
+            <div class="account-row-main">
+              <div class="account-row-title">Удаление аккаунта</div>
+              <div class="account-row-sub">Аккаунт, анкета и переписки будут удалены. Персональные данные удаляются в течение 30 календарных дней, за исключением случаев, предусмотренных законодательством РФ. Восстановление невозможно.</div>
+            </div>
+            <button id="btnDeleteAccount" class="btn danger account-action" type="button">Удалить</button>
           </div>
         </section>
 
@@ -3028,17 +3145,6 @@ function renderAccountDialogBody() {
               <div class="account-row-sub">Завершить сеанс на этом устройстве</div>
             </div>
             <button id="btnAccountLogout" class="btn ghost account-action" type="button">Выйти</button>
-          </div>
-        </section>
-
-        <section class="account-section account-danger">
-          <div class="account-section-title">Опасная зона</div>
-          <div class="account-row">
-            <div class="account-row-main">
-              <div class="account-row-title">Удалить аккаунт</div>
-              <div class="account-row-sub">Уничтожение всех данных, включая анкету, переписки и согласия (152-ФЗ, ст. 21). Восстановление невозможно.</div>
-            </div>
-            <button id="btnDeleteAccount" class="btn danger account-action" type="button">Удалить</button>
           </div>
         </section>
       </div>
@@ -5881,7 +5987,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v261</div>
+        <div class="muted app-version">v262</div>
     </div>
   `;
 
