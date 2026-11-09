@@ -5991,7 +5991,7 @@ function renderDating() {
 ${visible.length
           ? `<div class="tinder-wrap" id="tinderWrap"></div>`
           : `<div class="tinder-wrap"><div class="tinder-empty"><div class="tinder-empty-text">Пока нет новых анкет. Приглашайте друзей в сервис — чем больше участников, тем больше шанс найти свою пару!</div>${feedReason ? `<div class="tinder-empty-reason">${escapeHtml(feedReason)}</div>` : ''}</div></div>`}
-        <div class="muted app-version">v263</div>
+        <div class="muted app-version">v264</div>
     </div>
   `;
 
@@ -6307,7 +6307,7 @@ function renderStats() {
       </div>
 
       <div class="card" style="margin-top:12px">
-        <button id="btnShareColleague" class="btn ghost" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block;font-size:13px">📨 Поделиться с коллегой</button>
+        <button id="btnShareColleague" class="btn ghost" type="button" style="width:100%;max-width:360px;margin:0 auto;display:block">📨 Поделиться с коллегой</button>
       </div>
 
       <div class="card" id="accountCard" style="margin-top:12px">
