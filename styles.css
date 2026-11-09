@@ -2919,6 +2919,19 @@ dialog.net-gate::backdrop {
 }
 .account-row-danger .account-row-title { color: #be123c; }
 .account-row-danger .account-row-sub { color: #9f1239; }
+.account-row-legal span { display: block; }
+.account-row-legal span + span { margin-top: 8px; }
+
+/* Юридический текст удаления длинный: на узких экранах не сжимаем его
+   в колонку рядом с кнопкой, а даём на всю ширину, кнопку переносим ниже. */
+@media (max-width: 430px) {
+  .account-row-danger {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .account-row-danger .account-row-main { flex: 1 1 100%; }
+  .account-row-danger .account-action { margin-left: auto; }
+}
 
 /* Встроенные настройки cookies внутри окна аккаунта: копия экрана из
    cookie-баннера, но без ухода с текущего экрана. */
